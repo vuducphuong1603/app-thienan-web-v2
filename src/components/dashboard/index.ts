@@ -1,0 +1,8 @@
+export { default as DashboardHeader } from './DashboardHeader'
+export { default as StatsCard } from './StatsCard'
+export { default as WeeklyCalendar } from './WeeklyCalendar'
+export { default as MyNotes } from './MyNotes'
+export { default as TodayActivity } from './TodayActivity'
+export { default as AttendanceChart } from './AttendanceChart'
+export { default as AlertsSection } from './AlertsSection'
+export { default as ClassStats } from './ClassStats'

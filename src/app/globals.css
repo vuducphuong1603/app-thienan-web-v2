@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Background & Foreground */
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Brand Colors */
+  --brand-1: #FA865E;
+  --brand-light: rgba(250, 134, 94, 0.48);
+
+  /* Primary Colors */
+  --primary-1: #8A8C90;
+  --primary-3: #666D80;
+  --primary-4: #E5E1DC;
+
+  /* Complementary Colors */
+  --complementary-1: #DF1C41;
+
+  /* Semantic Colors */
+  --white-0: #ffffff;
+  --black-1: #000000;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-inter-tight), var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+/* Custom checkbox styling */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--primary-4);
+  border-radius: 4.8px;
+  background-color: white;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+
+input[type="checkbox"]:checked {
+  background-color: var(--brand-1);
+  border-color: var(--brand-1);
+}
+
+input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+input[type="checkbox"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--brand-light);
+}
+
+/* Custom input styling */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="tel"] {
+  font-family: inherit;
+}
+
+input::placeholder {
+  color: var(--primary-1);
+}
+
+/* Smooth focus transitions for interactive elements */
+input, button, a {
+  transition: border-color 150ms ease-in-out,
+              box-shadow 150ms ease-in-out,
+              background-color 150ms ease-in-out,
+              color 150ms ease-in-out;
+}
+
+/* Disable outline and use box-shadow for focus */
+input:focus,
+button:focus {
+  outline: none;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-3);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
