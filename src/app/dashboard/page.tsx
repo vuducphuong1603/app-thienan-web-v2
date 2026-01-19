@@ -127,30 +127,33 @@ export default function UserDashboard() {
                 title="Giáo lý viên"
                 value={87}
                 icon="teacher"
+                chart="wave"
               />
             </div>
 
-            {/* Middle Section - Notes/Activity and Calendar */}
-            <div className="grid grid-cols-2 gap-4">
-              {/* Left Column - Notes and Today Activity stacked */}
-              <div className="space-y-4">
-                <MyNotes />
-                <TodayActivity />
+            {/* Main Content - Flex layout with sidebar */}
+            <div className="flex gap-4 items-start">
+              {/* Main 2-column grid */}
+              <div className="flex-1 grid grid-cols-[1.2fr_0.8fr] gap-4 items-start">
+                {/* Left Column - Notes, Activity, Attendance stacked */}
+                <div className="space-y-4">
+                  <MyNotes />
+                  <TodayActivity />
+                  <AttendanceChart />
+                </div>
+
+                {/* Right Column - Calendar and Alerts stacked */}
+                <div className="space-y-4">
+                  <WeeklyCalendar currentWeek={3} activitiesCount={3} />
+                  <AlertsSection />
+                </div>
               </div>
-              {/* Right Column - Weekly Calendar */}
-              <WeeklyCalendar currentWeek={3} activitiesCount={3} />
-            </div>
 
-            {/* Bottom Section - Attendance and Alerts */}
-            <div className="grid grid-cols-2 gap-4">
-              <AttendanceChart />
-              <AlertsSection />
+              {/* Right Sidebar - Class Stats */}
+              <div className="w-[500px] flex-shrink-0">
+                <ClassStats />
+              </div>
             </div>
-          </div>
-
-          {/* Right Sidebar - Class Stats */}
-          <div className="w-[260px] flex-shrink-0">
-            <ClassStats />
           </div>
         </div>
       </main>
