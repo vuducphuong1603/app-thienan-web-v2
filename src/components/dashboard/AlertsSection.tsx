@@ -32,7 +32,7 @@ const alerts: Alert[] = [
 
 export default function AlertsSection() {
   return (
-    <div className="bg-white rounded-[15px] border border-white/60 overflow-hidden">
+    <div className="bg-white rounded-[15px] border border-white/60 overflow-hidden h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">

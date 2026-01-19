@@ -25,7 +25,7 @@ export default function AttendanceChart() {
   }
 
   return (
-    <div className="bg-white rounded-2xl p-4 border border-gray-100 w-full">
+    <div className="bg-white rounded-2xl p-4 border border-gray-100 w-full h-full">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>

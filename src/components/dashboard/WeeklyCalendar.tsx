@@ -45,7 +45,7 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
   const circumference = 2 * Math.PI * radius
 
   return (
-    <div className="bg-white rounded-2xl p-5 border border-gray-100">
+    <div className="bg-white rounded-2xl p-5 border border-gray-100 h-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-base font-semibold text-black">Kế hoạch tuần này</h3>

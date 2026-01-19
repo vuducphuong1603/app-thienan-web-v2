@@ -10,7 +10,6 @@ import {
   StatsCard,
   WeeklyCalendar,
   MyNotes,
-  TodayActivity,
   AttendanceChart,
   AlertsSection,
   ClassStats,
@@ -70,8 +69,8 @@ export default function UserDashboard() {
       />
 
       {/* Main Content */}
-      <main className="p-5">
-        <div className="space-y-5">
+      <main className="p-4">
+        <div className="space-y-4">
           {/* Welcome Section */}
           <div className="flex items-center justify-between">
             <div>
@@ -101,7 +100,7 @@ export default function UserDashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-4 gap-3">
             <StatsCard
               title="Tổng số ngành"
               value={4}
@@ -129,22 +128,17 @@ export default function UserDashboard() {
             />
           </div>
 
-          {/* Middle & Bottom Section - 3 columns, 2 rows layout */}
-          <div className="grid grid-cols-3 grid-rows-2 gap-4">
-            {/* Row 1, Col 1 - Notes and Today Activity */}
-            <div className="space-y-4">
-              <MyNotes />
-              <TodayActivity />
-            </div>
-            {/* Row 1, Col 2 - Weekly Calendar */}
+          {/* Middle & Bottom Section */}
+          <div className="grid grid-cols-[1fr_1fr_320px] grid-rows-[310px_330px] gap-3">
+            {/* Row 1: MyNotes, WeeklyCalendar */}
+            <MyNotes />
             <WeeklyCalendar currentWeek={3} activitiesCount={3} />
-            {/* Row 1-2, Col 3 - Class Stats spans 2 rows */}
-            <div className="row-span-2">
+            {/* ClassStats spans 2 rows */}
+            <div className="row-span-2 h-full">
               <ClassStats />
             </div>
-            {/* Row 2, Col 1 - Attendance Chart */}
+            {/* Row 2: AttendanceChart, AlertsSection */}
             <AttendanceChart />
-            {/* Row 2, Col 2 - Alerts Section */}
             <AlertsSection />
           </div>
         </div>

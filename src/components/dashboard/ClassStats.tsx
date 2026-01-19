@@ -270,7 +270,7 @@ function LineChart() {
 
 export default function ClassStats() {
   return (
-    <div className="bg-white rounded-[15px] p-4 border border-white/60 h-full flex flex-col">
+    <div className="bg-white rounded-[15px] p-4 border border-gray-100 flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">

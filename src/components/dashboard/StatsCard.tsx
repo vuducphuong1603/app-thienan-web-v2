@@ -249,10 +249,10 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
 
   return (
     <div
-      className={`rounded-2xl p-5 h-[120px] flex flex-col justify-between ${
+      className={`rounded-[15px] p-4 h-[120px] flex flex-col justify-between ${
         isPrimary
           ? 'bg-brand text-white'
-          : 'bg-white border border-gray-100/60 shadow-sm'
+          : 'bg-white border border-gray-100'
       }`}
     >
       {/* Top row: Title and Icon */}

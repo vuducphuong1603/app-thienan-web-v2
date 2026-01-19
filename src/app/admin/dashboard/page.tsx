@@ -11,7 +11,6 @@ import {
   StatsCard,
   WeeklyCalendar,
   MyNotes,
-  TodayActivity,
   AttendanceChart,
   AlertsSection,
   ClassStats,
@@ -185,10 +184,9 @@ export default function AdminDashboard() {
 
           {/* Middle & Bottom Section - 3 columns, 2 rows layout */}
           <div className="grid grid-cols-3 grid-rows-2 gap-4">
-            {/* Row 1, Col 1 - Notes and Today Activity */}
+            {/* Row 1, Col 1 - Notes */}
             <div className="space-y-4">
               <MyNotes />
-              <TodayActivity />
             </div>
             {/* Row 1, Col 2 - Weekly Calendar */}
             <WeeklyCalendar currentWeek={3} activitiesCount={3} />
