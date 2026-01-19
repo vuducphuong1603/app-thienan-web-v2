@@ -32,7 +32,7 @@ export default function UserDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <svg className="animate-spin h-8 w-8 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -61,7 +61,7 @@ export default function UserDashboard() {
   const firstName = user.full_name?.split(' ').pop() || user.full_name
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
       <DashboardHeader
         userName={firstName || 'User'}
@@ -71,89 +71,81 @@ export default function UserDashboard() {
 
       {/* Main Content */}
       <main className="p-5">
-        <div className="flex gap-5">
-          {/* Left Content - Main Area */}
-          <div className="flex-1 space-y-5 min-w-0">
-            {/* Welcome Section */}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Chúc ngày tốt lành</p>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Chào mừng, {firstName}. <span className="inline-block animate-wave">👋</span>
-                </h1>
-              </div>
-              <div className="flex items-center gap-3">
-                {/* Date Display */}
-                <div className="flex items-center gap-2">
-                  <span className="text-4xl font-bold text-gray-900">{dayOfMonth}</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{formattedDayOfWeek},</p>
-                    <p className="text-sm text-gray-500">{month}</p>
-                  </div>
-                </div>
-                {/* Notification Button */}
-                <button className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl hover:bg-orange-500 transition-colors">
-                  <span className="text-sm font-medium">Xem thông báo</span>
-                </button>
-                {/* Calendar Button */}
-                <button className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-colors">
-                  <Calendar className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
+        <div className="space-y-5">
+          {/* Welcome Section */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Chúc ngày tốt lành</p>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Chào mừng, {firstName}. <span className="inline-block animate-wave">👋</span>
+              </h1>
             </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-4 gap-4">
-              <StatsCard
-                title="Tổng số ngành"
-                value={4}
-                icon="branch"
-                variant="primary"
-                chart="line"
-              />
-              <StatsCard
-                title="Tổng số lớp"
-                value={42}
-                icon="class"
-                chart="bar"
-              />
-              <StatsCard
-                title="Tổng thiếu nhi"
-                value={1364}
-                icon="student"
-                chart="people"
-              />
-              <StatsCard
-                title="Giáo lý viên"
-                value={87}
-                icon="teacher"
-                chart="wave"
-              />
-            </div>
-
-            {/* Main Content - Flex layout with sidebar */}
-            <div className="flex gap-4 items-start">
-              {/* Main 2-column grid */}
-              <div className="flex-1 grid grid-cols-[1.2fr_0.8fr] gap-4 items-start">
-                {/* Left Column - Notes, Activity, Attendance stacked */}
-                <div className="space-y-4">
-                  <MyNotes />
-                  <TodayActivity />
-                  <AttendanceChart />
-                </div>
-
-                {/* Right Column - Calendar and Alerts stacked */}
-                <div className="space-y-4">
-                  <WeeklyCalendar currentWeek={3} activitiesCount={3} />
-                  <AlertsSection />
+            <div className="flex items-center gap-3">
+              {/* Date Display */}
+              <div className="flex items-center gap-2">
+                <span className="text-4xl font-bold text-gray-900">{dayOfMonth}</span>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{formattedDayOfWeek},</p>
+                  <p className="text-sm text-gray-500">{month}</p>
                 </div>
               </div>
-
-              {/* Right Sidebar - Class Stats */}
-              <div className="w-[500px] flex-shrink-0">
-                <ClassStats />
-              </div>
+              {/* Notification Button */}
+              <button className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl hover:bg-orange-500 transition-colors">
+                <span className="text-sm font-medium">Xem thông báo</span>
+              </button>
+              {/* Calendar Button */}
+              <button className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-colors">
+                <Calendar className="w-5 h-5 text-gray-600" />
+              </button>
             </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-4 gap-4">
+            <StatsCard
+              title="Tổng số ngành"
+              value={4}
+              icon="branch"
+              variant="primary"
+              chart="line"
+            />
+            <StatsCard
+              title="Tổng số lớp"
+              value={42}
+              icon="class"
+              chart="bar"
+            />
+            <StatsCard
+              title="Tổng thiếu nhi"
+              value={1364}
+              icon="student"
+              chart="people"
+            />
+            <StatsCard
+              title="Giáo lý viên"
+              value={87}
+              icon="teacher"
+              chart="wave"
+            />
+          </div>
+
+          {/* Middle & Bottom Section - 3 columns, 2 rows layout */}
+          <div className="grid grid-cols-3 grid-rows-2 gap-4">
+            {/* Row 1, Col 1 - Notes and Today Activity */}
+            <div className="space-y-4">
+              <MyNotes />
+              <TodayActivity />
+            </div>
+            {/* Row 1, Col 2 - Weekly Calendar */}
+            <WeeklyCalendar currentWeek={3} activitiesCount={3} />
+            {/* Row 1-2, Col 3 - Class Stats spans 2 rows */}
+            <div className="row-span-2">
+              <ClassStats />
+            </div>
+            {/* Row 2, Col 1 - Attendance Chart */}
+            <AttendanceChart />
+            {/* Row 2, Col 2 - Alerts Section */}
+            <AlertsSection />
           </div>
         </div>
       </main>

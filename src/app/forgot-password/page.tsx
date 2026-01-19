@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { Lock, FileText, HelpCircle, KeyRound } from 'lucide-react'
 import Link from 'next/link'
-import Image from 'next/image'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -46,17 +45,6 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen w-full relative overflow-hidden flex flex-col">
-      {/* Background Image - Full Screen */}
-      <div className="absolute inset-0 z-0">
-        <Image
-          src="/images/background.png"
-          alt="Background"
-          fill
-          className="object-cover"
-          priority
-        />
-      </div>
-
       {/* Header */}
       <header className="w-full px-8 py-6 flex items-center gap-3 relative z-10">
         <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-brand to-orange-400">

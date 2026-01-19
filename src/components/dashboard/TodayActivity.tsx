@@ -20,7 +20,6 @@ const activities: Activity[] = [
     location: 'Phòng A2',
     className: 'Lớp Ấu nhi',
     status: 'in_progress',
-    image: '/images/teaching.jpg',
   },
 ]
 

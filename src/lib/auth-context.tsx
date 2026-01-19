@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select('*')
         .eq('phone', normalizedIdentifier)
         .eq('password', password)
-        .single()
+        .maybeSingle()
 
       if (phoneResult.data) {
         data = phoneResult.data
@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select('*')
           .eq('email', normalizedIdentifier)
           .eq('password', password)
-          .single()
+          .maybeSingle()
 
         if (emailResult.data) {
           data = emailResult.data
@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .select('*')
             .eq('username', normalizedIdentifier)
             .eq('password', password)
-            .single()
+            .maybeSingle()
 
           if (usernameResult.data) {
             data = usernameResult.data
@@ -168,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('users')
         .select('id')
         .eq('username', username.trim())
-        .single()
+        .maybeSingle()
 
       if (existingUsername) {
         return { success: false, error: 'Tên đăng nhập đã tồn tại' }
@@ -179,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('users')
         .select('id')
         .eq('email', email.trim().toLowerCase())
-        .single()
+        .maybeSingle()
 
       if (existingEmail) {
         return { success: false, error: 'Email đã được sử dụng' }

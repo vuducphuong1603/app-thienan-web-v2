@@ -27,8 +27,20 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className={`${inter.variable} ${interTight.variable} font-sans antialiased`} suppressHydrationWarning>
+        {/* Background Image - Global */}
+        <div
+          className="fixed inset-0 z-0"
+          style={{
+            backgroundImage: 'url(/images/background.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
         <AuthProvider>
-          {children}
+          <div className="relative z-10 min-h-screen">
+            {children}
+          </div>
         </AuthProvider>
       </body>
     </html>
