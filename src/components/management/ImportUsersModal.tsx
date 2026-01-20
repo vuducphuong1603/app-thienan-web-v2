@@ -28,16 +28,6 @@ interface ImportResult {
   errors: string[]
 }
 
-// Branch mapping based on class code prefix
-const getBranchFromClassCode = (classCode: string): string => {
-  const code = classCode.toUpperCase()
-  if (code.startsWith('KT') || code.includes('CHIEN') || code.includes('KHAI')) return 'Chien'
-  if (code.startsWith('AU') || code.includes('AU')) return 'Au nhi'
-  if (code.startsWith('TS') || code.includes('THIEU')) return 'Thieu nhi'
-  if (code.startsWith('HS') || code.includes('NGHIA') || code.includes('HIEP')) return 'Nghia si'
-  return 'Chua xac dinh'
-}
-
 export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportUsersModalProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -186,7 +176,6 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
             }
           } else {
             // Insert new user
-            const branch = getBranchFromClassCode(user.class_code)
             const { error } = await supabase
               .from('users')
               .insert({

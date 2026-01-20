@@ -24,13 +24,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 // Routes that don't require authentication
 const publicRoutes = ['/login', '/register', '/forgot-password']
 
-// Role-based route access
-const roleRoutes: Record<UserRole, string[]> = {
-  admin: ['/admin', '/dashboard'],
-  phan_doan_truong: ['/dashboard'],
-  giao_ly_vien: ['/dashboard'],
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -191,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Create new user
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('users')
         .insert({
           username: username.trim(),

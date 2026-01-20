@@ -10,7 +10,7 @@ interface DeleteUserModalProps {
   userName?: string
 }
 
-export default function DeleteUserModal({ isOpen, onClose, onConfirm, userName }: DeleteUserModalProps) {
+export default function DeleteUserModal({ isOpen, onClose, onConfirm }: DeleteUserModalProps) {
   const [isDeleting, setIsDeleting] = useState(false)
 
   const handleDelete = async () => {

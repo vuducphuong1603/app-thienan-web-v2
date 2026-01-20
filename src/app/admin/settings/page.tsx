@@ -905,7 +905,6 @@ export default function SettingsPage() {
 
   // Render School Year Content
   const renderSchoolYearContent = () => {
-    const displayYear = isEditingSchoolYear ? schoolYearForm : currentSchoolYear
     const startDate = isEditingSchoolYear ? schoolYearForm.startDate : currentSchoolYear?.start_date
     const endDate = isEditingSchoolYear ? schoolYearForm.endDate : currentSchoolYear?.end_date
     const totalWeeks = startDate && endDate ? calculateTotalWeeks(startDate, endDate) : currentSchoolYear?.total_weeks || 0

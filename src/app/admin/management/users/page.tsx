@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, UserProfile, UserRole, ROLE_LABELS } from '@/lib/supabase'
-import { Search, ChevronDown, FileSpreadsheet, Plus, Edit2, KeyRound, Trash2, X, Check } from 'lucide-react'
+import { Search, ChevronDown, FileSpreadsheet, Plus, Edit2, KeyRound, Trash2, X } from 'lucide-react'
 import Image from 'next/image'
-import ImportUsersModal from '@/components/management/ImportUsersModal'
+// import ImportUsersModal from '@/components/management/ImportUsersModal'
 import DeleteUserModal from '@/components/management/DeleteUserModal'
 import ResetPasswordModal from '@/components/management/ResetPasswordModal'
 import AddUserForm from '@/components/management/AddUserForm'
@@ -40,7 +40,7 @@ export default function UsersPage() {
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false)
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false)
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false)
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  // const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false)

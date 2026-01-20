@@ -10,7 +10,7 @@ interface ResetPasswordModalProps {
   userName?: string
 }
 
-export default function ResetPasswordModal({ isOpen, onClose, onConfirm, userName }: ResetPasswordModalProps) {
+export default function ResetPasswordModal({ isOpen, onClose, onConfirm }: ResetPasswordModalProps) {
   const [isResetting, setIsResetting] = useState(false)
 
   const handleReset = async () => {

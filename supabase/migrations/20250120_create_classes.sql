@@ -65,3 +65,4 @@ INSERT INTO classes (name, branch, display_order) VALUES
   ('Nghĩa 3', 'Nghĩa Sĩ', 39),
   ('Hiệp Sĩ 1', 'Nghĩa Sĩ', 40),
   ('Hiệp Sĩ 2', 'Nghĩa Sĩ', 41);
+  

@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
 
       // Show success message
       setSuccess(true)
-    } catch (err) {
+    } catch {
       setError('Gửi email thất bại. Vui lòng thử lại.')
       setIsLoading(false)
     }
