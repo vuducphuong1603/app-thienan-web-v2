@@ -47,7 +47,49 @@ export default function ClassesPage() {
         .select('id, full_name, saint_name, class_id, class_name')
         .eq('role', 'giao_ly_vien')
 
-      // Map teachers to classes
+      // Fetch student count per class from thieu_nhi table
+      // Note: Supabase has server-side row limit, need to paginate
+      const allStudents: { id: string; class_id: string | null }[] = []
+      const pageSize = 1000
+      let page = 0
+      let hasMore = true
+
+      while (hasMore) {
+        const from = page * pageSize
+        const to = from + pageSize - 1
+        const { data: pageData } = await supabase
+          .from('thieu_nhi')
+          .select('id, class_id')
+          .range(from, to)
+
+        if (pageData && pageData.length > 0) {
+          allStudents.push(...pageData)
+          page++
+          hasMore = pageData.length === pageSize
+        } else {
+          hasMore = false
+        }
+      }
+
+      // Count students per class_id
+      const studentCountByClass: Record<string, number> = {}
+      let totalWithClassId = 0
+      let totalWithoutClassId = 0
+      allStudents.forEach((student) => {
+        if (student.class_id) {
+          studentCountByClass[student.class_id] = (studentCountByClass[student.class_id] || 0) + 1
+          totalWithClassId++
+        } else {
+          totalWithoutClassId++
+        }
+      })
+      console.log('DEBUG Classes page:')
+      console.log('- Total students fetched:', allStudents.length)
+      console.log('- Students with class_id:', totalWithClassId)
+      console.log('- Students without class_id:', totalWithoutClassId)
+      console.log('- Student count by class:', studentCountByClass)
+
+      // Map teachers and student counts to classes
       const classesWithDetails: ClassWithDetails[] = (classesData || []).map((cls) => {
         const classTeachers = (usersData || [])
           .filter((user) => user.class_id === cls.id || user.class_name === cls.name)
@@ -56,7 +98,7 @@ export default function ClassesPage() {
         return {
           ...cls,
           teachers: classTeachers,
-          student_count: Math.floor(Math.random() * 50) + 20, // Placeholder - will be replaced with actual data
+          student_count: studentCountByClass[cls.id] || 0,
         }
       })
 

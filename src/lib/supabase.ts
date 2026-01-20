@@ -51,6 +51,7 @@ export interface Class {
 // Thiếu nhi profile (đối tượng được quản lý)
 export interface ThieuNhiProfile {
   id: string
+  student_code?: string
   full_name: string
   saint_name?: string
   date_of_birth?: string
@@ -62,6 +63,13 @@ export interface ThieuNhiProfile {
   status: 'ACTIVE' | 'INACTIVE'
   avatar_url?: string
   notes?: string
+  // Score fields
+  score_45_hk1?: number
+  score_exam_hk1?: number
+  score_45_hk2?: number
+  score_exam_hk2?: number
+  attendance_thu5?: number
+  attendance_cn?: number
   created_at: string
   updated_at?: string
 }

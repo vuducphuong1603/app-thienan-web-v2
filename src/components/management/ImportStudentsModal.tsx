@@ -3,25 +3,23 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download, ChevronLeft } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { supabase, UserRole, ROLE_LABELS, Class } from '@/lib/supabase'
+import { supabase, Class } from '@/lib/supabase'
 
-interface ImportUsersModalProps {
+interface ImportStudentsModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
 }
 
-interface ParsedUser {
-  username: string
+interface ParsedStudent {
+  student_code: string
   saint_name: string
   full_name: string
   date_of_birth?: string
-  class_name: string
-  class_code: string
-  branch: string
-  role: UserRole
   address: string
-  phone: string
+  parent_phone: string
+  parent_phone_2: string
+  class_name: string
   isValid: boolean
   errors: string[]
   warnings: string[]
@@ -37,27 +35,8 @@ function excelSerialToDate(serial: number): string | undefined {
   return date_info.toISOString().split('T')[0]
 }
 
-// Helper function to determine branch from class name
-function getBranchFromClassName(className: string): string {
-  const upperClassName = className?.toUpperCase() || ''
-  if (upperClassName.includes('CHIÊN') || upperClassName.includes('CC')) return 'Chiên Con'
-  if (upperClassName.includes('ẤU') || upperClassName.includes('AU')) return 'Ấu Nhi'
-  if (upperClassName.includes('THIẾU') || upperClassName.startsWith('TS')) return 'Thiếu Nhi'
-  if (upperClassName.includes('NGHĨA') || upperClassName.startsWith('NS')) return 'Nghĩa Sĩ'
-  if (upperClassName.includes('HIỆP') || upperClassName.startsWith('HS')) return 'Hiệp Sĩ'
-  return 'Ấu Nhi' // Default
-}
-
-// Helper function to map role from notes
-function getRoleFromNotes(notes: string): UserRole {
-  const lowerNotes = notes?.toLowerCase() || ''
-  if (lowerNotes.includes('admin') || lowerNotes.includes('điều hành') || lowerNotes.includes('ban dieu hanh')) return 'admin'
-  if (lowerNotes.includes('phân đoàn') || lowerNotes.includes('phan doan') || lowerNotes.includes('pdt')) return 'phan_doan_truong'
-  return 'giao_ly_vien' // Default role for GLV
-}
-
 // Helper function to format phone number
-function formatPhone(phone: string | number): string {
+function formatPhone(phone: string | number | null | undefined): string {
   if (!phone) return ''
   let phoneStr = String(phone).replace(/\D/g, '')
   // Add leading 0 if missing (Vietnamese phone numbers)
@@ -68,7 +47,6 @@ function formatPhone(phone: string | number): string {
 }
 
 // Helper function to normalize class name for matching
-// Converts "ẤU 1A", "Ấu 1A", "AU 1A" all to "au1a" for comparison
 function normalizeClassName(name: string): string {
   if (!name) return ''
   return name
@@ -81,9 +59,9 @@ function normalizeClassName(name: string): string {
     .trim()
 }
 
-export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportUsersModalProps) {
+export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: ImportStudentsModalProps) {
   const [step, setStep] = useState<'upload' | 'preview' | 'importing' | 'result'>('upload')
-  const [parsedData, setParsedData] = useState<ParsedUser[]>([])
+  const [parsedData, setParsedData] = useState<ParsedStudent[]>([])
   const [importResult, setImportResult] = useState<{ success: number; failed: number; skipped: number; errors: string[] }>({
     success: 0,
     failed: 0,
@@ -158,40 +136,36 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
         const data = new Uint8Array(e.target?.result as ArrayBuffer)
         const workbook = XLSX.read(data, { type: 'array' })
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as (string | number)[][]
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as (string | number | null)[][]
 
-        // Parse data - skip header rows (row 0 and 1), data starts from row 2
-        // Excel structure from "DS GLV 2025-2026.xlsx":
-        // Col 0: MÃ GLV, Col 1: Tên thánh, Col 2: Họ, Col 3: Tên,
-        // Col 4: Năm sinh (Excel serial), Col 5: LỚP, Col 6: MÃ LỚP,
-        // Col 7: Ghi chú, Col 8: Địa chỉ, Col 9: Điện thoại
-        const users: ParsedUser[] = []
-        for (let i = 2; i < jsonData.length; i++) {
+        // Parse data - skip header row (row 0), data starts from row 1
+        // Excel structure from "DS tổng thiếu nhi 2025.xlsx":
+        // Col 0: STT, Col 1: Mã TN, Col 2: TÊN THÁNH, Col 3: HỌ VÀ TÊN (Họ), Col 4: (Tên)
+        // Col 5: NGÀY SINH (Excel serial), Col 6: ĐỊA CHỈ, Col 7: SĐT 1, Col 8: SĐT 2, Col 9: LỚP
+
+        const students: ParsedStudent[] = []
+        for (let i = 1; i < jsonData.length; i++) {
           const row = jsonData[i]
           if (!row || row.length < 2) continue // Skip empty rows
 
-          // Check if the first column has data (MÃ GLV)
-          const username = String(row[0] || '').trim()
-          if (!username) continue // Skip rows without username
+          // Check if the second column has data (Mã TN)
+          const studentCode = String(row[1] || '').trim()
+          if (!studentCode) continue // Skip rows without student code
 
           const errors: string[] = []
           const warnings: string[] = []
-          const saintName = String(row[1] || '').trim()
-          const lastName = String(row[2] || '').trim()
-          const firstName = String(row[3] || '').trim()
+          const saintName = String(row[2] || '').trim()
+          const lastName = String(row[3] || '').trim()
+          const firstName = String(row[4] || '').trim()
           const fullName = `${lastName} ${firstName}`.trim()
-          const dateOfBirth = typeof row[4] === 'number' ? excelSerialToDate(row[4]) : undefined
-          const className = String(row[5] || '').trim()
-          const classCode = String(row[6] || '').trim()
-          const notes = String(row[7] || '').trim()
-          const address = String(row[8] || '').trim()
-          const phone = formatPhone(row[9])
+          const dateOfBirth = typeof row[5] === 'number' ? excelSerialToDate(row[5]) : undefined
+          const address = String(row[6] || '').trim()
+          const phone1 = formatPhone(row[7])
+          const phone2 = formatPhone(row[8])
+          const className = String(row[9] || '').trim()
 
-          // Validation - only full_name is required, phone is optional
+          // Validation - only full_name is required
           if (!fullName || fullName === ' ') errors.push('Thiếu họ tên')
-
-          const branch = getBranchFromClassName(className)
-          const role = getRoleFromNotes(notes)
 
           // Check if class exists in database
           const classMatched = className ? classes.some(cls =>
@@ -203,17 +177,15 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
             warnings.push(`Không tìm thấy lớp "${className}"`)
           }
 
-          users.push({
-            username,
+          students.push({
+            student_code: studentCode,
             saint_name: saintName,
             full_name: fullName,
             date_of_birth: dateOfBirth,
-            class_name: className,
-            class_code: classCode,
-            branch,
-            role,
             address,
-            phone,
+            parent_phone: phone1,
+            parent_phone_2: phone2,
+            class_name: className,
             isValid: errors.length === 0,
             errors,
             warnings,
@@ -221,12 +193,12 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
           })
         }
 
-        if (users.length === 0) {
+        if (students.length === 0) {
           alert('Không tìm thấy dữ liệu trong file. Vui lòng kiểm tra lại định dạng file.')
           return
         }
 
-        setParsedData(users)
+        setParsedData(students)
         setStep('preview')
       } catch (error) {
         console.error('Error parsing Excel file:', error)
@@ -256,57 +228,51 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
 
   const handleImport = async () => {
     setStep('importing')
-    const validUsers = parsedData.filter(u => u.isValid)
+    const validStudents = parsedData.filter(s => s.isValid)
     let success = 0
     let skipped = 0
     let failed = 0
     const errors: string[] = []
 
-    for (const user of validUsers) {
+    for (const student of validStudents) {
       try {
-        // Check if username already exists - skip if exists
-        const { data: existingByUsername } = await supabase
-          .from('users')
+        // Check if student with same full_name and date_of_birth already exists - skip if exists
+        const { data: existing } = await supabase
+          .from('thieu_nhi')
           .select('id')
-          .eq('username', user.username)
+          .eq('full_name', student.full_name)
+          .eq('saint_name', student.saint_name || '')
           .maybeSingle()
 
-        if (existingByUsername) {
-          // Skip existing user
+        if (existing) {
+          // Skip existing student
           skipped++
           continue
         }
 
-        // Insert new user (phone can be null, email auto-generated from username)
-        const autoEmail = `${user.username.toLowerCase()}@thienan.local`
-
         // Lookup class UUID by matching class name
-        const classUuid = findClassId(user.class_name)
+        const classUuid = findClassId(student.class_name)
 
-        const { error } = await supabase.from('users').insert({
-          username: user.username,
-          email: autoEmail,
-          full_name: user.full_name,
-          saint_name: user.saint_name || null,
-          phone: user.phone || null,
-          address: user.address || null,
-          role: user.role,
-          branch: user.branch,
-          class_id: classUuid, // Now stores actual UUID instead of class_code
-          class_name: user.class_name || null,
-          status: 'ACTIVE',
-          password: '123456' // Default password
+        const { error } = await supabase.from('thieu_nhi').insert({
+          student_code: student.student_code || null,
+          full_name: student.full_name,
+          saint_name: student.saint_name || null,
+          date_of_birth: student.date_of_birth || null,
+          address: student.address || null,
+          parent_phone: student.parent_phone || null,
+          class_id: classUuid,
+          status: 'ACTIVE'
         })
 
         if (error) {
           failed++
-          errors.push(`${user.username}: ${error.message}`)
+          errors.push(`${student.full_name}: ${error.message}`)
         } else {
           success++
         }
       } catch (err) {
         failed++
-        errors.push(`${user.username}: Lỗi không xác định`)
+        errors.push(`${student.full_name}: Lỗi không xác định`)
       }
     }
 
@@ -317,37 +283,36 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
   const handleDownloadTemplate = () => {
     // Create a template workbook matching the expected format
     const templateData = [
-      ['MÃ GLV', 'GLV PHỤ TRÁCH', '', '', 'Năm sinh', 'LỚP', 'MÃ LỚP', 'Ghi chú', 'Địa chỉ', 'Điện thoại'],
-      ['', 'Tên thánh', 'Họ', 'Tên', '', '', '', '', '', ''],
-      ['GLV001', 'Phaolo', 'Nguyễn Văn', 'An', '', 'ẤU 1A', 'AU1A', 'Huynh trưởng', '123 Đường ABC, Quận XYZ', '0901234567'],
-      ['GLV002', 'Maria', 'Trần Thị', 'Bình', '', 'THIẾU 2B', 'TS2B', 'Giáo lý viên', '456 Đường DEF, Quận UVW', '0912345678'],
+      ['STT', 'Mã TN', 'TÊN THÁNH', 'HỌ VÀ TÊN', '', 'NGÀY SINH', 'ĐỊA CHỈ', 'SĐT 1', 'SĐT 2', 'LỚP'],
+      [1, 'HA172336', 'Têrêsa Avila', 'Hoàng Nguyễn Khả', 'Ái', '', '102/52 Bình Long, Phú Thạnh', '0906417493', '0906417492', 'Ấu 2B'],
+      [2, 'BA152253', 'Maria', 'Bùi Đặng Gia', 'An', '', '72 Đường số 13A, BHH, Bình Tân', '0939811068', '', 'Thiếu 1C'],
     ]
 
     const ws = XLSX.utils.aoa_to_sheet(templateData)
 
     // Set column widths
     ws['!cols'] = [
-      { wch: 10 }, // MÃ GLV
-      { wch: 12 }, // Tên thánh
+      { wch: 5 },  // STT
+      { wch: 12 }, // Mã TN
+      { wch: 15 }, // Tên thánh
       { wch: 15 }, // Họ
       { wch: 10 }, // Tên
-      { wch: 12 }, // Năm sinh
-      { wch: 12 }, // LỚP
-      { wch: 10 }, // MÃ LỚP
-      { wch: 15 }, // Ghi chú
+      { wch: 12 }, // Ngày sinh
       { wch: 35 }, // Địa chỉ
-      { wch: 12 }, // Điện thoại
+      { wch: 12 }, // SĐT 1
+      { wch: 12 }, // SĐT 2
+      { wch: 12 }, // Lớp
     ]
 
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'DS GLV')
-    XLSX.writeFile(wb, 'Template_Import_GLV.xlsx')
+    XLSX.utils.book_append_sheet(wb, ws, 'DS Thiếu Nhi')
+    XLSX.writeFile(wb, 'Template_Import_ThieuNhi.xlsx')
   }
 
   if (!isOpen) return null
 
-  const validCount = parsedData.filter(u => u.isValid).length
-  const invalidCount = parsedData.filter(u => !u.isValid).length
+  const validCount = parsedData.filter(s => s.isValid).length
+  const invalidCount = parsedData.filter(s => !s.isValid).length
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -368,7 +333,7 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
               </button>
             )}
             <h2 className="text-lg font-semibold text-black">
-              {step === 'upload' && 'Import danh sách Giáo lý viên'}
+              {step === 'upload' && 'Import danh sách Thiếu Nhi'}
               {step === 'preview' && 'Xem trước dữ liệu'}
               {step === 'importing' && 'Đang import...'}
               {step === 'result' && 'Kết quả import'}
@@ -442,19 +407,19 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
                 <ul className="text-xs text-primary-3 space-y-1.5">
                   <li className="flex items-start gap-2">
                     <span className="mt-1.5 w-1 h-1 rounded-full bg-primary-3 flex-shrink-0" />
-                    <span>Dòng 1-2 là header, dữ liệu bắt đầu từ dòng 3</span>
+                    <span>Dòng 1 là header, dữ liệu bắt đầu từ dòng 2</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-1.5 w-1 h-1 rounded-full bg-primary-3 flex-shrink-0" />
-                    <span>Cột bắt buộc: MÃ GLV, Họ & Tên (SĐT không bắt buộc)</span>
+                    <span>Cột bắt buộc: Mã TN, Họ & Tên</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-1.5 w-1 h-1 rounded-full bg-primary-3 flex-shrink-0" />
-                    <span>Mật khẩu mặc định: 123456</span>
+                    <span>Nếu thiếu nhi đã tồn tại (trùng tên + tên thánh) sẽ được bỏ qua</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-1.5 w-1 h-1 rounded-full bg-primary-3 flex-shrink-0" />
-                    <span>Nếu MÃ GLV đã tồn tại trong hệ thống sẽ được bỏ qua</span>
+                    <span>Điểm số sẽ được nhập riêng sau</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-1.5 w-1 h-1 rounded-full bg-brand flex-shrink-0" />
@@ -482,8 +447,8 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
                   </div>
                 )}
                 {(() => {
-                  const classMatchedCount = parsedData.filter(u => u.classMatched).length
-                  const classNotMatchedCount = parsedData.filter(u => u.class_name && !u.classMatched).length
+                  const classMatchedCount = parsedData.filter(s => s.classMatched).length
+                  const classNotMatchedCount = parsedData.filter(s => s.class_name && !s.classMatched).length
                   return (
                     <>
                       {classMatchedCount > 0 && (
@@ -505,44 +470,39 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
               </div>
 
               {/* Data Table */}
-              <div className="overflow-hidden">
+              <div className="border border-[#E5E1DC] rounded-xl overflow-hidden">
                 <div className="overflow-x-auto max-h-[400px]">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0">
-                      <tr>
-                        <th colSpan={9} className="p-0">
-                          <div className="flex items-center bg-[#E5E1DC] rounded-[15px] h-12 border border-white/60">
-                            <span className="px-3 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap w-[50px]">#</span>
-                            <span className="px-3 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap flex-1">Mã GLV</span>
-                            <span className="px-3 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap flex-1">Tên thánh</span>
-                            <span className="px-3 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap flex-1">Họ tên</span>
-                            <span className="px-3 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap flex-1">Ngành</span>
-                            <span className="px-3 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap flex-1">Lớp</span>
-                            <span className="px-3 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap flex-1">Vai trò</span>
-                            <span className="px-3 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap flex-1">SĐT</span>
-                            <span className="px-3 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap flex-1">Trạng thái</span>
-                          </div>
-                        </th>
+                      <tr className="bg-[#FAFAFA] border-b border-[#E5E1DC]">
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">#</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Mã TN</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Tên thánh</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Họ tên</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Ngày sinh</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Lớp</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">SĐT 1</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Trạng thái</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#E5E1DC]">
-                      {parsedData.map((user, index) => (
-                        <tr key={index} className={user.isValid ? 'bg-white hover:bg-gray-50' : 'bg-[#FFF5F5]'}>
+                      {parsedData.map((student, index) => (
+                        <tr key={index} className={student.isValid ? 'bg-white hover:bg-gray-50' : 'bg-[#FFF5F5]'}>
                           <td className="px-3 py-2 text-primary-3">{index + 1}</td>
-                          <td className="px-3 py-2 font-medium">{user.username}</td>
-                          <td className="px-3 py-2">{user.saint_name || '-'}</td>
-                          <td className="px-3 py-2">{user.full_name}</td>
-                          <td className="px-3 py-2">
-                            <span className="text-brand font-medium">{user.branch}</span>
+                          <td className="px-3 py-2 font-medium">{student.student_code}</td>
+                          <td className="px-3 py-2">{student.saint_name || '-'}</td>
+                          <td className="px-3 py-2">{student.full_name}</td>
+                          <td className="px-3 py-2 text-xs">
+                            {student.date_of_birth ? new Date(student.date_of_birth).toLocaleDateString('vi-VN') : '-'}
                           </td>
                           <td className="px-3 py-2 text-xs">
-                            {user.class_name ? (
+                            {student.class_name ? (
                               <span
-                                className={`flex items-center gap-1 ${user.classMatched ? 'text-[#2E7D32]' : 'text-[#F57C00]'}`}
-                                title={user.classMatched ? 'Đã liên kết lớp' : 'Chưa tìm thấy lớp trong hệ thống'}
+                                className={`flex items-center gap-1 ${student.classMatched ? 'text-[#2E7D32]' : 'text-[#F57C00]'}`}
+                                title={student.classMatched ? 'Đã liên kết lớp' : 'Chưa tìm thấy lớp trong hệ thống'}
                               >
-                                {user.class_name}
-                                {user.classMatched ? (
+                                {student.class_name}
+                                {student.classMatched ? (
                                   <CheckCircle className="w-3 h-3" />
                                 ) : (
                                   <AlertCircle className="w-3 h-3" />
@@ -552,26 +512,17 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
                               <span className="text-primary-3">-</span>
                             )}
                           </td>
+                          <td className="px-3 py-2">{student.parent_phone || '-'}</td>
                           <td className="px-3 py-2">
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                              user.role === 'admin' ? 'bg-[#FFF0EB] text-brand' :
-                              user.role === 'phan_doan_truong' ? 'bg-[#FFF0EB] text-brand' :
-                              'bg-[#E8F5E9] text-[#2E7D32]'
-                            }`}>
-                              {ROLE_LABELS[user.role]}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">{user.phone || '-'}</td>
-                          <td className="px-3 py-2">
-                            {user.isValid ? (
+                            {student.isValid ? (
                               <span className="flex items-center gap-1 text-[#2E7D32] text-xs">
                                 <CheckCircle className="w-4 h-4" />
                                 OK
                               </span>
                             ) : (
-                              <span className="flex items-center gap-1 text-[#C62828] text-xs" title={user.errors.join(', ')}>
+                              <span className="flex items-center gap-1 text-[#C62828] text-xs" title={student.errors.join(', ')}>
                                 <AlertCircle className="w-4 h-4" />
-                                {user.errors[0]}
+                                {student.errors[0]}
                               </span>
                             )}
                           </td>
@@ -590,7 +541,7 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <p className="text-sm text-primary-3">Đang import {validCount} người dùng...</p>
+              <p className="text-sm text-primary-3">Đang import {validCount} thiếu nhi...</p>
             </div>
           )}
 
@@ -622,7 +573,7 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
                   <h4 className="text-sm font-medium text-[#C62828] mb-2">Chi tiết lỗi:</h4>
                   <ul className="text-sm text-[#C62828] space-y-1 max-h-40 overflow-y-auto">
                     {importResult.errors.map((error, index) => (
-                      <li key={index}>• {error}</li>
+                      <li key={index}>* {error}</li>
                     ))}
                   </ul>
                 </div>
@@ -631,7 +582,7 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
               {importResult.success > 0 && (
                 <div className="p-4 bg-[#E8F5E9] border border-[#A5D6A7] rounded-xl text-center">
                   <p className="text-sm text-[#2E7D32]">
-                    Đã thêm mới {importResult.success} người dùng vào hệ thống.
+                    Đã thêm mới {importResult.success} thiếu nhi vào hệ thống.
                   </p>
                 </div>
               )}
@@ -639,7 +590,7 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
               {importResult.skipped > 0 && importResult.success === 0 && importResult.failed === 0 && (
                 <div className="p-4 bg-[#FFF8E1] border border-[#FFE082] rounded-xl text-center">
                   <p className="text-sm text-[#F57C00]">
-                    Tất cả {importResult.skipped} người dùng đã tồn tại trong hệ thống.
+                    Tất cả {importResult.skipped} thiếu nhi đã tồn tại trong hệ thống.
                   </p>
                 </div>
               )}
@@ -671,7 +622,7 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
                 disabled={validCount === 0}
                 className="px-6 py-2.5 bg-brand text-white rounded-xl text-sm font-medium hover:bg-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Import {validCount} người dùng
+                Import {validCount} thiếu nhi
               </button>
             </>
           )}

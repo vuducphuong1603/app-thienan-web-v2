@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, ThieuNhiProfile, Class, BRANCHES } from '@/lib/supabase'
 import { Search, ChevronDown, Plus } from 'lucide-react'
+import ImportStudentsModal from '@/components/management/ImportStudentsModal'
+import DeleteStudentModal from '@/components/management/DeleteStudentModal'
 
 interface StudentWithDetails extends ThieuNhiProfile {
   class_name?: string
@@ -22,6 +24,13 @@ interface StudentWithDetails extends ThieuNhiProfile {
   total_avg?: number
 }
 
+interface EditingScores {
+  score_45_hk1: string
+  score_exam_hk1: string
+  score_45_hk2: string
+  score_exam_hk2: string
+}
+
 type FilterClass = 'all' | string
 type FilterStatus = 'all' | 'ACTIVE' | 'INACTIVE'
 
@@ -34,6 +43,19 @@ export default function StudentsPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false)
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState<StudentWithDetails | null>(null)
+
+  // Edit mode state
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null)
+  const [editingScores, setEditingScores] = useState<EditingScores>({
+    score_45_hk1: '',
+    score_exam_hk1: '',
+    score_45_hk2: '',
+    score_exam_hk2: '',
+  })
+  const [isSaving, setIsSaving] = useState(false)
 
   // Fetch data from Supabase
   const fetchData = useCallback(async () => {
@@ -60,30 +82,40 @@ export default function StudentsPage() {
       }
 
       // Map students with class details
-      const studentsWithDetails: StudentWithDetails[] = (studentsData || []).map((student, index) => {
+      const studentsWithDetails: StudentWithDetails[] = (studentsData || []).map((student) => {
         const studentClass = (classesData || []).find((c) => c.id === student.class_id)
         const birthDate = student.date_of_birth ? new Date(student.date_of_birth) : null
         const age = birthDate ? Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : undefined
 
-        // Generate student code like HA172336
-        const code = `HA${String(172336 + index).padStart(6, '0')}`
+        // Calculate averages
+        const score_45_hk1 = student.score_45_hk1 || 0
+        const score_exam_hk1 = student.score_exam_hk1 || 0
+        const score_45_hk2 = student.score_45_hk2 || 0
+        const score_exam_hk2 = student.score_exam_hk2 || 0
+        const attendance_thu5 = student.attendance_thu5 || 0
+        const attendance_cn = student.attendance_cn || 0
+
+        // TB Giáo lý = average of 4 scores
+        const avg_catechism = (score_45_hk1 + score_exam_hk1 + score_45_hk2 + score_exam_hk2) / 4
+        // TB Điểm danh = average of Thu5 and CN
+        const avg_attendance = (attendance_thu5 + attendance_cn) / 2
+        // Tổng TB = average of all
+        const total_avg = (avg_catechism + avg_attendance) / 2
 
         return {
           ...student,
           class_name: studentClass?.name || undefined,
           class_branch: studentClass?.branch || undefined,
           age,
-          student_code: code,
-          // Placeholder scores - will be replaced with actual data from scores table
-          score_45_hk1: 0,
-          score_exam_hk1: 0,
-          score_45_hk2: 0,
-          score_exam_hk2: 0,
-          avg_catechism: 0,
-          attendance_thu5: 0,
-          attendance_cn: 0,
-          avg_attendance: 0,
-          total_avg: 0,
+          score_45_hk1,
+          score_exam_hk1,
+          score_45_hk2,
+          score_exam_hk2,
+          avg_catechism,
+          attendance_thu5,
+          attendance_cn,
+          avg_attendance,
+          total_avg,
         }
       })
 
@@ -128,6 +160,91 @@ export default function StudentsPage() {
     }
     return acc
   }, {} as Record<string, Class[]>)
+
+  // Handle delete student
+  const handleDeleteStudent = async () => {
+    if (!selectedStudent) return
+
+    const { error } = await supabase
+      .from('thieu_nhi')
+      .delete()
+      .eq('id', selectedStudent.id)
+
+    if (error) {
+      console.error('Error deleting student:', error)
+      throw error
+    }
+
+    // Refresh data after deletion
+    await fetchData()
+  }
+
+  // Open delete modal
+  const openDeleteModal = (student: StudentWithDetails) => {
+    setSelectedStudent(student)
+    setIsDeleteModalOpen(true)
+  }
+
+  // Start editing a student's scores
+  const startEditing = (student: StudentWithDetails) => {
+    setEditingStudentId(student.id)
+    setEditingScores({
+      score_45_hk1: (student.score_45_hk1 || 0).toString(),
+      score_exam_hk1: (student.score_exam_hk1 || 0).toString(),
+      score_45_hk2: (student.score_45_hk2 || 0).toString(),
+      score_exam_hk2: (student.score_exam_hk2 || 0).toString(),
+    })
+  }
+
+  // Cancel editing
+  const cancelEditing = () => {
+    setEditingStudentId(null)
+    setEditingScores({
+      score_45_hk1: '',
+      score_exam_hk1: '',
+      score_45_hk2: '',
+      score_exam_hk2: '',
+    })
+  }
+
+  // Save scores
+  const saveScores = async () => {
+    if (!editingStudentId) return
+
+    setIsSaving(true)
+    try {
+      const { error } = await supabase
+        .from('thieu_nhi')
+        .update({
+          score_45_hk1: parseFloat(editingScores.score_45_hk1) || 0,
+          score_exam_hk1: parseFloat(editingScores.score_exam_hk1) || 0,
+          score_45_hk2: parseFloat(editingScores.score_45_hk2) || 0,
+          score_exam_hk2: parseFloat(editingScores.score_exam_hk2) || 0,
+        })
+        .eq('id', editingStudentId)
+
+      if (error) {
+        console.error('Error saving scores:', error)
+        return
+      }
+
+      // Refresh data and exit edit mode
+      await fetchData()
+      cancelEditing()
+    } catch (err) {
+      console.error('Error:', err)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Handle score input change
+  const handleScoreChange = (field: keyof EditingScores, value: string) => {
+    // Allow empty string or valid number format
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setEditingScores((prev) => ({ ...prev, [field]: value }))
+    }
+  }
 
   return (
     <div className="bg-[#F6F6F6] border border-white/60 rounded-2xl">
@@ -242,7 +359,10 @@ export default function StudentsPage() {
             </div>
 
             {/* Import Button - Solid orange background */}
-            <button className="flex items-center gap-2 h-[38px] px-5 bg-brand rounded-full text-sm font-medium text-white hover:bg-orange-500 transition-colors">
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center gap-2 h-[38px] px-5 bg-brand rounded-full text-sm font-medium text-white hover:bg-orange-500 transition-colors"
+            >
               {/* Custom Upload Icon */}
               <svg width="18" height="18" viewBox="0 0 27 25" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path fillRule="evenodd" clipRule="evenodd" d="M26.276 0V24.816H0V5.84H2.92V21.896H23.356V2.92H17.516V0H26.276ZM9.299 0C13.224 0 16.425 3.098 16.591 6.982L16.598 7.299V12.532L19.945 9.186L22.01 11.25L15.138 18.122L8.267 11.25L10.331 9.186L13.678 12.532V7.299C13.678 4.967 11.855 3.06 9.556 2.927L9.299 2.92H0.54V0H9.299Z" fill="currentColor"/>
@@ -260,85 +380,97 @@ export default function StudentsPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1200px]">
-          {/* Table Header */}
-          <thead>
-            <tr className="border-b border-[#E5E1DC]">
-              <th className="px-4 py-3 text-left bg-white">
-                <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">
-                  TÊN THÁNH / HỌ
-                </span>
-              </th>
-              <th className="px-3 py-3 text-left bg-white">
-                <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">TÊN</span>
-              </th>
-              <th className="px-3 py-3 text-center bg-white border-l border-[#E5E1DC]">
-                <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">LỚP/</span>
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">TUỔI</span>
-                </div>
-              </th>
-              <th className="px-3 py-3 text-left bg-white">
-                <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">LIÊN HỆ</span>
-              </th>
-              <th className="px-2 py-3 text-center bg-white border-l border-[#E5E1DC]">
-                <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">45&apos;</span>
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">HK1</span>
-                </div>
-              </th>
-              <th className="px-2 py-3 text-center bg-white border-l border-[#E5E1DC]">
-                <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">THI</span>
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">HK1</span>
-                </div>
-              </th>
-              <th className="px-2 py-3 text-center bg-white border-l border-[#E5E1DC]">
-                <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">45&apos;</span>
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">HK2</span>
-                </div>
-              </th>
-              <th className="px-2 py-3 text-center bg-white border-l border-[#E5E1DC]">
-                <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">THI</span>
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">HK2</span>
-                </div>
-              </th>
-              <th className="px-2 py-3 text-center bg-white border-l border-[#E5E1DC]">
-                <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-semibold text-brand uppercase tracking-wide">TB</span>
-                  <span className="text-[11px] font-semibold text-brand uppercase tracking-wide">GIÁO LÝ</span>
-                </div>
-              </th>
-              <th className="px-2 py-3 text-center bg-white border-l border-[#E5E1DC]">
-                <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">ĐIỂM</span>
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">DANH T5</span>
-                </div>
-              </th>
-              <th className="px-2 py-3 text-center bg-white border-l border-[#E5E1DC]">
-                <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">ĐIỂM</span>
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">DANH CN</span>
-                </div>
-              </th>
-              <th className="px-2 py-3 text-center bg-white border-l border-[#E5E1DC]">
-                <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">TB ĐIỂM</span>
-                  <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">DANH</span>
-                </div>
-              </th>
-              <th className="px-2 py-3 text-center bg-white border-l border-[#E5E1DC]">
-                <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-semibold text-brand uppercase tracking-wide">TỔNG</span>
-                  <span className="text-[11px] font-semibold text-brand uppercase tracking-wide">TB</span>
-                </div>
-              </th>
-              <th className="px-3 py-3 text-left bg-white border-l border-[#E5E1DC]">
-                <span className="text-[11px] font-semibold text-[#8B8685] uppercase tracking-wide">THAO TÁC</span>
-              </th>
+      <div className="overflow-x-auto px-6 pb-4">
+        {/* Header Bar */}
+        <div className="bg-[#E5E1DC] rounded-[15px] h-12 border border-white/60 flex items-center">
+          <div className="w-[15%] min-w-[180px] px-4 flex items-center">
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide">TÊN THÁNH / HỌ</span>
+          </div>
+          <div className="w-[5%] min-w-[60px] px-2 flex items-center">
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide">TÊN</span>
+          </div>
+          <div className="w-[6%] min-w-[70px] px-2 flex flex-col items-center justify-center">
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">LỚP/</span>
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">TUỔI</span>
+          </div>
+          <div className="w-[9%] min-w-[110px] px-2 flex items-center">
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide">LIÊN HỆ</span>
+          </div>
+          <div className="w-[5%] min-w-[55px] px-1 flex flex-col items-center justify-center">
+            <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">45&apos;</span>
+            <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">HK1</span>
+          </div>
+          <div className="w-[5%] min-w-[55px] px-1 flex flex-col items-center justify-center">
+            <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">THI</span>
+            <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">HK1</span>
+          </div>
+          <div className="w-[5%] min-w-[55px] px-1 flex flex-col items-center justify-center">
+            <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">45&apos;</span>
+            <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">HK2</span>
+          </div>
+          <div className="w-[5%] min-w-[55px] px-1 flex flex-col items-center justify-center">
+            <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">THI</span>
+            <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">HK2</span>
+          </div>
+          <div className="w-[6%] min-w-[65px] px-1 flex flex-col items-center justify-center">
+            <span className="text-xs font-semibold text-[#6e62e5] uppercase tracking-wide leading-tight">TB</span>
+            <span className="text-xs font-semibold text-[#6e62e5] uppercase tracking-wide leading-tight">GIÁO LÝ</span>
+          </div>
+          <div className="w-[6%] min-w-[65px] px-1 flex flex-col items-center justify-center">
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">ĐIỂM</span>
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">DANH T5</span>
+          </div>
+          <div className="w-[6%] min-w-[70px] px-1 flex flex-col items-center justify-center">
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">ĐIỂM</span>
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">DANH CN</span>
+          </div>
+          <div className="w-[6%] min-w-[70px] px-1 flex flex-col items-center justify-center">
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">TB ĐIỂM</span>
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">DANH</span>
+          </div>
+          <div className="w-[5%] min-w-[55px] px-1 flex flex-col items-center justify-center">
+            <span className="text-xs font-semibold text-[#E178FF] uppercase tracking-wide leading-tight">TỔNG</span>
+            <span className="text-xs font-semibold text-[#E178FF] uppercase tracking-wide leading-tight">TB</span>
+          </div>
+          <div className="flex-1 min-w-[140px] px-3 flex items-center justify-center">
+            <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide">THAO TÁC</span>
+          </div>
+        </div>
+
+        {/* Table Body */}
+        <table className="w-full table-fixed">
+          <colgroup>
+            <col className="w-[15%]" />
+            <col className="w-[5%]" />
+            <col className="w-[6%]" />
+            <col className="w-[9%]" />
+            <col className="w-[5%]" />
+            <col className="w-[5%]" />
+            <col className="w-[5%]" />
+            <col className="w-[5%]" />
+            <col className="w-[6%]" />
+            <col className="w-[6%]" />
+            <col className="w-[6%]" />
+            <col className="w-[6%]" />
+            <col className="w-[5%]" />
+            <col />
+          </colgroup>
+          <thead className="sr-only">
+            <tr>
+              <th>Tên thánh / Họ</th>
+              <th>Tên</th>
+              <th>Lớp/Tuổi</th>
+              <th>Liên hệ</th>
+              <th>45&apos; HK1</th>
+              <th>THI HK1</th>
+              <th>45&apos; HK2</th>
+              <th>THI HK2</th>
+              <th>TB Giáo lý</th>
+              <th>Điểm danh T5</th>
+              <th>Điểm danh CN</th>
+              <th>TB Điểm danh</th>
+              <th>Tổng TB</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
 
@@ -387,154 +519,260 @@ export default function StudentsPage() {
                 </td>
               </tr>
             ) : (
-              filteredStudents.map((student) => (
-                <tr key={student.id} className="border-b border-[#E5E1DC] hover:bg-white/80 transition-colors">
-                  {/* Student Info - Avatar + Name + Code */}
-                  <td className="px-4 py-3 bg-white">
-                    <div className="flex items-center gap-3">
-                      {/* Avatar */}
-                      <div className="w-10 h-10 rounded-full bg-[#E8E8E8] flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {student.avatar_url ? (
-                          <img
-                            src={student.avatar_url}
-                            alt={student.full_name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-sm font-medium text-[#8B8685]">
-                            {student.full_name.charAt(0)}
+              filteredStudents.map((student) => {
+                const isEditing = editingStudentId === student.id
+                const rowBgClass = isEditing ? 'bg-[#FEF6EE]' : 'bg-white'
+
+                return (
+                  <tr key={student.id} className="hover:bg-[#F8F8F8] transition-colors">
+                    {/* Student Info - Avatar + Name + Code */}
+                    <td className={`py-3 ${rowBgClass} ${isEditing ? 'border-l-4 border-l-brand pl-3' : 'pl-4'}`}>
+                      <div className="flex items-center gap-3">
+                        {/* Avatar */}
+                        <div className="w-10 h-10 rounded-full bg-[#E8E8E8] flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {student.avatar_url ? (
+                            <img
+                              src={student.avatar_url}
+                              alt={student.full_name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-sm font-medium text-[#8B8685]">
+                              {student.full_name.charAt(0)}
+                            </span>
+                          )}
+                        </div>
+                        {/* Name and Code */}
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-medium text-black leading-tight">
+                            {student.saint_name && `${student.saint_name} `}
+                            {student.full_name.split(' ').slice(0, -1).join(' ')}
+                          </span>
+                          <span className="text-xs text-[#8B8685]">{student.student_code}</span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* First Name */}
+                    <td className={`px-2 py-3 ${rowBgClass}`}>
+                      <span className="text-sm font-medium text-black">
+                        {student.full_name.split(' ').slice(-1)[0]}
+                      </span>
+                    </td>
+
+                    {/* Class and Age */}
+                    <td className={`px-2 py-3 ${rowBgClass}`}>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-sm font-medium text-black">{student.class_name || '-'}</span>
+                        {student.age && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-brand/15 text-[11px] font-medium text-brand">
+                            {student.age} tuổi
                           </span>
                         )}
                       </div>
-                      {/* Name and Code */}
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[13px] font-medium text-black leading-tight">
-                          {student.saint_name && `${student.saint_name} `}
-                          {student.full_name.split(' ').slice(0, -1).join(' ')}
-                        </span>
-                        <span className="text-xs text-[#8B8685]">{student.student_code}</span>
+                    </td>
+
+                    {/* Contact - Two phone numbers */}
+                    <td className={`px-2 py-3 ${rowBgClass}`}>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-black">{student.parent_phone || '-'}</span>
+                        <span className="text-xs text-[#8B8685]">{student.parent_phone_2 || student.parent_phone || '-'}</span>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* First Name */}
-                  <td className="px-3 py-3 bg-white">
-                    <span className="text-[13px] text-black">
-                      {student.full_name.split(' ').slice(-1)[0]}
-                    </span>
-                  </td>
-
-                  {/* Class and Age */}
-                  <td className="px-3 py-3 bg-white">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[13px] font-medium text-black">{student.class_name || '-'}</span>
-                      {student.age && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-brand/15 text-[11px] font-medium text-brand">
-                          {student.age} tuổi
-                        </span>
+                    {/* Score: 45' HK1 - Start of score group with #F6F6F6 background */}
+                    <td className="px-1 py-3 text-center bg-[#F6F6F6]" style={{ borderLeft: '0.5px solid #E5E1DC', borderRight: '0.5px solid #E5E1DC' }}>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editingScores.score_45_hk1}
+                          onChange={(e) => handleScoreChange('score_45_hk1', e.target.value)}
+                          className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
+                        />
+                      ) : (
+                        <span className="text-sm text-[#8a8c90]">{student.score_45_hk1?.toFixed(1) || '0.0'}</span>
                       )}
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Contact - Two phone numbers */}
-                  <td className="px-3 py-3 bg-white">
-                    <div className="flex flex-col">
-                      <span className="text-[13px] font-medium text-black">{student.parent_phone || '-'}</span>
-                      <span className="text-[13px] text-[#8B8685]">{student.parent_phone_2 || student.parent_phone || '-'}</span>
-                    </div>
-                  </td>
+                    {/* Score: THI HK1 */}
+                    <td className="px-1 py-3 text-center bg-[#F6F6F6]" style={{ borderRight: '0.5px solid #E5E1DC' }}>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editingScores.score_exam_hk1}
+                          onChange={(e) => handleScoreChange('score_exam_hk1', e.target.value)}
+                          className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
+                        />
+                      ) : (
+                        <span className="text-sm text-[#8a8c90]">{student.score_exam_hk1?.toFixed(1) || '0.0'}</span>
+                      )}
+                    </td>
 
-                  {/* Scores - No border-l for data rows */}
-                  <td className="px-2 py-3 text-center bg-white">
-                    <span className="text-[13px] text-[#8B8685]">{student.score_45_hk1?.toFixed(1) || '0.0'}</span>
-                  </td>
-                  <td className="px-2 py-3 text-center bg-white">
-                    <span className="text-[13px] text-[#8B8685]">{student.score_exam_hk1?.toFixed(1) || '0.0'}</span>
-                  </td>
-                  <td className="px-2 py-3 text-center bg-white">
-                    <span className="text-[13px] text-[#8B8685]">{student.score_45_hk2?.toFixed(1) || '0.0'}</span>
-                  </td>
-                  <td className="px-2 py-3 text-center bg-white">
-                    <span className="text-[13px] text-[#8B8685]">{student.score_exam_hk2?.toFixed(1) || '0.0'}</span>
-                  </td>
-                  <td className="px-2 py-3 text-center bg-white">
-                    <span className="text-[13px] font-semibold text-brand">{student.avg_catechism?.toFixed(1) || '0.0'}</span>
-                  </td>
-                  <td className="px-2 py-3 text-center bg-white">
-                    <span className="text-[13px] text-[#8B8685]">{student.attendance_thu5?.toFixed(1) || '0.0'}</span>
-                  </td>
-                  <td className="px-2 py-3 text-center bg-white">
-                    <span className="text-[13px] text-[#8B8685]">{student.attendance_cn?.toFixed(1) || '0.0'}</span>
-                  </td>
-                  <td className="px-2 py-3 text-center bg-white">
-                    <span className="text-[13px] text-[#8B8685]">{student.avg_attendance?.toFixed(1) || '0.0'}</span>
-                  </td>
-                  <td className="px-2 py-3 text-center bg-white">
-                    <span className="text-[13px] font-semibold text-brand">{student.total_avg?.toFixed(1) || '0.0'}</span>
-                  </td>
+                    {/* Score: 45' HK2 */}
+                    <td className="px-1 py-3 text-center bg-[#F6F6F6]" style={{ borderRight: '0.5px solid #E5E1DC' }}>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editingScores.score_45_hk2}
+                          onChange={(e) => handleScoreChange('score_45_hk2', e.target.value)}
+                          className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
+                        />
+                      ) : (
+                        <span className="text-sm text-[#8a8c90]">{student.score_45_hk2?.toFixed(1) || '0.0'}</span>
+                      )}
+                    </td>
 
-                  {/* Actions - 5 icons matching Figma */}
-                  <td className="px-3 py-3 bg-white">
-                    <div className="flex items-center gap-1">
-                      {/* View Profile Icon */}
-                      <button
-                        className="w-8 h-8 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
-                        title="Xem hồ sơ"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M10 10C12.0711 10 13.75 8.32107 13.75 6.25C13.75 4.17893 12.0711 2.5 10 2.5C7.92893 2.5 6.25 4.17893 6.25 6.25C6.25 8.32107 7.92893 10 10 10Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M3.75 17.5V15.625C3.75 14.7962 4.07924 14.0013 4.66529 13.4153C5.25134 12.8292 6.0462 12.5 6.875 12.5H13.125C13.9538 12.5 14.7487 12.8292 15.3347 13.4153C15.9208 14.0013 16.25 14.7962 16.25 15.625V17.5" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      {/* Calendar Icon */}
-                      <button
-                        className="w-8 h-8 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
-                        title="Lịch học"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M15.8333 3.33334H4.16667C3.24619 3.33334 2.5 4.07954 2.5 5.00001V16.6667C2.5 17.5872 3.24619 18.3333 4.16667 18.3333H15.8333C16.7538 18.3333 17.5 17.5872 17.5 16.6667V5.00001C17.5 4.07954 16.7538 3.33334 15.8333 3.33334Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M13.3333 1.66666V5.00001" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M6.66667 1.66666V5.00001" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M2.5 8.33334H17.5" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      {/* Attendance/Clipboard Icon */}
-                      <button
-                        className="w-8 h-8 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
-                        title="Điểm danh"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M12.5 2.5H14.1667C14.6087 2.5 15.0326 2.67559 15.3452 2.98816C15.6577 3.30072 15.8333 3.72464 15.8333 4.16667V16.6667C15.8333 17.1087 15.6577 17.5326 15.3452 17.8452C15.0326 18.1577 14.6087 18.3333 14.1667 18.3333H5.83333C5.39131 18.3333 4.96738 18.1577 4.65482 17.8452C4.34226 17.5326 4.16667 17.1087 4.16667 16.6667V4.16667C4.16667 3.72464 4.34226 3.30072 4.65482 2.98816C4.96738 2.67559 5.39131 2.5 5.83333 2.5H7.5" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M11.6667 1.66666H8.33333C7.8731 1.66666 7.5 2.03976 7.5 2.5V3.33333C7.5 3.79357 7.8731 4.16666 8.33333 4.16666H11.6667C12.1269 4.16666 12.5 3.79357 12.5 3.33333V2.5C12.5 2.03976 12.1269 1.66666 11.6667 1.66666Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      {/* Edit Icon */}
-                      <button
-                        className="w-8 h-8 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
-                        title="Chỉnh sửa"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M14.1667 2.5C14.3856 2.28113 14.6454 2.10752 14.9314 1.98906C15.2173 1.87061 15.5238 1.80965 15.8333 1.80965C16.1429 1.80965 16.4493 1.87061 16.7353 1.98906C17.0213 2.10752 17.2811 2.28113 17.5 2.5C17.7189 2.71887 17.8925 2.97871 18.0109 3.26468C18.1294 3.55064 18.1904 3.85714 18.1904 4.16667C18.1904 4.4762 18.1294 4.78269 18.0109 5.06866C17.8925 5.35462 17.7189 5.61446 17.5 5.83333L6.25 17.0833L1.66667 18.3333L2.91667 13.75L14.1667 2.5Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      {/* Delete Icon - Red/Pink */}
-                      <button
-                        className="w-8 h-8 rounded-lg bg-[#FEE2E2] flex items-center justify-center hover:bg-red-200 transition-colors"
-                        title="Xóa"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2.5 5H4.16667H17.5" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M6.66667 5V3.33333C6.66667 2.89131 6.84226 2.46738 7.15482 2.15482C7.46738 1.84226 7.89131 1.66667 8.33333 1.66667H11.6667C12.1087 1.66667 12.5326 1.84226 12.8452 2.15482C13.1577 2.46738 13.3333 2.89131 13.3333 3.33333V5M15.8333 5V16.6667C15.8333 17.1087 15.6577 17.5326 15.3452 17.8452C15.0326 18.1577 14.6087 18.3333 14.1667 18.3333H5.83333C5.39131 18.3333 4.96738 18.1577 4.65482 17.8452C4.34226 17.5326 4.16667 17.1087 4.16667 16.6667V5H15.8333Z" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    {/* Score: THI HK2 */}
+                    <td className="px-1 py-3 text-center bg-[#F6F6F6]" style={{ borderRight: '0.5px solid #E5E1DC' }}>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editingScores.score_exam_hk2}
+                          onChange={(e) => handleScoreChange('score_exam_hk2', e.target.value)}
+                          className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
+                        />
+                      ) : (
+                        <span className="text-sm text-[#8a8c90]">{student.score_exam_hk2?.toFixed(1) || '0.0'}</span>
+                      )}
+                    </td>
+
+                    {/* TB Giáo Lý (calculated, purple) - End of score group */}
+                    <td className="px-1 py-3 text-center bg-[#F6F6F6]" style={{ borderRight: '0.5px solid #E5E1DC' }}>
+                      <span className="text-sm font-medium text-[#6e62e5]">{student.avg_catechism?.toFixed(1) || '0.0'}</span>
+                    </td>
+
+                    {/* Điểm danh T5 */}
+                    <td className={`px-1 py-3 text-center ${rowBgClass}`}>
+                      <span className="text-sm text-[#8B8685]">{student.attendance_thu5?.toFixed(1) || '0.0'}</span>
+                    </td>
+
+                    {/* Điểm danh CN */}
+                    <td className={`px-1 py-3 text-center ${rowBgClass}`}>
+                      <span className="text-sm text-[#8B8685]">{student.attendance_cn?.toFixed(1) || '0.0'}</span>
+                    </td>
+
+                    {/* TB Điểm danh (calculated) */}
+                    <td className={`px-1 py-3 text-center ${rowBgClass}`}>
+                      <span className="text-sm text-[#8B8685]">{student.avg_attendance?.toFixed(1) || '0.0'}</span>
+                    </td>
+
+                    {/* Tổng TB (calculated, pink) */}
+                    <td className={`px-1 py-3 text-center ${rowBgClass}`}>
+                      <span className="text-sm font-semibold text-[#E178FF]">{student.total_avg?.toFixed(1) || '0.0'}</span>
+                    </td>
+
+                    {/* Actions */}
+                    <td className={`px-3 py-3 ${rowBgClass}`}>
+                      <div className="flex items-center justify-center gap-2">
+                        {isEditing ? (
+                          <>
+                            {/* Save Button */}
+                            <button
+                              onClick={saveScores}
+                              disabled={isSaving}
+                              className="w-9 h-9 rounded-lg bg-brand flex items-center justify-center hover:bg-orange-500 transition-colors disabled:opacity-50"
+                              title="Lưu"
+                            >
+                              {isSaving ? (
+                                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              ) : (
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16L21 8V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  <path d="M17 21V13H7V21" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  <path d="M7 3V8H15" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              )}
+                            </button>
+                            {/* Cancel Button */}
+                            <button
+                              onClick={cancelEditing}
+                              disabled={isSaving}
+                              className="w-9 h-9 rounded-lg bg-[#FEE2E2] flex items-center justify-center hover:bg-red-200 transition-colors disabled:opacity-50"
+                              title="Hủy"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M18 6L6 18" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M6 6L18 18" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {/* Medal/Award Icon */}
+                            <button
+                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+                              title="Xem thành tích"
+                            >
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="12" cy="8" r="6" stroke="#8B8685" strokeWidth="1.5"/>
+                                <path d="M15.477 12.89L17 22L12 19L7 22L8.523 12.89" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                            {/* Calendar Icon */}
+                            <button
+                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+                              title="Lịch học"
+                            >
+                              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M15.8333 3.33334H4.16667C3.24619 3.33334 2.5 4.07954 2.5 5.00001V16.6667C2.5 17.5872 3.24619 18.3333 4.16667 18.3333H15.8333C16.7538 18.3333 17.5 17.5872 17.5 16.6667V5.00001C17.5 4.07954 16.7538 3.33334 15.8333 3.33334Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M13.3333 1.66666V5.00001" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M6.66667 1.66666V5.00001" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M2.5 8.33334H17.5" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                            {/* Edit Icon */}
+                            <button
+                              onClick={() => startEditing(student)}
+                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+                              title="Chỉnh sửa điểm"
+                            >
+                              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M14.1667 2.5C14.3856 2.28113 14.6454 2.10752 14.9314 1.98906C15.2173 1.87061 15.5238 1.80965 15.8333 1.80965C16.1429 1.80965 16.4493 1.87061 16.7353 1.98906C17.0213 2.10752 17.2811 2.28113 17.5 2.5C17.7189 2.71887 17.8925 2.97871 18.0109 3.26468C18.1294 3.55064 18.1904 3.85714 18.1904 4.16667C18.1904 4.4762 18.1294 4.78269 18.0109 5.06866C17.8925 5.35462 17.7189 5.61446 17.5 5.83333L6.25 17.0833L1.66667 18.3333L2.91667 13.75L14.1667 2.5Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                            {/* Delete Icon */}
+                            <button
+                              onClick={() => openDeleteModal(student)}
+                              className="w-9 h-9 rounded-lg bg-[#FEE2E2] flex items-center justify-center hover:bg-red-200 transition-colors"
+                              title="Xóa"
+                            >
+                              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M2.5 5H4.16667H17.5" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M6.66667 5V3.33333C6.66667 2.89131 6.84226 2.46738 7.15482 2.15482C7.46738 1.84226 7.89131 1.66667 8.33333 1.66667H11.6667C12.1087 1.66667 12.5326 1.84226 12.8452 2.15482C13.1577 2.46738 13.3333 2.89131 13.3333 3.33333V5M15.8333 5V16.6667C15.8333 17.1087 15.6577 17.5326 15.3452 17.8452C15.0326 18.1577 14.6087 18.3333 14.1667 18.3333H5.83333C5.39131 18.3333 4.96738 18.1577 4.65482 17.8452C4.34226 17.5326 4.16667 17.1087 4.16667 16.6667V5H15.8333Z" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Import Modal */}
+      <ImportStudentsModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => fetchData()}
+      />
+
+      {/* Delete Modal */}
+      <DeleteStudentModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false)
+          setSelectedStudent(null)
+        }}
+        onConfirm={handleDeleteStudent}
+        studentName={selectedStudent?.full_name}
+      />
     </div>
   )
 }
