@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase, ThieuNhiProfile, Class, BRANCHES } from '@/lib/supabase'
 import { Search, ChevronDown, Plus } from 'lucide-react'
 import ImportStudentsModal from '@/components/management/ImportStudentsModal'
@@ -35,6 +36,7 @@ type FilterClass = 'all' | string
 type FilterStatus = 'all' | 'ACTIVE' | 'INACTIVE'
 
 export default function StudentsPage() {
+  const router = useRouter()
   const [students, setStudents] = useState<StudentWithDetails[]>([])
   const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
@@ -163,18 +165,31 @@ export default function StudentsPage() {
 
   // Handle delete student
   const handleDeleteStudent = async () => {
-    if (!selectedStudent) return
+    console.log('handleDeleteStudent called')
+    console.log('selectedStudent:', selectedStudent)
 
-    const { error } = await supabase
+    if (!selectedStudent) {
+      console.log('No student selected, returning')
+      return
+    }
+
+    console.log('Attempting to delete student with id:', selectedStudent.id)
+
+    const { data, error } = await supabase
       .from('thieu_nhi')
       .delete()
       .eq('id', selectedStudent.id)
+      .select()
+
+    console.log('Delete response - data:', data, 'error:', error)
 
     if (error) {
       console.error('Error deleting student:', error)
+      alert(`Không thể xóa thiếu nhi: ${error.message}`)
       throw error
     }
 
+    console.log('Delete successful, refreshing data...')
     // Refresh data after deletion
     await fetchData()
   }
@@ -371,7 +386,10 @@ export default function StudentsPage() {
             </button>
 
             {/* Add Button - White with orange border */}
-            <button className="flex items-center gap-2 h-[37px] px-5 bg-white border border-brand rounded-full text-sm font-medium text-brand hover:bg-brand/5 transition-colors">
+            <button
+              onClick={() => router.push('/admin/management/students/add')}
+              className="flex items-center gap-2 h-[37px] px-5 bg-white border border-brand rounded-full text-sm font-medium text-brand hover:bg-brand/5 transition-colors"
+            >
               <Plus className="w-4 h-4" />
               Thêm
             </button>

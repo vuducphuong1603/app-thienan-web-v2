@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface DeleteStudentModalProps {
   isOpen: boolean
@@ -11,14 +11,24 @@ interface DeleteStudentModalProps {
 
 export default function DeleteStudentModal({ isOpen, onClose, onConfirm, studentName }: DeleteStudentModalProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Reset error when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setError(null)
+    }
+  }, [isOpen])
 
   const handleDelete = async () => {
     setIsDeleting(true)
+    setError(null)
     try {
       await onConfirm()
       onClose()
-    } catch (error) {
-      console.error('Error deleting student:', error)
+    } catch (err: any) {
+      console.error('Error deleting student:', err)
+      setError(err?.message || 'Có lỗi xảy ra khi xóa')
     } finally {
       setIsDeleting(false)
     }
@@ -41,12 +51,19 @@ export default function DeleteStudentModal({ isOpen, onClose, onConfirm, student
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-black mb-2">Xóa tài khoản?</h2>
+          <h2 className="text-xl font-bold text-black mb-2">Xóa thiếu nhi?</h2>
 
           {/* Description */}
-          <p className="text-sm text-primary-3 text-center mb-6">
-            Bạn chắc chắn muốn xóa tài khoản này?
+          <p className="text-sm text-primary-3 text-center mb-4">
+            Bạn chắc chắn muốn xóa thiếu nhi <span className="font-medium text-black">{studentName}</span>?
           </p>
+
+          {/* Error message */}
+          {error && (
+            <div className="w-full mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600 text-center">{error}</p>
+            </div>
+          )}
 
           {/* Buttons */}
           <div className="w-full flex items-center gap-3">
@@ -68,7 +85,7 @@ export default function DeleteStudentModal({ isOpen, onClose, onConfirm, student
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              {isDeleting ? 'Đang xóa...' : 'Xóa tài khoản'}
+              {isDeleting ? 'Đang xóa...' : 'Xóa'}
             </button>
           </div>
         </div>
