@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase, UserProfile, UserRole, ROLE_LABELS } from '@/lib/supabase'
 import { Search, ChevronDown, FileSpreadsheet, Plus, Edit2, KeyRound, Trash2, X } from 'lucide-react'
 import Image from 'next/image'
-// import ImportUsersModal from '@/components/management/ImportUsersModal'
+import ImportUsersModal from '@/components/management/ImportUsersModal'
 import DeleteUserModal from '@/components/management/DeleteUserModal'
 import ResetPasswordModal from '@/components/management/ResetPasswordModal'
 import AddUserForm from '@/components/management/AddUserForm'
@@ -40,7 +40,7 @@ export default function UsersPage() {
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false)
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false)
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false)
-  // const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false)
@@ -212,7 +212,10 @@ export default function UsersPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl text-sm font-medium text-primary-3 hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl text-sm font-medium text-primary-3 hover:bg-gray-50 transition-colors"
+          >
             <FileSpreadsheet className="w-4 h-4" />
             Import Excel
           </button>
@@ -490,6 +493,13 @@ export default function UsersPage() {
         }}
         onConfirm={handleResetPassword}
         userName={userToResetPassword?.full_name}
+      />
+
+      {/* Import Users Modal */}
+      <ImportUsersModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={fetchUsers}
       />
     </div>
   )
