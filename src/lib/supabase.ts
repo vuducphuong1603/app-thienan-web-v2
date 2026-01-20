@@ -22,10 +22,28 @@ export interface UserProfile {
   full_name: string
   saint_name?: string
   phone: string
+  address?: string
   role: UserRole
   status: 'ACTIVE' | 'INACTIVE'
+  branch?: string
   class_id?: string
+  class_name?: string
   avatar_url?: string
+  created_at: string
+  updated_at?: string
+}
+
+// Branch options (with Vietnamese diacritics)
+export const BRANCHES = ['Chiên Con', 'Ấu Nhi', 'Thiếu Nhi', 'Nghĩa Sĩ'] as const
+export type Branch = typeof BRANCHES[number]
+
+// Class interface
+export interface Class {
+  id: string
+  name: string
+  branch: Branch
+  display_order: number
+  status: 'ACTIVE' | 'INACTIVE'
   created_at: string
   updated_at?: string
 }
@@ -44,6 +62,20 @@ export interface ThieuNhiProfile {
   status: 'ACTIVE' | 'INACTIVE'
   avatar_url?: string
   notes?: string
+  created_at: string
+  updated_at?: string
+}
+
+// Năm học
+export interface SchoolYear {
+  id: string
+  name: string // e.g., "2025 - 2026"
+  start_date: string // e.g., "2025-09-14"
+  end_date: string // e.g., "2026-05-31"
+  is_current: boolean
+  parish_name: string // e.g., "Giáo xứ Thiên Ân"
+  total_weeks: number
+  status: 'ACTIVE' | 'INACTIVE'
   created_at: string
   updated_at?: string
 }

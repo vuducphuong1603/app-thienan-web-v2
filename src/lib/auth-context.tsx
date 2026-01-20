@@ -10,6 +10,10 @@ interface AuthContextType {
   login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>
   register: (username: string, email: string, password: string, fullName?: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
+  updateProfile: (data: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>
+  uploadAvatar: (file: File) => Promise<{ success: boolean; url?: string; error?: string }>
+  deleteAvatar: () => Promise<{ success: boolean; error?: string }>
   isAdmin: boolean
   isGiaoLyVien: boolean
   isPhanDoanTruong: boolean
@@ -131,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         full_name: data.full_name || 'Nguoi dung',
         saint_name: data.saint_name,
         phone: data.phone,
+        address: data.address,
         role: data.role || 'giao_ly_vien',
         status: data.status,
         class_id: data.class_id,
@@ -220,6 +225,201 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/login')
   }
 
+  const updateProfile = async (data: Partial<UserProfile>): Promise<{ success: boolean; error?: string }> => {
+    if (!user) {
+      return { success: false, error: 'Bạn chưa đăng nhập' }
+    }
+
+    try {
+      // Update in Supabase
+      const { error } = await supabase
+        .from('users')
+        .update({
+          full_name: data.full_name,
+          saint_name: data.saint_name,
+          phone: data.phone,
+          address: data.address,
+          avatar_url: data.avatar_url,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
+
+      if (error) {
+        console.error('Update profile error:', error)
+        return { success: false, error: 'Cập nhật thông tin thất bại' }
+      }
+
+      // Update local state and localStorage
+      const updatedUser = { ...user, ...data }
+      setUser(updatedUser)
+      localStorage.setItem('thien_an_user', JSON.stringify(updatedUser))
+
+      return { success: true }
+    } catch (err) {
+      console.error('Update profile error:', err)
+      return { success: false, error: 'Đã có lỗi xảy ra' }
+    }
+  }
+
+  const changePassword = async (currentPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    if (!user) {
+      return { success: false, error: 'Bạn chưa đăng nhập' }
+    }
+
+    try {
+      // Verify current password
+      const { data: userData, error: verifyError } = await supabase
+        .from('users')
+        .select('password')
+        .eq('id', user.id)
+        .single()
+
+      if (verifyError || !userData) {
+        return { success: false, error: 'Không thể xác minh mật khẩu' }
+      }
+
+      if (userData.password !== currentPassword) {
+        return { success: false, error: 'Mật khẩu hiện tại không đúng' }
+      }
+
+      // Update password
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          password: newPassword,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
+
+      if (updateError) {
+        console.error('Change password error:', updateError)
+        return { success: false, error: 'Đổi mật khẩu thất bại' }
+      }
+
+      return { success: true }
+    } catch (err) {
+      console.error('Change password error:', err)
+      return { success: false, error: 'Đã có lỗi xảy ra' }
+    }
+  }
+
+  const uploadAvatar = async (file: File): Promise<{ success: boolean; url?: string; error?: string }> => {
+    if (!user) {
+      return { success: false, error: 'Bạn chưa đăng nhập' }
+    }
+
+    try {
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        return { success: false, error: 'Ảnh phải nhỏ hơn 5MB' }
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        return { success: false, error: 'Chỉ hỗ trợ định dạng JPG, PNG, GIF, WEBP' }
+      }
+
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
+
+      // Delete old avatar if exists
+      if (user.avatar_url) {
+        const oldPath = user.avatar_url.split('/').pop()
+        if (oldPath) {
+          await supabase.storage.from('avatars').remove([`avatars/${oldPath}`])
+        }
+      }
+
+      // Upload new avatar
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+        })
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        return { success: false, error: 'Tải ảnh lên thất bại' }
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      const avatarUrl = urlData.publicUrl
+
+      // Update user profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
+
+      if (updateError) {
+        console.error('Update avatar URL error:', updateError)
+        return { success: false, error: 'Cập nhật ảnh đại diện thất bại' }
+      }
+
+      // Update local state
+      const updatedUser = { ...user, avatar_url: avatarUrl }
+      setUser(updatedUser)
+      localStorage.setItem('thien_an_user', JSON.stringify(updatedUser))
+
+      return { success: true, url: avatarUrl }
+    } catch (err) {
+      console.error('Upload avatar error:', err)
+      return { success: false, error: 'Đã có lỗi xảy ra' }
+    }
+  }
+
+  const deleteAvatar = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!user) {
+      return { success: false, error: 'Bạn chưa đăng nhập' }
+    }
+
+    try {
+      // Delete from storage if exists
+      if (user.avatar_url) {
+        const urlParts = user.avatar_url.split('/')
+        const fileName = urlParts[urlParts.length - 1]
+        if (fileName) {
+          await supabase.storage.from('avatars').remove([`avatars/${fileName}`])
+        }
+      }
+
+      // Update user profile to remove avatar URL
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          avatar_url: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
+
+      if (updateError) {
+        console.error('Delete avatar error:', updateError)
+        return { success: false, error: 'Xóa ảnh đại diện thất bại' }
+      }
+
+      // Update local state
+      const updatedUser = { ...user, avatar_url: undefined }
+      setUser(updatedUser)
+      localStorage.setItem('thien_an_user', JSON.stringify(updatedUser))
+
+      return { success: true }
+    } catch (err) {
+      console.error('Delete avatar error:', err)
+      return { success: false, error: 'Đã có lỗi xảy ra' }
+    }
+  }
+
   const isAdmin = user?.role === 'admin'
   const isGiaoLyVien = user?.role === 'giao_ly_vien'
   const isPhanDoanTruong = user?.role === 'phan_doan_truong'
@@ -231,6 +431,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      updateProfile,
+      changePassword,
+      uploadAvatar,
+      deleteAvatar,
       isAdmin,
       isGiaoLyVien,
       isPhanDoanTruong
