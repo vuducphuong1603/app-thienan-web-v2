@@ -739,10 +739,11 @@ export default function StudentsPage() {
                                 <path d="M15.477 12.89L17 22L12 19L7 22L8.523 12.89" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             </button>
-                            {/* Calendar Icon */}
+                            {/* Calendar Icon - Xem điểm danh */}
                             <button
+                              onClick={() => router.push(`/admin/management/students/${student.id}/attendance`)}
                               className="w-9 h-9 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
-                              title="Lịch học"
+                              title="Xem điểm danh"
                             >
                               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M15.8333 3.33334H4.16667C3.24619 3.33334 2.5 4.07954 2.5 5.00001V16.6667C2.5 17.5872 3.24619 18.3333 4.16667 18.3333H15.8333C16.7538 18.3333 17.5 17.5872 17.5 16.6667V5.00001C17.5 4.07954 16.7538 3.33334 15.8333 3.33334Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
