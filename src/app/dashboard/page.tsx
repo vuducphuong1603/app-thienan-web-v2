@@ -16,7 +16,7 @@ import {
 } from '@/components/dashboard'
 
 export default function UserDashboard() {
-  const { user, loading } = useAuth()
+  const { user, loading, logout } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -65,7 +65,9 @@ export default function UserDashboard() {
       <DashboardHeader
         userName={firstName || 'User'}
         userRole={ROLE_LABELS[user.role]}
+        userEmail={user.email || ''}
         activeTab="overview"
+        onLogout={logout}
       />
 
       {/* Main Content */}
