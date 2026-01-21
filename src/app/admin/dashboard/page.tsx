@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {
@@ -24,7 +24,7 @@ interface Stats {
 }
 
 export default function AdminDashboard() {
-  const { user, loading, isAdmin } = useAuth()
+  const { user, loading, isAdmin, logout } = useAuth()
   const router = useRouter()
   const [stats, setStats] = useState<Stats>({
     totalBranches: 4,
@@ -119,7 +119,9 @@ export default function AdminDashboard() {
       <DashboardHeader
         userName={firstName || 'Admin'}
         userRole={ROLE_LABELS[user.role]}
+        userEmail={user.email || ''}
         activeTab="overview"
+        onLogout={logout}
       />
 
       {/* Main Content */}
