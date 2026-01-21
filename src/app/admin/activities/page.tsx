@@ -1752,26 +1752,27 @@ export default function ActivitiesPage() {
                 {/* Attendance Table */}
                 <div className="overflow-hidden relative">
                   {/* Table Header */}
-                  <div className="flex items-center h-[38px] bg-[#E5E1DC] rounded-[15px] border border-white/60 mb-2">
-                    <div className="w-[60px] text-center text-sm font-medium text-[#666d80]">STT</div>
-                    <div className="w-[64px]"></div>
-                    <div className="w-[100px] text-sm font-medium text-[#666d80]">Tên thánh</div>
-                    <div className="w-[260px] text-sm font-medium text-[#666d80]">Họ và tên</div>
-                    <div className="flex-1 flex">
-                      {reportDates.map((date) => (
-                        <div key={date} className="flex-1 text-center text-sm font-medium text-[#666d80]">
-                          {formatShortDate(date)}
-                        </div>
-                      ))}
-                      {reportDates.length === 0 && (
-                        <div className="flex-1 text-center text-sm text-[#666d80]">Không có dữ liệu</div>
-                      )}
-                    </div>
+                  <div className="relative h-[38px] bg-[#E5E1DC] rounded-[15px] border border-white/60">
+                    <span className="absolute left-[30px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">STT</span>
+                    <span className="absolute left-[150px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">Tên thánh</span>
+                    <span className="absolute left-[350px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">Họ và tên</span>
+                    {reportDates.map((date, idx) => (
+                      <span
+                        key={date}
+                        className="absolute top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]"
+                        style={{ right: `${(reportDates.length - 1 - idx) * 134 + 40}px` }}
+                      >
+                        {formatShortDate(date)}
+                      </span>
+                    ))}
+                    {reportDates.length === 0 && (
+                      <span className="absolute right-[40px] top-1/2 -translate-y-1/2 text-[16px] text-[#666d80]">Không có dữ liệu</span>
+                    )}
                   </div>
 
                   {/* Table Body */}
                   {reportStudents.length === 0 ? (
-                    <div className="py-12 text-center text-sm text-[#666d80]">
+                    <div className="py-12 text-center text-[16px] text-[#666d80]">
                       Không có học sinh trong lớp này
                     </div>
                   ) : (
@@ -1782,32 +1783,36 @@ export default function ActivitiesPage() {
                       const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
 
                       return (
-                        <div key={student.id} className="relative">
-                          <div className="flex items-center h-[56px]">
-                            <div className="w-[60px] text-center text-sm font-medium text-black">{index + 1}</div>
-                            <div className="w-[64px] flex items-center justify-center">
-                              <div className="w-[48px] h-[48px] rounded-[12px] bg-[#F3F3F3] flex items-center justify-center overflow-hidden">
-                                {student.avatar_url ? (
-                                  <img src={student.avatar_url} alt={student.full_name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <span className="text-sm font-medium text-[#8B8685]">{student.full_name.charAt(0)}</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="w-[100px] text-sm font-medium text-black">{student.saint_name || '-'}</div>
-                            <div className="w-[135px] text-sm font-semibold text-[#8A8C90]">{familyMiddleName}</div>
-                            <div className="w-[125px] text-sm font-semibold text-black">{givenName}</div>
-                            {/* Vertical separator */}
-                            <div className="w-[1px] h-full bg-[#8A8C90]/30 self-stretch" />
-                            <div className="flex-1 flex">
-                              {reportDates.map((date, dateIndex) => (
-                                <div key={date} className="flex-1 h-[56px] flex items-center justify-center relative">
-                                  {/* Vertical separator between date columns */}
-                                  {dateIndex > 0 && (
-                                    <div className="absolute left-0 top-0 bottom-0 w-[1px] bg-[#8A8C90]/30" />
-                                  )}
+                        <div key={student.id} className="relative h-[56px]">
+                          {/* STT */}
+                          <span className="absolute left-[37px] top-1/2 -translate-y-1/2 text-[14px] font-medium text-black">{index + 1}</span>
+                          {/* Avatar placeholder */}
+                          <div className="absolute left-[90px] top-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-[12px] bg-[#F3F3F3] flex items-center justify-center overflow-hidden">
+                            {student.avatar_url ? (
+                              <img src={student.avatar_url} alt={student.full_name} className="w-full h-full object-cover" />
+                            ) : null}
+                          </div>
+                          {/* Tên thánh */}
+                          <span className="absolute left-[150px] top-1/2 -translate-y-1/2 text-[14px] font-medium text-black">{student.saint_name || '-'}</span>
+                          {/* Họ và tên đệm */}
+                          <span className="absolute left-[350px] top-1/2 -translate-y-1/2 w-[150px] text-[14px] font-semibold text-[#8A8C90]">{familyMiddleName}</span>
+                          {/* Tên - positioned at center of table */}
+                          <span className="absolute left-[700px] top-1/2 -translate-y-1/2 text-[14px] font-semibold text-black">{givenName}</span>
+
+                          {/* Date columns - positioned from right */}
+                          {reportDates.map((date, dateIndex) => {
+                            const rightPosition = (reportDates.length - 1 - dateIndex) * 134
+                            return (
+                              <div key={date} className="absolute top-0 h-[56px]" style={{ right: `${rightPosition}px`, width: '134px' }}>
+                                {/* Vertical separator on left */}
+                                <div className="absolute left-0 top-0 w-[1px] h-full bg-[#8A8C90]" />
+                                <div className="w-full h-full flex items-center justify-center">
                                   {student.attendance[date] === 'present' ? (
-                                    <div className="w-full h-full bg-[rgba(0,168,107,0.1)]"></div>
+                                    <div className="w-full h-full bg-[rgba(250,134,94,0.2)] flex items-center justify-center">
+                                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M10.5369 0.251055C10.8717 -0.083685 11.4143 -0.083685 11.749 0.251055C12.0837 0.585795 12.0837 1.12839 11.749 1.46313L7.2121 6.00002L11.749 10.5369C12.0837 10.8717 12.0837 11.4143 11.749 11.749C11.4143 12.0837 10.8717 12.0837 10.5369 11.749L6.00002 7.2121L1.46313 11.749C1.12839 12.0837 0.585795 12.0837 0.251055 11.749C-0.083685 11.4143 -0.083685 10.8717 0.251055 10.5369L4.78795 6.00002L0.251055 1.46313C-0.083685 1.12839 -0.083685 0.585795 0.251055 0.251055C0.585795 -0.083685 1.12839 -0.083685 1.46313 0.251055L6.00002 4.78795L10.5369 0.251055Z" fill="#8A8C90"/>
+                                      </svg>
+                                    </div>
                                   ) : student.attendance[date] === 'absent' ? (
                                     <div className="w-full h-full bg-[rgba(250,134,94,0.2)] flex items-center justify-center">
                                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1818,13 +1823,13 @@ export default function ActivitiesPage() {
                                     <span className="text-[#666d80]">-</span>
                                   )}
                                 </div>
-                              ))}
-                              {/* Right vertical line after last date column */}
-                              <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-[#8A8C90]/30" />
-                            </div>
-                          </div>
-                          {/* Bottom separator line for each row */}
-                          <div className="absolute bottom-0 left-[20px] right-[20px] h-[1px] bg-[#8A8C90]/30" />
+                                {/* Vertical separator on right */}
+                                <div className="absolute right-0 top-0 w-[1px] h-full bg-[#8A8C90]" />
+                              </div>
+                            )
+                          })}
+                          {/* Bottom separator line */}
+                          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[#8A8C90]" />
                         </div>
                       )
                     })
