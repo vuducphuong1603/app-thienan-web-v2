@@ -42,7 +42,7 @@ export default function DashboardHeader({
         {/* Left: Logo + Navigation */}
         <div className="flex items-center gap-6">
           {/* Logo */}
-          <div className="w-[52px] h-[52px] rounded-full overflow-hidden flex-shrink-0">
+          <Link href="/admin/dashboard" className="w-[52px] h-[52px] rounded-full overflow-hidden flex-shrink-0">
             <Image
               src="/logo.png"
               alt="Giáo Xứ Thiên Ân"
@@ -50,7 +50,7 @@ export default function DashboardHeader({
               height={52}
               className="object-cover"
             />
-          </div>
+          </Link>
 
           {/* Navigation Tabs */}
           <nav className="flex items-center gap-2">

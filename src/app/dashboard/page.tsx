@@ -68,6 +68,7 @@ export default function UserDashboard() {
         userEmail={user.email || ''}
         activeTab="overview"
         onLogout={logout}
+        userAvatar={user.avatar_url}
       />
 
       {/* Main Content */}
@@ -131,12 +132,12 @@ export default function UserDashboard() {
           </div>
 
           {/* Middle & Bottom Section */}
-          <div className="grid grid-cols-[1fr_1fr_320px] grid-rows-[310px_330px] gap-3">
+          <div className="grid grid-cols-[1fr_1fr_320px] grid-rows-[310px_auto] gap-3">
             {/* Row 1: MyNotes, WeeklyCalendar */}
             <MyNotes />
             <WeeklyCalendar currentWeek={3} activitiesCount={3} />
             {/* ClassStats spans 2 rows */}
-            <div className="row-span-2 h-full">
+            <div className="row-span-2">
               <ClassStats />
             </div>
             {/* Row 2: AttendanceChart, AlertsSection */}

@@ -26,7 +26,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        'inter-tight': ['Inter Tight', 'Inter', 'sans-serif'],
+        sans: ['Inter Tight', 'system-ui', '-apple-system', 'sans-serif'],
+        'inter-tight': ['Inter Tight', 'system-ui', '-apple-system', 'sans-serif'],
       },
       animation: {
         wave: 'wave 2s ease-in-out infinite',

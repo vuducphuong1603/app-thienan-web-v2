@@ -1,18 +1,6 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
-
-const inter = Inter({
-  subsets: ["latin", "vietnamese"],
-  variable: "--font-inter",
-});
-
-const interTight = Inter({
-  subsets: ["latin", "vietnamese"],
-  variable: "--font-inter-tight",
-  weight: ["400", "500", "600", "700"],
-});
 
 export const metadata: Metadata = {
   title: "Giáo Xứ Thiên Ân - Quản Lý Thiếu Nhi",
@@ -26,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body className={`${inter.variable} ${interTight.variable} font-sans antialiased`} suppressHydrationWarning>
+      <body className="font-sans antialiased" suppressHydrationWarning>
         {/* Background Image - Global */}
         <div
           className="fixed inset-0 z-0"

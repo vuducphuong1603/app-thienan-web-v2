@@ -1469,12 +1469,13 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors">
+    <div className="min-h-screen flex flex-col transition-colors">
       {/* Header */}
       <DashboardHeader
         userName={firstName || 'Admin'}
         userRole={ROLE_LABELS[user.role]}
         activeTab="system"
+        userAvatar={user.avatar_url}
       />
 
       {/* Main Content */}

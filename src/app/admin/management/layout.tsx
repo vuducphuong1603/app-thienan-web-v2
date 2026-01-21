@@ -114,7 +114,7 @@ export default function ManagementLayout({ children }: ManagementLayoutProps) {
   const activeItem = getActiveItem()
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFAFA]">
+    <div className="min-h-screen flex flex-col">
       {/* Header */}
       <DashboardHeader
         userName={firstName || 'Admin'}

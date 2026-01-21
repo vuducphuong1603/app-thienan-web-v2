@@ -122,6 +122,7 @@ export default function AdminDashboard() {
         userEmail={user.email || ''}
         activeTab="overview"
         onLogout={logout}
+        userAvatar={user.avatar_url}
       />
 
       {/* Main Content */}
