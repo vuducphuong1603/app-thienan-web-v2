@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context'
 import { Check, X, List, FileText, Loader2 } from 'lucide-react'
 import QRAttendanceModal from '@/components/QRAttendanceModal'
 import AttendanceConfirmModal from '@/components/AttendanceConfirmModal'
+import ImportExcelModal from '@/components/ImportExcelModal'
 
 interface StudentWithAttendance extends ThieuNhiProfile {
   class_name?: string
@@ -40,6 +41,9 @@ export default function ActivitiesPage() {
   // Confirmation Modal states
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
   const [selectedStudentForConfirm, setSelectedStudentForConfirm] = useState<StudentWithAttendance | null>(null)
+
+  // Import Excel Modal states
+  const [isImportExcelModalOpen, setIsImportExcelModalOpen] = useState(false)
 
   // Get day of week from selected date
   const getDayOfWeek = (dateString: string) => {
@@ -414,6 +418,24 @@ export default function ActivitiesPage() {
     setSelectedStudentForConfirm(null)
   }
 
+  // Open Import Excel modal
+  const openImportExcelModal = () => {
+    setIsImportExcelModalOpen(true)
+  }
+
+  // Close Import Excel modal
+  const closeImportExcelModal = () => {
+    setIsImportExcelModalOpen(false)
+  }
+
+  // Handle import from Excel file (placeholder - to be implemented later)
+  const handleImportExcel = (file: File) => {
+    console.log('Import file:', file.name)
+    // TODO: Implement actual import logic
+    showNotification('success', `Đã chọn file: ${file.name}`)
+    closeImportExcelModal()
+  }
+
   return (
     <div className="flex gap-[17px]">
       {/* Notification Toast */}
@@ -774,7 +796,11 @@ export default function ActivitiesPage() {
                         </button>
 
                         {/* Import Excel Button */}
-                        <button className="h-[60px] w-full bg-[#E5E1DC] border border-white/60 rounded-[18px] flex items-center gap-4 px-5 hover:bg-[#d9d5d0] transition-colors">
+                        <button
+                          onClick={openImportExcelModal}
+                          disabled={!dayType}
+                          className="h-[60px] w-full bg-[#E5E1DC] border border-white/60 rounded-[18px] flex items-center gap-4 px-5 hover:bg-[#d9d5d0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
                           <span className="text-sm text-black/80">Import Excel</span>
                         </button>
                       </div>
@@ -972,6 +998,17 @@ export default function ActivitiesPage() {
           attendanceDate={selectedDate}
           dayType={dayType}
           isLoading={saving === selectedStudentForConfirm.id}
+        />
+      )}
+
+      {/* Import Excel Modal */}
+      {dayType && (
+        <ImportExcelModal
+          isOpen={isImportExcelModalOpen}
+          onClose={closeImportExcelModal}
+          onImport={handleImportExcel}
+          selectedDate={selectedDate}
+          dayType={dayType}
         />
       )}
     </div>
