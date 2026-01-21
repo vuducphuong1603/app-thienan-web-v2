@@ -1,5 +1,8 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+
 interface BranchData {
   name: string
   stats: {
@@ -9,52 +12,11 @@ interface BranchData {
   }[]
 }
 
-const branchesData: BranchData[] = [
-  {
-    name: 'Chiên con',
-    stats: [
-      { label: 'Lớp', value: 7, percentage: 65 },
-      { label: 'Thiếu nhi', value: 178, percentage: 18 },
-      { label: 'Giáo lý viên', value: 87, percentage: 95 },
-    ],
-  },
-  {
-    name: 'Ấu nhi',
-    stats: [
-      { label: 'Lớp', value: 7, percentage: 70 },
-      { label: 'Thiếu nhi', value: 178, percentage: 25 },
-      { label: 'Giáo lý viên', value: 87, percentage: 80 },
-    ],
-  },
-  {
-    name: 'Thiếu nhi',
-    stats: [
-      { label: 'Lớp', value: 7, percentage: 55 },
-      { label: 'Thiếu nhi', value: 178, percentage: 30 },
-      { label: 'Giáo lý viên', value: 87, percentage: 70 },
-    ],
-  },
-  {
-    name: 'Nghĩa sĩ',
-    stats: [
-      { label: 'Lớp', value: 7, percentage: 60 },
-      { label: 'Thiếu nhi', value: 178, percentage: 20 },
-      { label: 'Giáo lý viên', value: 87, percentage: 85 },
-    ],
-  },
-]
-
-// Chart data points (percentage values for Y position)
-const chartData = {
-  attendance: [45, 15, 75, 35], // Chiên con, Ấu nhi, Thiếu nhi, Nghĩa sĩ
-  learning: [30, 25, 55, 45],
-  labels: ['Chiên con', 'Ấu nhi', 'Thiếu nhi', 'Nghĩa sĩ'],
-  tooltips: [
-    { show: true, value: 18, position: 0 },
-    { show: false, value: 0, position: 1 },
-    { show: false, value: 0, position: 2 },
-    { show: true, value: 125, position: 3 },
-  ],
+interface BranchStats {
+  name: string
+  classes: number
+  students: number
+  teachers: number
 }
 
 // Sparkle Icon Component
@@ -130,24 +92,30 @@ function BranchCard({ branch }: { branch: BranchData }) {
   )
 }
 
-function LineChart() {
+function LineChart({ branchesData }: { branchesData: BranchData[] }) {
   const width = 300
   const height = 80
   const padding = { left: 10, right: 10, top: 25, bottom: 5 }
   const chartWidth = width - padding.left - padding.right
   const chartHeight = height - padding.top - padding.bottom
 
+  // Extract data from branchesData
+  const labels = branchesData.map(b => b.name)
+  const studentsData = branchesData.map(b => b.stats.find(s => s.label === 'Thiếu nhi')?.percentage || 0)
+  const teachersData = branchesData.map(b => b.stats.find(s => s.label === 'Giáo lý viên')?.percentage || 0)
+
   // Calculate points for lines
-  const getX = (index: number) => padding.left + (index * chartWidth) / (chartData.attendance.length - 1)
+  const dataLength = branchesData.length || 1
+  const getX = (index: number) => padding.left + (index * chartWidth) / Math.max(dataLength - 1, 1)
   const getY = (value: number) => padding.top + chartHeight - (value / 100) * chartHeight
 
-  // Generate path for attendance line (orange)
-  const attendancePath = chartData.attendance
+  // Generate path for students line (orange)
+  const studentsPath = studentsData
     .map((val, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(val)}`)
     .join(' ')
 
-  // Generate path for learning line (gray)
-  const learningPath = chartData.learning
+  // Generate path for teachers line (gray)
+  const teachersPath = teachersData
     .map((val, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(val)}`)
     .join(' ')
 
@@ -166,9 +134,9 @@ function LineChart() {
             strokeWidth="1"
           />
 
-          {/* Learning line (gray/beige) */}
+          {/* Teachers line (gray/beige) */}
           <path
-            d={learningPath}
+            d={teachersPath}
             fill="none"
             stroke="#E5E1DC"
             strokeWidth="2"
@@ -176,9 +144,9 @@ function LineChart() {
             strokeLinejoin="round"
           />
 
-          {/* Attendance line (orange) */}
+          {/* Students line (orange) */}
           <path
-            d={attendancePath}
+            d={studentsPath}
             fill="none"
             stroke="#FA865E"
             strokeWidth="2"
@@ -186,10 +154,10 @@ function LineChart() {
             strokeLinejoin="round"
           />
 
-          {/* Attendance points (orange) */}
-          {chartData.attendance.map((val, i) => (
+          {/* Students points (orange) */}
+          {studentsData.map((val, i) => (
             <circle
-              key={`att-${i}`}
+              key={`student-${i}`}
               cx={getX(i)}
               cy={getY(val)}
               r="3"
@@ -197,10 +165,10 @@ function LineChart() {
             />
           ))}
 
-          {/* Learning points (gray/beige) */}
-          {chartData.learning.map((val, i) => (
+          {/* Teachers points (gray/beige) */}
+          {teachersData.map((val, i) => (
             <circle
-              key={`learn-${i}`}
+              key={`teacher-${i}`}
               cx={getX(i)}
               cy={getY(val)}
               r="3"
@@ -208,46 +176,68 @@ function LineChart() {
             />
           ))}
 
-          {/* Tooltips */}
-          {chartData.tooltips.map((tooltip, i) => {
-            if (!tooltip.show) return null
-            const x = getX(tooltip.position)
-            const y = getY(chartData.attendance[tooltip.position])
-            return (
-              <g key={`tooltip-${i}`}>
-                {/* Tooltip box */}
+          {/* Tooltips for first and last points */}
+          {studentsData.length > 0 && (
+            <>
+              {/* First point tooltip */}
+              <g>
                 <rect
-                  x={x - 18}
-                  y={y - 28}
+                  x={getX(0) - 18}
+                  y={getY(studentsData[0]) - 28}
                   width="36"
                   height="20"
                   rx="4"
                   fill="#FA865E"
                 />
-                {/* Tooltip arrow */}
                 <polygon
-                  points={`${x - 5},${y - 8} ${x + 5},${y - 8} ${x},${y - 3}`}
+                  points={`${getX(0) - 5},${getY(studentsData[0]) - 8} ${getX(0) + 5},${getY(studentsData[0]) - 8} ${getX(0)},${getY(studentsData[0]) - 3}`}
                   fill="#FA865E"
                 />
-                {/* Tooltip text */}
                 <text
-                  x={x}
-                  y={y - 14}
+                  x={getX(0)}
+                  y={getY(studentsData[0]) - 14}
                   textAnchor="middle"
                   fill="white"
                   fontSize="11"
                   fontWeight="500"
                 >
-                  {tooltip.value}
+                  {studentsData[0]}%
                 </text>
               </g>
-            )
-          })}
+              {/* Last point tooltip */}
+              {studentsData.length > 1 && (
+                <g>
+                  <rect
+                    x={getX(studentsData.length - 1) - 18}
+                    y={getY(studentsData[studentsData.length - 1]) - 28}
+                    width="36"
+                    height="20"
+                    rx="4"
+                    fill="#FA865E"
+                  />
+                  <polygon
+                    points={`${getX(studentsData.length - 1) - 5},${getY(studentsData[studentsData.length - 1]) - 8} ${getX(studentsData.length - 1) + 5},${getY(studentsData[studentsData.length - 1]) - 8} ${getX(studentsData.length - 1)},${getY(studentsData[studentsData.length - 1]) - 3}`}
+                    fill="#FA865E"
+                  />
+                  <text
+                    x={getX(studentsData.length - 1)}
+                    y={getY(studentsData[studentsData.length - 1]) - 14}
+                    textAnchor="middle"
+                    fill="white"
+                    fontSize="11"
+                    fontWeight="500"
+                  >
+                    {studentsData[studentsData.length - 1]}%
+                  </text>
+                </g>
+              )}
+            </>
+          )}
         </svg>
 
         {/* X-axis labels */}
         <div className="flex justify-between mt-1 px-2">
-          {chartData.labels.map((label, i) => (
+          {labels.map((label, i) => (
             <span key={i} className="text-[10px] text-[#666D80]">{label}</span>
           ))}
         </div>
@@ -257,11 +247,11 @@ function LineChart() {
       <div className="flex items-center justify-center gap-6 mt-3">
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-[2px] bg-[#FA865E] rounded-full"></div>
-          <span className="text-[10px] text-[#666D80]">Điểm danh trung bình</span>
+          <span className="text-[10px] text-[#666D80]">Thiếu nhi (%)</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-[2px] bg-[#E5E1DC] rounded-full"></div>
-          <span className="text-[10px] text-[#666D80]">Học tập trung bình</span>
+          <span className="text-[10px] text-[#666D80]">Giáo lý viên (%)</span>
         </div>
       </div>
     </div>
@@ -269,6 +259,112 @@ function LineChart() {
 }
 
 export default function ClassStats() {
+  const [branchesData, setBranchesData] = useState<BranchData[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        // Fetch branches
+        const { data: branches } = await supabase
+          .from('branches')
+          .select('id, name, order_index')
+          .order('order_index')
+
+        if (!branches) return
+
+        // Fetch classes grouped by branch
+        const { data: classes } = await supabase
+          .from('classes')
+          .select('id, branch')
+          .eq('status', 'ACTIVE')
+
+        // Fetch students with their class info to get branch
+        const { data: students } = await supabase
+          .from('thieu_nhi')
+          .select('id, class_id')
+          .eq('status', 'ACTIVE')
+
+        // Fetch teachers (giáo lý viên) with class_id to get branch
+        const { data: teachers } = await supabase
+          .from('users')
+          .select('id, class_id')
+          .eq('role', 'giao_ly_vien')
+          .eq('status', 'ACTIVE')
+
+        // Create a map of class_id to branch for quick lookup
+        const classBranchMap = new Map<string, string>()
+        classes?.forEach(c => {
+          if (c.id && c.branch) {
+            classBranchMap.set(c.id, c.branch.toLowerCase())
+          }
+        })
+
+        // Calculate stats for each branch (case-insensitive comparison)
+        const branchStats: BranchStats[] = branches.map(branch => {
+          const branchNameLower = branch.name.toLowerCase()
+          const branchClasses = classes?.filter(c => c.branch?.toLowerCase() === branchNameLower).length || 0
+
+          // Count students by looking up their class's branch
+          const branchStudents = students?.filter(s => {
+            if (!s.class_id) return false
+            const classBranch = classBranchMap.get(s.class_id)
+            return classBranch === branchNameLower
+          }).length || 0
+
+          // Count teachers by looking up their class's branch
+          const branchTeachers = teachers?.filter(t => {
+            if (!t.class_id) return false
+            const classBranch = classBranchMap.get(t.class_id)
+            return classBranch === branchNameLower
+          }).length || 0
+
+          return {
+            name: branch.name,
+            classes: branchClasses,
+            students: branchStudents,
+            teachers: branchTeachers,
+          }
+        })
+
+        // Calculate totals for percentage
+        const totalClasses = branchStats.reduce((sum, b) => sum + b.classes, 0)
+        const totalStudents = branchStats.reduce((sum, b) => sum + b.students, 0)
+        const totalTeachers = branchStats.reduce((sum, b) => sum + b.teachers, 0)
+
+        // Convert to BranchData format with percentages
+        const formattedData: BranchData[] = branchStats.map(branch => ({
+          name: branch.name,
+          stats: [
+            {
+              label: 'Lớp',
+              value: branch.classes,
+              percentage: totalClasses > 0 ? Math.round((branch.classes / totalClasses) * 100) : 0,
+            },
+            {
+              label: 'Thiếu nhi',
+              value: branch.students,
+              percentage: totalStudents > 0 ? Math.round((branch.students / totalStudents) * 100) : 0,
+            },
+            {
+              label: 'Giáo lý viên',
+              value: branch.teachers,
+              percentage: totalTeachers > 0 ? Math.round((branch.teachers / totalTeachers) * 100) : 0,
+            },
+          ],
+        }))
+
+        setBranchesData(formattedData)
+      } catch (error) {
+        console.error('Error fetching class stats:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [])
+
   return (
     <div className="bg-white rounded-[15px] p-4 border border-gray-100 flex flex-col h-full">
       {/* Header */}
@@ -284,13 +380,19 @@ export default function ClassStats() {
 
       {/* Branch Cards */}
       <div className="flex-1 space-y-3 overflow-auto">
-        {branchesData.map((branch, index) => (
-          <BranchCard key={index} branch={branch} />
-        ))}
+        {loading ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="animate-spin h-6 w-6 border-2 border-brand border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          branchesData.map((branch, index) => (
+            <BranchCard key={index} branch={branch} />
+          ))
+        )}
       </div>
 
       {/* Line Chart */}
-      <LineChart />
+      <LineChart branchesData={branchesData} />
     </div>
   )
 }

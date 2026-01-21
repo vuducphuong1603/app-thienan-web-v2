@@ -1,14 +1,18 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
+
 interface StatsCardProps {
   title: string
   value: number | string
   icon?: 'branch' | 'class' | 'student' | 'teacher'
   variant?: 'primary' | 'default'
   chart?: 'line' | 'bar' | 'people' | 'wave'
+  href?: string
 }
 
-export default function StatsCard({ title, value, icon = 'branch', variant = 'default', chart }: StatsCardProps) {
+export default function StatsCard({ title, value, icon = 'branch', variant = 'default', chart, href }: StatsCardProps) {
+  const router = useRouter()
   const isPrimary = variant === 'primary'
 
   const renderChart = () => {
@@ -247,13 +251,20 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
     return null
   }
 
+  const handleClick = () => {
+    if (href) {
+      router.push(href)
+    }
+  }
+
   return (
     <div
+      onClick={handleClick}
       className={`rounded-[15px] p-4 h-[120px] flex flex-col justify-between ${
         isPrimary
           ? 'bg-brand text-white'
           : 'bg-white border border-gray-100'
-      }`}
+      } ${href ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
     >
       {/* Top row: Title and Icon */}
       <div className="flex items-start justify-between">

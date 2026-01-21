@@ -170,18 +170,21 @@ export default function AdminDashboard() {
               value={loadingStats ? '...' : stats.totalClasses}
               icon="class"
               chart="bar"
+              href="/admin/management/classes"
             />
             <StatsCard
               title="Tổng thiếu nhi"
               value={loadingStats ? '...' : stats.totalThieuNhi}
               icon="student"
               chart="people"
+              href="/admin/management/students"
             />
             <StatsCard
               title="Giáo lý viên"
               value={loadingStats ? '...' : stats.totalGiaoLyVien}
               icon="teacher"
               chart="wave"
+              href="/admin/management/users"
             />
           </div>
 
