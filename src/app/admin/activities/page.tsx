@@ -3,10 +3,25 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Check, X, List, FileText, Loader2 } from 'lucide-react'
+import { Check, X, List, FileText, Loader2, Plus, Calendar } from 'lucide-react'
 import QRAttendanceModal from '@/components/QRAttendanceModal'
 import AttendanceConfirmModal from '@/components/AttendanceConfirmModal'
 import ImportExcelModal from '@/components/ImportExcelModal'
+import ExportSuccessModal from '@/components/ExportSuccessModal'
+
+// Report related interfaces
+interface ReportStudent {
+  id: string
+  student_code?: string
+  full_name: string
+  saint_name?: string
+  avatar_url?: string
+  attendance: Record<string, 'present' | 'absent' | null> // date -> status
+}
+
+type TimeFilterMode = 'week' | 'dateRange'
+type ReportType = 'attendance' | 'score'
+type AttendanceTypeFilter = 'all' | 'thu5' | 'cn'
 
 interface StudentWithAttendance extends ThieuNhiProfile {
   class_name?: string
@@ -44,6 +59,38 @@ export default function ActivitiesPage() {
 
   // Import Excel Modal states
   const [isImportExcelModalOpen, setIsImportExcelModalOpen] = useState(false)
+
+  // Report states
+  const [reportTimeFilterMode, setReportTimeFilterMode] = useState<TimeFilterMode>('dateRange')
+  const [reportFromDate, setReportFromDate] = useState<string>(new Date().toISOString().split('T')[0])
+  const [reportToDate, setReportToDate] = useState<string>(new Date().toISOString().split('T')[0])
+  const [reportWeekStart, setReportWeekStart] = useState<string>('')
+  const [reportWeekEnd, setReportWeekEnd] = useState<string>('')
+  const [reportType, setReportType] = useState<ReportType>('attendance')
+  const [reportBranch, setReportBranch] = useState<string>('')
+  const [reportClassId, setReportClassId] = useState<string>('')
+  const [reportAttendanceType, setReportAttendanceType] = useState<AttendanceTypeFilter>('all')
+  const [isReportGenerated, setIsReportGenerated] = useState(false)
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportStudents, setReportStudents] = useState<ReportStudent[]>([])
+  const [reportDates, setReportDates] = useState<string[]>([])
+  const [reportStats, setReportStats] = useState({
+    presentThu5: 0,
+    presentCn: 0,
+    notChecked: 0,
+    totalAttendance: 0,
+  })
+  const [isExportSuccessModalOpen, setIsExportSuccessModalOpen] = useState(false)
+  const [exportSuccessMessage, setExportSuccessMessage] = useState('')
+
+  // Report dropdown states
+  const [isReportClassDropdownOpen, setIsReportClassDropdownOpen] = useState(false)
+  const [isReportBranchDropdownOpen, setIsReportBranchDropdownOpen] = useState(false)
+  const [isReportTypeDropdownOpen, setIsReportTypeDropdownOpen] = useState(false)
+  const [isReportAttendanceTypeDropdownOpen, setIsReportAttendanceTypeDropdownOpen] = useState(false)
+  const [isReportFromDatePickerOpen, setIsReportFromDatePickerOpen] = useState(false)
+  const [isReportToDatePickerOpen, setIsReportToDatePickerOpen] = useState(false)
+  const [isReportWeekPickerOpen, setIsReportWeekPickerOpen] = useState(false)
 
   // Get day of week from selected date
   const getDayOfWeek = (dateString: string) => {
@@ -136,7 +183,7 @@ export default function ActivitiesPage() {
         } else {
           console.warn('Attendance table may not exist yet:', attendanceError.message)
         }
-      } catch (e) {
+      } catch {
         console.warn('Could not fetch attendance records - table may not exist')
       }
 
@@ -435,6 +482,190 @@ export default function ActivitiesPage() {
     showNotification('success', `Đã chọn file: ${file.name}`)
     closeImportExcelModal()
   }
+
+  // Report helper functions
+  const formatDisplayDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric', year: 'numeric' })
+  }
+
+  const formatShortDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+  }
+
+  // Get report class name
+  const getReportClassName = (classId: string) => {
+    const cls = classes.find((c) => c.id === classId)
+    return cls?.name || ''
+  }
+
+  // Get classes filtered by branch for report
+  const getClassesByBranch = (branch: string) => {
+    if (!branch) return classes
+    return classes.filter(c => c.branch === branch)
+  }
+
+  // Close all report dropdowns
+  const closeAllReportDropdowns = () => {
+    setIsReportClassDropdownOpen(false)
+    setIsReportBranchDropdownOpen(false)
+    setIsReportTypeDropdownOpen(false)
+    setIsReportAttendanceTypeDropdownOpen(false)
+    setIsReportFromDatePickerOpen(false)
+    setIsReportToDatePickerOpen(false)
+    setIsReportWeekPickerOpen(false)
+  }
+
+  // Generate report (placeholder - to be implemented with actual data fetching)
+  const generateReport = async () => {
+    if (!reportClassId) {
+      showNotification('error', 'Vui lòng chọn lớp')
+      return
+    }
+
+    setReportLoading(true)
+    try {
+      // Get date range based on filter mode
+      let fromDate = reportFromDate
+      let toDate = reportToDate
+      if (reportTimeFilterMode === 'week' && reportWeekStart && reportWeekEnd) {
+        fromDate = reportWeekStart
+        toDate = reportWeekEnd
+      }
+
+      // Fetch students in the class
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('thieu_nhi')
+        .select('id, student_code, full_name, saint_name, avatar_url')
+        .eq('class_id', reportClassId)
+        .eq('status', 'ACTIVE')
+        .order('full_name', { ascending: true })
+
+      if (studentsError) {
+        throw studentsError
+      }
+
+      // Build query for attendance records
+      let query = supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('class_id', reportClassId)
+        .gte('attendance_date', fromDate)
+        .lte('attendance_date', toDate)
+
+      // Filter by attendance type if not 'all'
+      if (reportAttendanceType !== 'all') {
+        query = query.eq('day_type', reportAttendanceType)
+      }
+
+      const { data: attendanceData, error: attendanceError } = await query
+
+      if (attendanceError) {
+        console.warn('Attendance fetch error:', attendanceError)
+      }
+
+      // Get unique dates from attendance records
+      const uniqueDates = new Set<string>()
+      attendanceData?.forEach(record => {
+        uniqueDates.add(record.attendance_date)
+      })
+      const sortedDates = Array.from(uniqueDates).sort()
+      setReportDates(sortedDates)
+
+      // Map attendance to students
+      const attendanceMap = new Map<string, Map<string, 'present' | 'absent'>>()
+      attendanceData?.forEach(record => {
+        if (!attendanceMap.has(record.student_id)) {
+          attendanceMap.set(record.student_id, new Map())
+        }
+        attendanceMap.get(record.student_id)?.set(record.attendance_date, record.status)
+      })
+
+      // Build report students
+      const reportStudentsData: ReportStudent[] = (studentsData || []).map(student => {
+        const studentAttendance: Record<string, 'present' | 'absent' | null> = {}
+        sortedDates.forEach(date => {
+          studentAttendance[date] = attendanceMap.get(student.id)?.get(date) || null
+        })
+        return {
+          ...student,
+          attendance: studentAttendance,
+        }
+      })
+
+      setReportStudents(reportStudentsData)
+
+      // Calculate stats
+      let presentThu5 = 0
+      let presentCn = 0
+      let notChecked = 0
+      let totalAttendance = 0
+
+      attendanceData?.forEach(record => {
+        if (record.status === 'present') {
+          totalAttendance++
+          if (record.day_type === 'thu5') {
+            presentThu5++
+          } else if (record.day_type === 'cn') {
+            presentCn++
+          }
+        }
+      })
+
+      // Count not checked
+      reportStudentsData.forEach(student => {
+        sortedDates.forEach(date => {
+          if (student.attendance[date] === null) {
+            notChecked++
+          }
+        })
+      })
+
+      setReportStats({
+        presentThu5,
+        presentCn,
+        notChecked,
+        totalAttendance,
+      })
+
+      setIsReportGenerated(true)
+      showNotification('success', 'Đã tạo báo cáo thành công')
+    } catch (error) {
+      console.error('Error generating report:', error)
+      showNotification('error', 'Không thể tạo báo cáo')
+    } finally {
+      setReportLoading(false)
+    }
+  }
+
+  // Export image (placeholder)
+  const handleExportImage = () => {
+    setExportSuccessMessage('Đã xuất ảnh!')
+    setIsExportSuccessModalOpen(true)
+    setTimeout(() => setIsExportSuccessModalOpen(false), 2000)
+  }
+
+  // Export Excel (placeholder)
+  const handleExportExcel = () => {
+    setExportSuccessMessage('Đã xuất Excel!')
+    setIsExportSuccessModalOpen(true)
+    setTimeout(() => setIsExportSuccessModalOpen(false), 2000)
+  }
+
+  // Set week dates (get current week by default)
+  useEffect(() => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    const monday = new Date(today)
+    monday.setDate(today.getDate() + mondayOffset)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+
+    setReportWeekStart(monday.toISOString().split('T')[0])
+    setReportWeekEnd(sunday.toISOString().split('T')[0])
+  }, [])
 
   return (
     <div className="flex gap-[17px]">
@@ -967,11 +1198,640 @@ export default function ActivitiesPage() {
           </>
         ) : (
           /* Reports Tab */
-          <div className="flex flex-col items-center justify-center h-full min-h-[600px]">
-            <div className="bg-[#f6f6f6] rounded-2xl px-10 py-6 flex flex-col items-center gap-2">
-              <FileText className="w-12 h-12 text-[#666d80]" />
-              <p className="text-sm text-black">Tính năng báo cáo đang được phát triển</p>
+          <div className="p-6">
+            {/* Header Section */}
+            <div className="flex items-start gap-6 mb-6">
+              {/* Title */}
+              <div className="w-[300px]">
+                <h1 className="text-[26px] font-semibold text-black">Tạo báo cáo mới</h1>
+                <p className="text-sm font-medium text-[#666d80] mt-1">Tạo và xuất báo cáo</p>
+              </div>
+
+              {/* Time Filter Mode Selector */}
+              <div className="flex-1 bg-white border border-[#e5e1dc] rounded-2xl overflow-hidden">
+                <div className="flex items-center h-12 px-4">
+                  <span className="flex-1 text-base font-semibold text-black">Cách chọn lọc thời gian</span>
+                  <div className="flex items-center gap-4">
+                    {/* Chọn tuần option */}
+                    <button
+                      onClick={() => setReportTimeFilterMode('week')}
+                      className="flex items-center gap-2"
+                    >
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        reportTimeFilterMode === 'week' ? 'border-brand' : 'border-gray-300'
+                      }`}>
+                        {reportTimeFilterMode === 'week' && (
+                          <div className="w-2 h-2 rounded-full bg-brand" />
+                        )}
+                      </div>
+                      <span className="text-sm font-medium text-black">Chọn tuần</span>
+                    </button>
+
+                    {/* Chọn từ ngày - đến ngày option */}
+                    <button
+                      onClick={() => setReportTimeFilterMode('dateRange')}
+                      className="flex items-center gap-2"
+                    >
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        reportTimeFilterMode === 'dateRange' ? 'border-brand' : 'border-gray-300'
+                      }`}>
+                        {reportTimeFilterMode === 'dateRange' && (
+                          <div className="w-2 h-2 rounded-full bg-brand" />
+                        )}
+                      </div>
+                      <span className="text-sm font-medium text-black">Chọn từ ngày - đến ngày</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Divider */}
+            <div className="h-px bg-[#e5e1dc] mb-6" />
+
+            {/* Form Row 1 - Date Selection */}
+            <div className="flex items-start gap-3 mb-6">
+              {reportTimeFilterMode === 'dateRange' ? (
+                <>
+                  {/* Từ ngày */}
+                  <div className="w-[27%]">
+                    <label className="block text-sm font-medium text-[#666d80] mb-2">Từ ngày</label>
+                    <div className="relative">
+                      <button
+                        onClick={() => {
+                          closeAllReportDropdowns()
+                          setIsReportFromDatePickerOpen(!isReportFromDatePickerOpen)
+                        }}
+                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                      >
+                        <span className="text-sm text-black">{formatDisplayDate(reportFromDate)}</span>
+                        <Calendar className="w-5 h-5 text-[#8A8C90]" />
+                      </button>
+                      {isReportFromDatePickerOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 p-3">
+                          <input
+                            type="date"
+                            value={reportFromDate}
+                            onChange={(e) => {
+                              setReportFromDate(e.target.value)
+                              setIsReportFromDatePickerOpen(false)
+                            }}
+                            className="w-full px-3 py-2 border border-[#E5E1DC] rounded-lg text-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Đến ngày */}
+                  <div className="w-[27%]">
+                    <label className="block text-sm font-medium text-[#666d80] mb-2">Đến ngày</label>
+                    <div className="relative">
+                      <button
+                        onClick={() => {
+                          closeAllReportDropdowns()
+                          setIsReportToDatePickerOpen(!isReportToDatePickerOpen)
+                        }}
+                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                      >
+                        <span className="text-sm text-black">{formatDisplayDate(reportToDate)}</span>
+                        <Calendar className="w-5 h-5 text-[#8A8C90]" />
+                      </button>
+                      {isReportToDatePickerOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 p-3">
+                          <input
+                            type="date"
+                            value={reportToDate}
+                            onChange={(e) => {
+                              setReportToDate(e.target.value)
+                              setIsReportToDatePickerOpen(false)
+                            }}
+                            className="w-full px-3 py-2 border border-[#E5E1DC] rounded-lg text-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Chọn tuần */
+                <div className="w-[55%]">
+                  <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn tuần</label>
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        closeAllReportDropdowns()
+                        setIsReportWeekPickerOpen(!isReportWeekPickerOpen)
+                      }}
+                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                    >
+                      <span className="text-sm text-black">
+                        {reportWeekStart && reportWeekEnd
+                          ? `${formatDisplayDate(reportWeekStart)} - ${formatDisplayDate(reportWeekEnd)}`
+                          : 'Chọn tuần'}
+                      </span>
+                      <Calendar className="w-5 h-5 text-[#8A8C90]" />
+                    </button>
+                    {isReportWeekPickerOpen && (
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 p-3">
+                        <p className="text-xs text-[#666d80] mb-2">Chọn ngày bắt đầu tuần:</p>
+                        <input
+                          type="date"
+                          value={reportWeekStart}
+                          onChange={(e) => {
+                            const start = new Date(e.target.value)
+                            const end = new Date(start)
+                            end.setDate(start.getDate() + 6)
+                            setReportWeekStart(e.target.value)
+                            setReportWeekEnd(end.toISOString().split('T')[0])
+                            setIsReportWeekPickerOpen(false)
+                          }}
+                          className="w-full px-3 py-2 border border-[#E5E1DC] rounded-lg text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Loại báo cáo */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-[#666d80] mb-2">Loại báo cáo</label>
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      closeAllReportDropdowns()
+                      setIsReportTypeDropdownOpen(!isReportTypeDropdownOpen)
+                    }}
+                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                  >
+                    <span className="text-sm text-black">
+                      {reportType === 'attendance' ? 'Báo cáo điểm danh' : 'Báo cáo điểm số'}
+                    </span>
+                    <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                      <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
+                    </svg>
+                  </button>
+                  {isReportTypeDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden">
+                      <button
+                        onClick={() => {
+                          setReportType('attendance')
+                          setIsReportTypeDropdownOpen(false)
+                        }}
+                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportType === 'attendance' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                      >
+                        Báo cáo điểm danh
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Form Row 2 - Filters */}
+            <div className="flex items-start gap-3 mb-6">
+              {/* Ngành (tùy chọn) */}
+              <div className="flex-[1.28]">
+                <label className="block text-sm font-medium text-[#666d80] mb-2">Ngành (tùy chọn)</label>
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      closeAllReportDropdowns()
+                      setIsReportBranchDropdownOpen(!isReportBranchDropdownOpen)
+                    }}
+                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                  >
+                    <span className="text-sm text-black">{reportBranch || 'Tất cả ngành'}</span>
+                    <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportBranchDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                      <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
+                    </svg>
+                  </button>
+                  {isReportBranchDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden max-h-[200px] overflow-y-auto">
+                      <button
+                        onClick={() => {
+                          setReportBranch('')
+                          setReportClassId('')
+                          setIsReportBranchDropdownOpen(false)
+                        }}
+                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${!reportBranch ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                      >
+                        Tất cả ngành
+                      </button>
+                      {BRANCHES.map((branch) => (
+                        <button
+                          key={branch}
+                          onClick={() => {
+                            setReportBranch(branch)
+                            setReportClassId('')
+                            setIsReportBranchDropdownOpen(false)
+                          }}
+                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportBranch === branch ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                        >
+                          {branch}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Lớp */}
+              <div className="flex-[1.28]">
+                <label className="block text-sm font-medium text-[#666d80] mb-2">Lớp</label>
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      closeAllReportDropdowns()
+                      setIsReportClassDropdownOpen(!isReportClassDropdownOpen)
+                    }}
+                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                  >
+                    <span className="text-sm text-black">{reportClassId ? getReportClassName(reportClassId) : 'Chọn lớp'}</span>
+                    <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportClassDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                      <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
+                    </svg>
+                  </button>
+                  {isReportClassDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden max-h-[300px] overflow-y-auto">
+                      {getClassesByBranch(reportBranch).map((cls) => (
+                        <button
+                          key={cls.id}
+                          onClick={() => {
+                            setReportClassId(cls.id)
+                            setIsReportClassDropdownOpen(false)
+                          }}
+                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportClassId === cls.id ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                        >
+                          {cls.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Năm học */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-[#666d80] mb-2">Năm học</label>
+                <div className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full">
+                  <span className="text-sm text-black">{schoolYear?.name || 'Năm học hiện tại'}</span>
+                  <svg className="w-[9px] h-[18px] text-black" viewBox="0 0 9 18" fill="none">
+                    <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Loại điểm danh */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-[#666d80] mb-2">Loại điểm danh</label>
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      closeAllReportDropdowns()
+                      setIsReportAttendanceTypeDropdownOpen(!isReportAttendanceTypeDropdownOpen)
+                    }}
+                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                  >
+                    <span className="text-sm text-black">
+                      {reportAttendanceType === 'all' ? 'Tất cả' : reportAttendanceType === 'thu5' ? 'Thứ 5' : 'Chủ nhật'}
+                    </span>
+                    <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportAttendanceTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                      <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
+                    </svg>
+                  </button>
+                  {isReportAttendanceTypeDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden">
+                      {[
+                        { value: 'all', label: 'Tất cả' },
+                        { value: 'thu5', label: 'Thứ 5' },
+                        { value: 'cn', label: 'Chủ nhật' },
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            setReportAttendanceType(option.value as AttendanceTypeFilter)
+                            setIsReportAttendanceTypeDropdownOpen(false)
+                          }}
+                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportAttendanceType === option.value ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-[#e5e1dc] mb-6" />
+
+            {/* Action Button */}
+            <div className="flex justify-end mb-6">
+              <button
+                onClick={generateReport}
+                disabled={reportLoading}
+                className="h-[49px] px-6 bg-brand border border-white/60 rounded-full flex items-center gap-1 text-lg text-white hover:bg-orange-500 transition-colors disabled:opacity-50"
+              >
+                {reportLoading ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <>
+                    <Plus className="w-6 h-6" />
+                    <span>Tạo báo cáo</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Report Result Section */}
+            {isReportGenerated && (
+              <div className="bg-white rounded-[24px] p-6">
+                {/* Report Preview Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    {/* Eye Icon */}
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12.0001 12C15.0793 12 18.0179 13.8185 20.1133 17.1592C20.8187 18.2839 20.8187 19.7161 20.1133 20.8408C18.0179 24.1815 15.0793 26 12.0001 26C8.92077 26 5.98224 24.1815 3.88678 20.8408C3.18144 19.7161 3.18144 18.2839 3.88678 17.1592C5.98224 13.8185 8.92077 12 12.0001 12ZM12.0001 14C9.77455 14 7.40822 15.3088 5.58112 18.2217C5.28324 18.6966 5.28324 19.3034 5.58112 19.7783C7.40822 22.6912 9.77455 24 12.0001 24C14.2256 24 16.5919 22.6912 18.419 19.7783C18.7169 19.3034 18.7169 18.6966 18.419 18.2217C16.5919 15.3088 14.2256 14 12.0001 14ZM12.0001 15C14.2092 15 16.0001 16.7909 16.0001 19C16.0001 21.2091 14.2092 23 12.0001 23C9.79092 23 8.00006 21.2091 8.00006 19C8.00006 16.7909 9.79092 15 12.0001 15ZM11.9141 17.0039C11.9687 17.1594 12.0001 17.3259 12.0001 17.5C12.0001 18.3284 11.3285 19 10.5001 19C10.326 19 10.1594 18.9686 10.004 18.9141C10.0028 18.9426 10.0001 18.9712 10.0001 19C10.0001 20.1046 10.8955 21 12.0001 21C13.1046 21 14.0001 20.1045 14.0001 19C14.0001 17.8955 13.1046 17 12.0001 17C11.9713 17 11.9426 17.0027 11.9141 17.0039Z" fill="#8A8C90" transform="translate(0, -7)"/>
+                    </svg>
+                    <span className="text-sm text-[#666D80]">
+                      Xem trước báo cáo: <span className="font-medium text-black">Báo cáo điểm danh</span>
+                    </span>
+                    {reportClassId && (
+                      <span className="h-[26px] px-4 bg-[#8A8C90] rounded-[13px] text-xs font-medium text-white uppercase flex items-center">
+                        LỚP {getReportClassName(reportClassId)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleExportImage}
+                      className="h-[38px] px-4 border border-brand rounded-[19px] flex items-center gap-2 text-sm text-brand hover:bg-brand/5 transition-colors"
+                    >
+                      <svg width="18" height="17" viewBox="0 0 18 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fillRule="evenodd" clipRule="evenodd" d="M18 0V17H0V4H2V15H16V2H12V0H18ZM5 0C7.68925 0 9.88225 2.1223 9.99625 4.78305L10 5L10 8.5852L12.293 6.2929L13.707 7.7071L9 12.4142L4.293 7.707L5.707 6.2928L8 8.5852V5C8 3.4023 6.75075 2.0963 5.176 2.0051L5 2H-1V0H5Z" fill="#FA865E"/>
+                      </svg>
+                      Xuất ảnh
+                    </button>
+                    <button
+                      onClick={handleExportExcel}
+                      className="h-[38px] px-4 border border-brand rounded-[19px] flex items-center gap-2 text-sm text-brand hover:bg-brand/5 transition-colors"
+                    >
+                      <svg width="18" height="17" viewBox="0 0 18 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fillRule="evenodd" clipRule="evenodd" d="M18 0V17H0V4H2V15H16V2H12V0H18ZM5 0C7.68925 0 9.88225 2.1223 9.99625 4.78305L10 5L10 8.5852L12.293 6.2929L13.707 7.7071L9 12.4142L4.293 7.707L5.707 6.2928L8 8.5852V5C8 3.4023 6.75075 2.0963 5.176 2.0051L5 2H-1V0H5Z" fill="#FA865E"/>
+                      </svg>
+                      Xuất Excel
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stats Cards */}
+                <div className="flex items-stretch gap-[3px] mb-6">
+                  {/* Có mặt thứ 5 */}
+                  <div className="flex-1 h-[130px] bg-brand rounded-[15px] px-4 py-4 flex flex-col justify-between relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-white/80">Có mặt 5</span>
+                      <div className="w-[44px] h-[44px] rounded-full bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="white" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="flex items-end justify-between">
+                      <span className="text-[40px] font-bold text-white leading-none">{reportStats.presentThu5}</span>
+                    </div>
+                    {/* Trend lines decoration */}
+                    <svg className="absolute right-4 bottom-3" width="88" height="45" viewBox="0 0 88 45" fill="none">
+                      <path d="M0 35C36 -12 36 88.5 62 55C66.6 49 78 41.5 88 57" stroke="url(#trendGrad1)" strokeWidth="2.6" strokeLinecap="round"/>
+                      <path d="M0 52.5C33 23 26 10 56 56C60 64 72 70.5 88 47.5" stroke="url(#trendGrad2)" strokeWidth="2.6" strokeLinecap="round"/>
+                      <circle cx="22" cy="35" r="3" fill="#FA865E" stroke="white"/>
+                      <defs>
+                        <linearGradient id="trendGrad1" x1="0" y1="50" x2="88" y2="50" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="white" stopOpacity="0"/>
+                          <stop offset="0.26" stopColor="white"/>
+                          <stop offset="0.79" stopColor="white"/>
+                          <stop offset="1" stopColor="white" stopOpacity="0"/>
+                        </linearGradient>
+                        <linearGradient id="trendGrad2" x1="0" y1="50" x2="88" y2="50" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="white" stopOpacity="0"/>
+                          <stop offset="0.6" stopColor="white"/>
+                          <stop offset="1" stopColor="white" stopOpacity="0"/>
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                  </div>
+
+                  {/* Có mặt chủ nhật */}
+                  <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-black/80">Có mặt chủ nhật</span>
+                      <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="flex items-end justify-between">
+                      <span className="text-[40px] font-bold text-black leading-none">{reportStats.presentCn}</span>
+                      {/* Bar chart decoration */}
+                      <div className="flex items-end gap-[1px]">
+                        <div className="w-[11px] h-[3px] bg-[#E5E1DC] rounded-full"></div>
+                        <div className="w-[11px] h-[6px] bg-[#E5E1DC] rounded-[3px]"></div>
+                        <div className="w-[11px] h-[9px] bg-[#E5E1DC] rounded-[4.6px]"></div>
+                        <div className="w-[11px] h-[17px] bg-brand rounded-[4.8px]"></div>
+                        <div className="w-[11px] h-[25px] bg-brand rounded-[4.8px]"></div>
+                        <div className="w-[11px] h-[15px] bg-brand rounded-[4.8px]"></div>
+                        <div className="w-[11px] h-[10px] bg-[#E5E1DC] rounded-[4.8px]"></div>
+                        <div className="w-[11px] h-[3px] bg-[#E5E1DC] rounded-full"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Học sinh chưa điểm danh */}
+                  <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-black/80">Học sinh chưa điểm danh</span>
+                      <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="flex items-end justify-between">
+                      <span className="text-[40px] font-bold text-black leading-none">{reportStats.notChecked}</span>
+                      {/* Bar chart decoration */}
+                      <div className="flex items-end gap-[1px]">
+                        <div className="w-[11px] h-[3px] bg-[#E5E1DC] rounded-full"></div>
+                        <div className="w-[11px] h-[6px] bg-[#E5E1DC] rounded-[3px]"></div>
+                        <div className="w-[11px] h-[9px] bg-[#E5E1DC] rounded-[4.6px]"></div>
+                        <div className="w-[11px] h-[17px] bg-brand rounded-[4.8px]"></div>
+                        <div className="w-[11px] h-[25px] bg-brand rounded-[4.8px]"></div>
+                        <div className="w-[11px] h-[15px] bg-brand rounded-[4.8px]"></div>
+                        <div className="w-[11px] h-[10px] bg-[#E5E1DC] rounded-[4.8px]"></div>
+                        <div className="w-[11px] h-[3px] bg-[#E5E1DC] rounded-full"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tổng lượt điểm danh */}
+                  <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-black/80">Tổng lượt điểm danh</span>
+                      <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="flex items-end justify-between">
+                      <span className="text-[40px] font-bold text-black leading-none">{reportStats.totalAttendance}</span>
+                      {/* Attendance bars decoration */}
+                      <div className="flex items-end gap-[1px]">
+                        <div className="w-[2.6px] flex flex-col gap-[2px]">
+                          <div className="h-[4px] bg-white rounded-full"></div>
+                          <div className="h-[15px] bg-brand rounded-full"></div>
+                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
+                        </div>
+                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
+                          <div className="h-[6px] bg-white rounded-full"></div>
+                          <div className="h-[12px] bg-brand rounded-full"></div>
+                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
+                        </div>
+                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
+                          <div className="h-[3px] bg-brand rounded-full"></div>
+                          <div className="h-[15px] bg-white rounded-full"></div>
+                          <div className="w-[4px] h-[4px] bg-white rounded-full -ml-[0.7px]"></div>
+                        </div>
+                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
+                          <div className="h-[3px] bg-white rounded-full"></div>
+                          <div className="h-[16px] bg-brand rounded-full"></div>
+                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
+                        </div>
+                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
+                          <div className="h-[3px] bg-brand rounded-full"></div>
+                          <div className="h-[15px] bg-white rounded-full"></div>
+                          <div className="w-[4px] h-[4px] bg-white rounded-full -ml-[0.7px]"></div>
+                        </div>
+                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
+                          <div className="h-[3px] bg-white rounded-full"></div>
+                          <div className="h-[16px] bg-brand rounded-full"></div>
+                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
+                        </div>
+                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
+                          <div className="h-[3px] bg-brand rounded-full"></div>
+                          <div className="h-[15px] bg-white rounded-full"></div>
+                          <div className="w-[4px] h-[4px] bg-white rounded-full -ml-[0.7px]"></div>
+                        </div>
+                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
+                          <div className="h-[3px] bg-white rounded-full"></div>
+                          <div className="h-[15px] bg-brand rounded-full"></div>
+                          <div className="w-[4px] h-[4px] bg-white rounded-full -ml-[0.7px]"></div>
+                        </div>
+                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
+                          <div className="h-[6px] bg-white rounded-full"></div>
+                          <div className="h-[12px] bg-brand rounded-full"></div>
+                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
+                        </div>
+                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
+                          <div className="h-[3px] bg-brand rounded-full"></div>
+                          <div className="h-[15px] bg-white rounded-full"></div>
+                          <div className="w-[4px] h-[4px] bg-white rounded-full -ml-[0.7px]"></div>
+                        </div>
+                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
+                          <div className="h-[8px] bg-white rounded-full"></div>
+                          <div className="h-[10px] bg-brand rounded-full"></div>
+                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Attendance Table */}
+                <div className="overflow-hidden relative">
+                  {/* Table Header */}
+                  <div className="flex items-center h-[38px] bg-[#E5E1DC] rounded-[15px] border border-white/60 mb-2">
+                    <div className="w-[60px] text-center text-sm font-medium text-[#666d80]">STT</div>
+                    <div className="w-[64px]"></div>
+                    <div className="w-[100px] text-sm font-medium text-[#666d80]">Tên thánh</div>
+                    <div className="w-[260px] text-sm font-medium text-[#666d80]">Họ và tên</div>
+                    <div className="flex-1 flex">
+                      {reportDates.map((date) => (
+                        <div key={date} className="flex-1 text-center text-sm font-medium text-[#666d80]">
+                          {formatShortDate(date)}
+                        </div>
+                      ))}
+                      {reportDates.length === 0 && (
+                        <div className="flex-1 text-center text-sm text-[#666d80]">Không có dữ liệu</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Table Body */}
+                  {reportStudents.length === 0 ? (
+                    <div className="py-12 text-center text-sm text-[#666d80]">
+                      Không có học sinh trong lớp này
+                    </div>
+                  ) : (
+                    reportStudents.map((student, index) => {
+                      // Split name: last word is "Tên" (given name), rest is "Họ và tên đệm"
+                      const nameParts = student.full_name.split(' ')
+                      const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
+                      const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
+
+                      return (
+                        <div key={student.id} className="relative">
+                          <div className="flex items-center h-[56px]">
+                            <div className="w-[60px] text-center text-sm font-medium text-black">{index + 1}</div>
+                            <div className="w-[64px] flex items-center justify-center">
+                              <div className="w-[48px] h-[48px] rounded-[12px] bg-[#F3F3F3] flex items-center justify-center overflow-hidden">
+                                {student.avatar_url ? (
+                                  <img src={student.avatar_url} alt={student.full_name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span className="text-sm font-medium text-[#8B8685]">{student.full_name.charAt(0)}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="w-[100px] text-sm font-medium text-black">{student.saint_name || '-'}</div>
+                            <div className="w-[135px] text-sm font-semibold text-[#8A8C90]">{familyMiddleName}</div>
+                            <div className="w-[125px] text-sm font-semibold text-black">{givenName}</div>
+                            {/* Vertical separator */}
+                            <div className="w-[1px] h-full bg-[#8A8C90]/30 self-stretch" />
+                            <div className="flex-1 flex">
+                              {reportDates.map((date, dateIndex) => (
+                                <div key={date} className="flex-1 h-[56px] flex items-center justify-center relative">
+                                  {/* Vertical separator between date columns */}
+                                  {dateIndex > 0 && (
+                                    <div className="absolute left-0 top-0 bottom-0 w-[1px] bg-[#8A8C90]/30" />
+                                  )}
+                                  {student.attendance[date] === 'present' ? (
+                                    <div className="w-full h-full bg-[rgba(0,168,107,0.1)]"></div>
+                                  ) : student.attendance[date] === 'absent' ? (
+                                    <div className="w-full h-full bg-[rgba(250,134,94,0.2)] flex items-center justify-center">
+                                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M10.5369 0.251055C10.8717 -0.083685 11.4143 -0.083685 11.749 0.251055C12.0837 0.585795 12.0837 1.12839 11.749 1.46313L7.2121 6.00002L11.749 10.5369C12.0837 10.8717 12.0837 11.4143 11.749 11.749C11.4143 12.0837 10.8717 12.0837 10.5369 11.749L6.00002 7.2121L1.46313 11.749C1.12839 12.0837 0.585795 12.0837 0.251055 11.749C-0.083685 11.4143 -0.083685 10.8717 0.251055 10.5369L4.78795 6.00002L0.251055 1.46313C-0.083685 1.12839 -0.083685 0.585795 0.251055 0.251055C0.585795 -0.083685 1.12839 -0.083685 1.46313 0.251055L6.00002 4.78795L10.5369 0.251055Z" fill="#8A8C90"/>
+                                      </svg>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[#666d80]">-</span>
+                                  )}
+                                </div>
+                              ))}
+                              {/* Right vertical line after last date column */}
+                              <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-[#8A8C90]/30" />
+                            </div>
+                          </div>
+                          {/* Bottom separator line for each row */}
+                          <div className="absolute bottom-0 left-[20px] right-[20px] h-[1px] bg-[#8A8C90]/30" />
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1011,6 +1871,13 @@ export default function ActivitiesPage() {
           dayType={dayType}
         />
       )}
+
+      {/* Export Success Modal */}
+      <ExportSuccessModal
+        isOpen={isExportSuccessModalOpen}
+        onClose={() => setIsExportSuccessModalOpen(false)}
+        message={exportSuccessMessage}
+      />
     </div>
   )
 }
