@@ -186,7 +186,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Middle & Bottom Section - 3 columns, 2 rows layout */}
-          <div className="grid grid-cols-3 grid-rows-2 gap-4">
+          <div className="grid grid-cols-3 grid-rows-[1.4fr_1fr] gap-4">
             {/* Row 1, Col 1 - Notes */}
             <div className="space-y-4">
               <MyNotes />
