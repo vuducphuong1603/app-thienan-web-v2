@@ -63,6 +63,15 @@ export default function StudentsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
+      // Fetch current school year to get total_weeks
+      const { data: schoolYearData } = await supabase
+        .from('school_years')
+        .select('total_weeks')
+        .eq('is_current', true)
+        .single()
+
+      const currentTotalWeeks = schoolYearData?.total_weeks || 40
+
       // Fetch classes first
       const { data: classesData } = await supabase
         .from('classes')
@@ -97,12 +106,12 @@ export default function StudentsPage() {
         const attendance_thu5 = student.attendance_thu5 || 0
         const attendance_cn = student.attendance_cn || 0
 
-        // TB Giáo lý = average of 4 scores
-        const avg_catechism = (score_45_hk1 + score_exam_hk1 + score_45_hk2 + score_exam_hk2) / 4
-        // TB Điểm danh = average of Thu5 and CN
-        const avg_attendance = (attendance_thu5 + attendance_cn) / 2
-        // Tổng TB = average of all
-        const total_avg = (avg_catechism + avg_attendance) / 2
+        // TB Giáo lý = (45' HK1 + 45' HK2 + Thi HK1×2 + Thi HK2×2) / 6
+        const avg_catechism = (score_45_hk1 + score_45_hk2 + score_exam_hk1 * 2 + score_exam_hk2 * 2) / 6
+        // TB Điểm danh = (số buổi T5 × 0.4 + số buổi CN × 0.6) × (10 / tổng tuần)
+        const avg_attendance = (attendance_thu5 * 0.4 + attendance_cn * 0.6) * (10 / currentTotalWeeks)
+        // Tổng TB = TB Giáo lý × 0.6 + TB Điểm danh × 0.4
+        const total_avg = avg_catechism * 0.6 + avg_attendance * 0.4
 
         return {
           ...student,
@@ -719,10 +728,11 @@ export default function StudentsPage() {
                           </>
                         ) : (
                           <>
-                            {/* Medal/Award Icon */}
+                            {/* Medal/Award Icon - Chỉnh sửa điểm */}
                             <button
+                              onClick={() => startEditing(student)}
                               className="w-9 h-9 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
-                              title="Xem thành tích"
+                              title="Chỉnh sửa điểm"
                             >
                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <circle cx="12" cy="8" r="6" stroke="#8B8685" strokeWidth="1.5"/>
@@ -741,11 +751,11 @@ export default function StudentsPage() {
                                 <path d="M2.5 8.33334H17.5" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             </button>
-                            {/* Edit Icon */}
+                            {/* Edit Icon - Chỉnh sửa thiếu nhi */}
                             <button
-                              onClick={() => startEditing(student)}
+                              onClick={() => router.push(`/admin/management/students/${student.id}/edit`)}
                               className="w-9 h-9 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
-                              title="Chỉnh sửa điểm"
+                              title="Chỉnh sửa thiếu nhi"
                             >
                               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M14.1667 2.5C14.3856 2.28113 14.6454 2.10752 14.9314 1.98906C15.2173 1.87061 15.5238 1.80965 15.8333 1.80965C16.1429 1.80965 16.4493 1.87061 16.7353 1.98906C17.0213 2.10752 17.2811 2.28113 17.5 2.5C17.7189 2.71887 17.8925 2.97871 18.0109 3.26468C18.1294 3.55064 18.1904 3.85714 18.1904 4.16667C18.1904 4.4762 18.1294 4.78269 18.0109 5.06866C17.8925 5.35462 17.7189 5.61446 17.5 5.83333L6.25 17.0833L1.66667 18.3333L2.91667 13.75L14.1667 2.5Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>

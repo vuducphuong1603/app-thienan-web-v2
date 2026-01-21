@@ -12,10 +12,10 @@ interface DashboardHeaderProps {
 }
 
 const navTabs = [
-  { id: 'overview', label: 'Tong quan', href: '/admin/dashboard' },
-  { id: 'management', label: 'Quan ly', href: '/admin/management/users' },
-  { id: 'activities', label: 'Hoat dong', href: '/admin/activities' },
-  { id: 'system', label: 'He thong', href: '/admin/settings' },
+  { id: 'overview', label: 'Tổng quan', href: '/admin/dashboard' },
+  { id: 'management', label: 'Quản lý', href: '/admin/management/users' },
+  { id: 'activities', label: 'Hoạt động', href: '/admin/activities' },
+  { id: 'system', label: 'Hệ thống', href: '/admin/settings' },
 ]
 
 export default function DashboardHeader({ userName, userRole, activeTab = 'overview', userAvatar }: DashboardHeaderProps) {

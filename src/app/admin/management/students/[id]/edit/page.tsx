@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { ChevronLeft, User } from 'lucide-react'
 import { supabase, Class, BRANCHES } from '@/lib/supabase'
 
@@ -41,28 +41,77 @@ const initialFormData: StudentFormData = {
   avatar_url: '',
 }
 
-export default function AddStudentPage() {
+export default function EditStudentPage() {
+  const params = useParams()
+  const studentId = params.id as string
   const router = useRouter()
   const [formData, setFormData] = useState<StudentFormData>(initialFormData)
   const [classes, setClasses] = useState<Class[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [errors, setErrors] = useState<Partial<Record<keyof StudentFormData, string>>>({})
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false)
 
-  // Fetch classes on mount
+  // Fetch student data and classes on mount
   useEffect(() => {
-    const fetchClasses = async () => {
-      const { data } = await supabase
-        .from('classes')
-        .select('*')
-        .eq('status', 'ACTIVE')
-        .order('display_order', { ascending: true })
-      setClasses(data || [])
+    const fetchData = async () => {
+      setIsLoading(true)
+      try {
+        // Fetch classes
+        const { data: classesData } = await supabase
+          .from('classes')
+          .select('*')
+          .eq('status', 'ACTIVE')
+          .order('display_order', { ascending: true })
+        setClasses(classesData || [])
+
+        // Fetch student data
+        const { data: studentData, error } = await supabase
+          .from('thieu_nhi')
+          .select('*')
+          .eq('id', studentId)
+          .single()
+
+        if (error || !studentData) {
+          console.error('Error fetching student:', error)
+          alert('Không tìm thấy thiếu nhi')
+          router.push('/admin/management/students')
+          return
+        }
+
+        // Populate form data
+        setFormData({
+          student_code: studentData.student_code || '',
+          class_id: studentData.class_id || '',
+          saint_name: studentData.saint_name || '',
+          full_name: studentData.full_name || '',
+          date_of_birth: studentData.date_of_birth || '',
+          phone: studentData.phone || '',
+          parent_phone: studentData.parent_phone || '',
+          parent_phone_2: studentData.parent_phone_2 || '',
+          address: studentData.address || '',
+          notes: studentData.notes || '',
+          score_45_hk1: studentData.score_45_hk1?.toString() || '',
+          score_exam_hk1: studentData.score_exam_hk1?.toString() || '',
+          score_45_hk2: studentData.score_45_hk2?.toString() || '',
+          score_exam_hk2: studentData.score_exam_hk2?.toString() || '',
+          avatar_url: studentData.avatar_url || '',
+        })
+
+        if (studentData.avatar_url) {
+          setAvatarPreview(studentData.avatar_url)
+        }
+      } catch (err) {
+        console.error('Error:', err)
+      } finally {
+        setIsLoading(false)
+      }
     }
-    fetchClasses()
-  }, [])
+
+    fetchData()
+  }, [studentId, router])
 
   // Group classes by branch
   const classesGroupedByBranch = BRANCHES.reduce((acc, branch) => {
@@ -73,10 +122,10 @@ export default function AddStudentPage() {
     return acc
   }, {} as Record<string, Class[]>)
 
-  // Get class name by id
-  const getClassName = (classId: string) => {
+  // Get class name and branch by id
+  const getClassInfo = (classId: string) => {
     const cls = classes.find((c) => c.id === classId)
-    return cls?.name || ''
+    return cls ? `${cls.name} (${cls.branch})` : ''
   }
 
   // Handle input change
@@ -144,28 +193,31 @@ export default function AddStudentPage() {
 
     setIsSubmitting(true)
     try {
-      const { error } = await supabase.from('thieu_nhi').insert({
-        student_code: formData.student_code.trim() || null,
-        class_id: formData.class_id,
-        saint_name: formData.saint_name.trim() || null,
-        full_name: formData.full_name.trim(),
-        date_of_birth: formData.date_of_birth || null,
-        phone: formData.phone.trim() || null,
-        parent_phone: formData.parent_phone.trim() || null,
-        parent_phone_2: formData.parent_phone_2.trim() || null,
-        address: formData.address.trim() || null,
-        notes: formData.notes.trim() || null,
-        score_45_hk1: parseFloat(formData.score_45_hk1) || 0,
-        score_exam_hk1: parseFloat(formData.score_exam_hk1) || 0,
-        score_45_hk2: parseFloat(formData.score_45_hk2) || 0,
-        score_exam_hk2: parseFloat(formData.score_exam_hk2) || 0,
-        avatar_url: avatarPreview || null,
-        status: 'ACTIVE',
-      })
+      const { error } = await supabase
+        .from('thieu_nhi')
+        .update({
+          student_code: formData.student_code.trim() || null,
+          class_id: formData.class_id,
+          saint_name: formData.saint_name.trim() || null,
+          full_name: formData.full_name.trim(),
+          date_of_birth: formData.date_of_birth || null,
+          phone: formData.phone.trim() || null,
+          parent_phone: formData.parent_phone.trim() || null,
+          parent_phone_2: formData.parent_phone_2.trim() || null,
+          address: formData.address.trim() || null,
+          notes: formData.notes.trim() || null,
+          score_45_hk1: parseFloat(formData.score_45_hk1) || 0,
+          score_exam_hk1: parseFloat(formData.score_exam_hk1) || 0,
+          score_45_hk2: parseFloat(formData.score_45_hk2) || 0,
+          score_exam_hk2: parseFloat(formData.score_exam_hk2) || 0,
+          avatar_url: avatarPreview || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', studentId)
 
       if (error) {
-        console.error('Error adding student:', error)
-        alert('Có lỗi xảy ra khi thêm thiếu nhi. Vui lòng thử lại.')
+        console.error('Error updating student:', error)
+        alert('Có lỗi xảy ra khi cập nhật thiếu nhi. Vui lòng thử lại.')
         return
       }
 
@@ -176,6 +228,29 @@ export default function AddStudentPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="bg-[#F6F6F6] border border-white/60 rounded-2xl min-h-[calc(100vh-140px)] flex items-center justify-center">
+        <div className="flex items-center gap-3">
+          <svg
+            className="animate-spin h-8 w-8 text-brand"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <span className="text-[#666d80]">Đang tải...</span>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -193,7 +268,7 @@ export default function AddStudentPage() {
               <span className="text-xs">Quay trở lại</span>
             </button>
             {/* Title */}
-            <h1 className="text-[40px] font-bold text-black leading-tight">Thêm thiếu nhi</h1>
+            <h1 className="text-[40px] font-bold text-black leading-tight">Chỉnh sửa thiếu nhi</h1>
           </div>
 
           {/* Action Buttons */}
@@ -274,7 +349,7 @@ export default function AddStudentPage() {
               {/* Mã thiếu nhi */}
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">
-                  Mã thiếu nhi
+                  Mã thiếu nhi <span className="text-[#df1c41]">*</span>
                 </label>
                 <input
                   type="text"
@@ -296,9 +371,11 @@ export default function AddStudentPage() {
                   className={`w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-left flex items-center justify-between ${errors.class_id ? 'ring-1 ring-red-500' : ''}`}
                 >
                   <span className={formData.class_id ? 'text-black' : 'text-[#8B8685]'}>
-                    {formData.class_id ? getClassName(formData.class_id) : 'Chọn lớp'}
+                    {formData.class_id ? getClassInfo(formData.class_id) : 'Chọn lớp'}
                   </span>
-                  <ChevronLeft className={`w-4 h-4 text-[#8B8685] transition-transform ${isClassDropdownOpen ? 'rotate-90' : '-rotate-90'}`} />
+                  <ChevronLeft
+                    className={`w-4 h-4 text-[#8B8685] transition-transform ${isClassDropdownOpen ? 'rotate-90' : '-rotate-90'}`}
+                  />
                 </button>
                 {isClassDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 max-h-[200px] overflow-y-auto">
@@ -332,7 +409,7 @@ export default function AddStudentPage() {
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">
-                  Tên thánh
+                  Tên thánh <span className="text-[#df1c41]">*</span>
                 </label>
                 <input
                   type="text"
@@ -415,7 +492,7 @@ export default function AddStudentPage() {
             {/* Row 5: Địa chỉ */}
             <div>
               <label className="block text-sm font-medium text-[#666d80] mb-1.5">
-                Địa chỉ
+                Địa chỉ <span className="text-[#df1c41]">*</span>
               </label>
               <textarea
                 value={formData.address}
@@ -468,7 +545,7 @@ export default function AddStudentPage() {
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">
-                      Điểm 45 phút
+                      Điểm 45 phút <span className="text-[#df1c41]">*</span>
                     </label>
                     <input
                       type="number"
@@ -483,7 +560,7 @@ export default function AddStudentPage() {
                   </div>
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">
-                      Điểm học kỳ (x2)
+                      Điểm học kỳ (x2) <span className="text-[#df1c41]">*</span>
                     </label>
                     <input
                       type="number"
@@ -509,7 +586,7 @@ export default function AddStudentPage() {
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">
-                      Điểm 45 phút
+                      Điểm 45 phút <span className="text-[#df1c41]">*</span>
                     </label>
                     <input
                       type="number"
@@ -524,7 +601,7 @@ export default function AddStudentPage() {
                   </div>
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">
-                      Điểm học kỳ (x2)
+                      Điểm học kỳ (x2) <span className="text-[#df1c41]">*</span>
                     </label>
                     <input
                       type="number"

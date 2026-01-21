@@ -95,7 +95,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('Dung luong file toi da 5MB')
+        alert('Dung lượng file tối đa 5MB')
         return
       }
       setAvatarFile(file)
@@ -110,14 +110,14 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
   const validateForm = (): boolean => {
     const newErrors: Partial<FormData> = {}
 
-    if (!formData.username.trim()) newErrors.username = 'Vui long nhap ten dang nhap'
-    if (!formData.password.trim()) newErrors.password = 'Vui long nhap mat khau'
+    if (!formData.username.trim()) newErrors.username = 'Vui lòng nhập tên đăng nhập'
+    if (!formData.password.trim()) newErrors.password = 'Vui lòng nhập mật khẩu'
     if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Mat khau xac nhan khong khop'
+      newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp'
     }
-    if (!formData.saint_name.trim()) newErrors.saint_name = 'Vui long nhap ten thanh'
-    if (!formData.full_name.trim()) newErrors.full_name = 'Vui long nhap ho va ten'
-    if (!formData.phone.trim()) newErrors.phone = 'Vui long nhap so dien thoai'
+    if (!formData.saint_name.trim()) newErrors.saint_name = 'Vui lòng nhập tên thánh'
+    if (!formData.full_name.trim()) newErrors.full_name = 'Vui lòng nhập họ và tên'
+    if (!formData.phone.trim()) newErrors.phone = 'Vui lòng nhập số điện thoại'
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -167,7 +167,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
 
       if (error) {
         console.error('Error creating user:', error)
-        alert(`Loi tao nguoi dung: ${error.message}`)
+        alert(`Lỗi tạo người dùng: ${error.message}`)
         return
       }
 
@@ -175,7 +175,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
       onBack()
     } catch (err) {
       console.error('Error:', err)
-      alert('Co loi xay ra')
+      alert('Có lỗi xảy ra')
     } finally {
       setIsSubmitting(false)
     }
@@ -191,9 +191,9 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
             className="flex items-center gap-2 text-primary-3 hover:text-black transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="text-sm">Quay tro lai</span>
+            <span className="text-sm">Quay trở lại</span>
           </button>
-          <h1 className="text-4xl font-bold text-black">Them nguoi dung</h1>
+          <h1 className="text-4xl font-bold text-black">Thêm người dùng</h1>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -201,7 +201,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
             disabled={isSubmitting}
             className="h-[40px] px-6 bg-white border border-[#E5E1DC] rounded-full text-sm font-bold text-black hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
-            Huy
+            Hủy
           </button>
           <button
             onClick={handleSubmit}
@@ -214,7 +214,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             )}
-            Luu thay doi
+            Lưu thay đổi
           </button>
         </div>
       </div>
@@ -225,8 +225,8 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
         <div className="flex gap-6 pb-6 border-b border-[#E5E1DC]">
           {/* Left Label */}
           <div className="w-[300px] flex-shrink-0">
-            <h2 className="text-lg font-bold text-black">Thong tin tai khoan</h2>
-            <p className="text-sm text-primary-3">Tao nguoi dung moi cho he thong</p>
+            <h2 className="text-lg font-bold text-black">Thông tin tài khoản</h2>
+            <p className="text-sm text-primary-3">Tạo người dùng mới cho hệ thống</p>
           </div>
 
           {/* Right Form */}
@@ -251,9 +251,9 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                   onClick={() => fileInputRef.current?.click()}
                   className="text-sm font-medium text-brand hover:underline"
                 >
-                  Chon anh dai dien
+                  Chọn ảnh đại diện
                 </button>
-                <p className="text-xs text-black/40">Ho tro JPG, PNG. Dung luong toi da 5MB.</p>
+                <p className="text-xs text-black/40">Hỗ trợ JPG, PNG. Dung lượng tối đa 5MB.</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -268,7 +268,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
             <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Ten dang nhap <span className="text-[#DF1C41]">*</span>
+                  Tên đăng nhập <span className="text-[#DF1C41]">*</span>
                 </label>
                 <input
                   type="text"
@@ -281,7 +281,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
               </div>
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Vai tro <span className="text-[#DF1C41]">*</span>
+                  Vai trò <span className="text-[#DF1C41]">*</span>
                 </label>
                 <div className="relative">
                   <button
@@ -315,26 +315,26 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
             <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Mat khau <span className="text-[#DF1C41]">*</span>
+                  Mật khẩu <span className="text-[#DF1C41]">*</span>
                 </label>
                 <input
                   type="password"
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
-                  placeholder="Nhap mat khau"
+                  placeholder="Nhập mật khẩu"
                   className={`h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black placeholder:text-black/40 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.password ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
               </div>
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Xac nhan mat khau <span className="text-[#DF1C41]">*</span>
+                  Xác nhận mật khẩu <span className="text-[#DF1C41]">*</span>
                 </label>
                 <input
                   type="password"
                   value={formData.confirmPassword}
                   onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                  placeholder="Nhap lai mat khau"
+                  placeholder="Nhập lại mật khẩu"
                   className={`h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black placeholder:text-black/40 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.confirmPassword ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword}</p>}
@@ -348,7 +348,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
             <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Ten thanh <span className="text-[#DF1C41]">*</span>
+                  Tên thánh <span className="text-[#DF1C41]">*</span>
                 </label>
                 <input
                   type="text"

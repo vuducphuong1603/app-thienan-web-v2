@@ -25,8 +25,8 @@ const ROLE_BADGE_STYLES: Record<UserRole, { bg: string; text: string }> = {
 }
 
 const STATUS_BADGE_STYLES = {
-  ACTIVE: { bg: 'bg-[#E8F5E9]', text: 'text-[#2E7D32]', label: 'Hoat dong' },
-  INACTIVE: { bg: 'bg-[#FFEBEE]', text: 'text-[#C62828]', label: 'Ngung hoat dong' },
+  ACTIVE: { bg: 'bg-[#E8F5E9]', text: 'text-[#2E7D32]', label: 'Hoạt động' },
+  INACTIVE: { bg: 'bg-[#FFEBEE]', text: 'text-[#C62828]', label: 'Ngưng hoạt động' },
 }
 
 export default function UsersPage() {
@@ -203,7 +203,7 @@ export default function UsersPage() {
           <Search className="w-5 h-5 text-primary-3" />
           <input
             type="text"
-            placeholder="Tim kiem theo ten, username,..."
+            placeholder="Tìm kiếm theo tên, username,..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 h-full bg-transparent text-sm text-black placeholder:text-primary-3 border-none focus:outline-none"
@@ -224,7 +224,7 @@ export default function UsersPage() {
             className="flex items-center gap-2 h-[42px] px-4 bg-brand rounded-xl text-sm font-medium text-white hover:bg-orange-500 transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Them nguoi dung
+            Thêm người dùng
           </button>
         </div>
       </div>
@@ -241,7 +241,7 @@ export default function UsersPage() {
             }}
             className="flex items-center justify-between gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl min-w-[160px] text-sm text-primary-3 hover:bg-gray-50 transition-colors"
           >
-            <span>{filterRole === 'all' ? 'Tat ca vai tro' : ROLE_LABELS[filterRole]}</span>
+            <span>{filterRole === 'all' ? 'Tất cả vai trò' : ROLE_LABELS[filterRole]}</span>
             <ChevronDown className={`w-4 h-4 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {isRoleDropdownOpen && (
@@ -253,7 +253,7 @@ export default function UsersPage() {
                 }}
                 className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterRole === 'all' ? 'bg-brand/10 text-brand' : 'text-black'}`}
               >
-                Tat ca vai tro
+                Tất cả vai trò
               </button>
               {Object.entries(ROLE_LABELS).map(([key, label]) => (
                 <button
@@ -281,7 +281,7 @@ export default function UsersPage() {
             }}
             className="flex items-center justify-between gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl min-w-[160px] text-sm text-primary-3 hover:bg-gray-50 transition-colors"
           >
-            <span>{filterBranch === 'all' ? 'Tat ca nganh' : filterBranch}</span>
+            <span>{filterBranch === 'all' ? 'Tất cả ngành' : filterBranch}</span>
             <ChevronDown className={`w-4 h-4 transition-transform ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {isBranchDropdownOpen && (
@@ -293,9 +293,9 @@ export default function UsersPage() {
                 }}
                 className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterBranch === 'all' ? 'bg-brand/10 text-brand' : 'text-black'}`}
               >
-                Tat ca nganh
+                Tất cả ngành
               </button>
-              {['Au nhi', 'Thieu nhi', 'Nghia si', 'Hiep si'].map((branch) => (
+              {['Ấu nhi', 'Thiếu nhi', 'Nghĩa sĩ', 'Hiệp sĩ'].map((branch) => (
                 <button
                   key={branch}
                   onClick={() => {
@@ -321,13 +321,13 @@ export default function UsersPage() {
             }}
             className="flex items-center justify-between gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl min-w-[180px] text-sm text-primary-3 hover:bg-gray-50 transition-colors"
           >
-            <span>{filterClass === 'all' ? 'Chon nganh truoc' : filterClass}</span>
+            <span>{filterClass === 'all' ? 'Chọn ngành trước' : filterClass}</span>
             <ChevronDown className={`w-4 h-4 transition-transform ${isClassDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {isClassDropdownOpen && (
             <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden">
               <div className="px-4 py-2.5 text-sm text-primary-3">
-                Vui long chon nganh truoc
+                Vui lòng chọn ngành trước
               </div>
             </div>
           )}
@@ -344,7 +344,7 @@ export default function UsersPage() {
           }`}
         >
           <X className="w-4 h-4" />
-          Xoa bo loc
+          Xóa bộ lọc
         </button>
       </div>
 
@@ -360,12 +360,12 @@ export default function UsersPage() {
               className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand cursor-pointer"
             />
           </div>
-          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Nguoi dung</div>
-          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Vai tro</div>
-          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Nganh/ Lop</div>
-          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Lien he</div>
-          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Trang thai</div>
-          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Thao tac</div>
+          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Người dùng</div>
+          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Vai trò</div>
+          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Ngành/ Lớp</div>
+          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Liên hệ</div>
+          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Trạng thái</div>
+          <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Thao tác</div>
         </div>
 
         {/* Table Body */}
@@ -381,7 +381,7 @@ export default function UsersPage() {
             <svg className="w-12 h-12 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
-            <p className="text-sm">Khong tim thay nguoi dung nao</p>
+            <p className="text-sm">Không tìm thấy người dùng nào</p>
           </div>
         ) : (
           <div className="divide-y divide-[#E5E1DC]">

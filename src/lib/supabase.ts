@@ -56,9 +56,12 @@ export interface ThieuNhiProfile {
   saint_name?: string
   date_of_birth?: string
   gender?: 'male' | 'female'
+  phone?: string
   address?: string
   parent_name?: string
   parent_phone?: string
+  parent_name_2?: string
+  parent_phone_2?: string
   class_id?: string
   status: 'ACTIVE' | 'INACTIVE'
   avatar_url?: string
