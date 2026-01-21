@@ -90,3 +90,20 @@ export interface SchoolYear {
   created_at: string
   updated_at?: string
 }
+
+// Attendance record for detailed tracking
+export interface AttendanceRecord {
+  id: string
+  student_id: string
+  class_id: string
+  school_year_id?: string
+  attendance_date: string // YYYY-MM-DD
+  day_type: 'thu5' | 'cn' // thu5 = Thursday, cn = Sunday
+  status: 'present' | 'absent'
+  check_in_time?: string // HH:MM:SS
+  check_in_method?: 'manual' | 'qr_scan'
+  notes?: string
+  created_by?: string
+  created_at: string
+  updated_at?: string
+}
