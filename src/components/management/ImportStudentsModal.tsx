@@ -260,6 +260,7 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
           date_of_birth: student.date_of_birth || null,
           address: student.address || null,
           parent_phone: student.parent_phone || null,
+          parent_phone_2: student.parent_phone_2 || null,
           class_id: classUuid,
           status: 'ACTIVE'
         })
@@ -482,6 +483,7 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
                         <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Ngày sinh</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Lớp</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">SĐT 1</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">SĐT 2</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Trạng thái</th>
                       </tr>
                     </thead>
@@ -513,6 +515,7 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
                             )}
                           </td>
                           <td className="px-3 py-2">{student.parent_phone || '-'}</td>
+                          <td className="px-3 py-2">{student.parent_phone_2 || '-'}</td>
                           <td className="px-3 py-2">
                             {student.isValid ? (
                               <span className="flex items-center gap-1 text-[#2E7D32] text-xs">
