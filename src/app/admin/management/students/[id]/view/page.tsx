@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ChevronLeft, User } from 'lucide-react'
-import { supabase, Class, BRANCHES } from '@/lib/supabase'
+import { supabase, Class } from '@/lib/supabase'
 
 interface StudentData {
   id: string
