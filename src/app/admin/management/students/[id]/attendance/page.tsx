@@ -3,10 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Check } from 'lucide-react'
-import { supabase, ThieuNhiProfile, SchoolYear } from '@/lib/supabase'
+import { supabase, ThieuNhiProfile, SchoolYear, AttendanceRecord } from '@/lib/supabase'
 
 interface StudentWithClass extends ThieuNhiProfile {
   class_name?: string
+}
+
+interface AttendanceRecordWithDetails extends AttendanceRecord {
+  created_by_user?: { full_name: string; saint_name?: string }
 }
 
 export default function StudentAttendancePage() {
@@ -16,6 +20,7 @@ export default function StudentAttendancePage() {
 
   const [student, setStudent] = useState<StudentWithClass | null>(null)
   const [schoolYear, setSchoolYear] = useState<SchoolYear | null>(null)
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecordWithDetails[]>([])
   const [loading, setLoading] = useState(true)
 
   // Fetch student and school year data
@@ -58,6 +63,43 @@ export default function StudentAttendancePage() {
         .single()
 
       setSchoolYear(schoolYearData)
+
+      // Fetch attendance records from attendance_records table
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('student_id', studentId)
+        .eq('status', 'present')
+        .order('attendance_date', { ascending: false })
+
+      if (!attendanceError && attendanceData) {
+        // Get unique created_by user IDs
+        const createdByIds = Array.from(new Set(attendanceData.map(r => r.created_by).filter(Boolean)))
+
+        // Fetch user profiles for created_by users
+        let userMap: Record<string, { full_name: string; saint_name?: string }> = {}
+        if (createdByIds.length > 0) {
+          const { data: profilesData } = await supabase
+            .from('users')
+            .select('id, full_name, saint_name')
+            .in('id', createdByIds)
+
+          if (profilesData) {
+            userMap = profilesData.reduce((acc, profile) => {
+              acc[profile.id] = { full_name: profile.full_name, saint_name: profile.saint_name }
+              return acc
+            }, {} as Record<string, { full_name: string; saint_name?: string }>)
+          }
+        }
+
+        // Merge user info into attendance records
+        const recordsWithUsers = attendanceData.map(record => ({
+          ...record,
+          created_by_user: record.created_by ? userMap[record.created_by] : undefined
+        }))
+
+        setAttendanceRecords(recordsWithUsers)
+      }
     } catch (error) {
       console.error('Error:', error)
     } finally {
@@ -93,23 +135,49 @@ export default function StudentAttendancePage() {
   }
 
   const totalWeeks = schoolYear?.total_weeks || 37
-  const attendanceThu5 = student.attendance_thu5 || 0
-  const attendanceCn = student.attendance_cn || 0
 
-  // Generate week grid data
-  const generateWeekGrid = (attendedCount: number, total: number) => {
+  // Calculate week number from attendance date based on school year start date
+  const getWeekNumber = (attendanceDate: string): number => {
+    if (!schoolYear?.start_date) return 1
+
+    const startDate = new Date(schoolYear.start_date)
+    const recordDate = new Date(attendanceDate)
+
+    // Calculate the difference in days
+    const diffTime = recordDate.getTime() - startDate.getTime()
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+    // Calculate week number (1-based)
+    const weekNumber = Math.floor(diffDays / 7) + 1
+
+    // Ensure week is within valid range
+    return Math.max(1, Math.min(weekNumber, totalWeeks))
+  }
+
+  // Calculate attendance from attendance_records table
+  const thu5Records = attendanceRecords.filter(r => r.day_type === 'thu5')
+  const cnRecords = attendanceRecords.filter(r => r.day_type === 'cn')
+  const attendanceThu5 = thu5Records.length
+  const attendanceCn = cnRecords.length
+
+  // Get set of actual attended weeks
+  const thu5AttendedWeeks = new Set(thu5Records.map(r => getWeekNumber(r.attendance_date)))
+  const cnAttendedWeeks = new Set(cnRecords.map(r => getWeekNumber(r.attendance_date)))
+
+  // Generate week grid data with actual attended weeks
+  const generateWeekGrid = (attendedWeeks: Set<number>, total: number) => {
     const weeks = []
     for (let i = 1; i <= total; i++) {
       weeks.push({
         week: i,
-        attended: i <= attendedCount
+        attended: attendedWeeks.has(i)
       })
     }
     return weeks
   }
 
-  const thu5Weeks = generateWeekGrid(attendanceThu5, totalWeeks)
-  const cnWeeks = generateWeekGrid(attendanceCn, totalWeeks)
+  const thu5Weeks = generateWeekGrid(thu5AttendedWeeks, totalWeeks)
+  const cnWeeks = generateWeekGrid(cnAttendedWeeks, totalWeeks)
 
   // Rows of 10 weeks each
   const getWeeksRows = (weeks: { week: number; attended: boolean }[]) => {
@@ -122,6 +190,25 @@ export default function StudentAttendancePage() {
 
   const thu5Rows = getWeeksRows(thu5Weeks)
   const cnRows = getWeeksRows(cnWeeks)
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+
+  // Format time for display
+  const formatTime = (timeString?: string) => {
+    if (!timeString) return '--:--'
+    return timeString.substring(0, 5)
+  }
+
+  // Get check-in method label
+  const getCheckInMethodLabel = (method?: string) => {
+    if (method === 'qr_scan') return 'QR Scan'
+    if (method === 'manual') return 'Thủ công'
+    return 'Điểm danh'
+  }
 
   // Week cell component
   const WeekCell = ({ week, attended }: { week: number; attended: boolean }) => (
@@ -284,20 +371,20 @@ export default function StudentAttendancePage() {
           </div>
 
           {/* Records Grid */}
-          {attendanceThu5 > 0 ? (
+          {thu5Records.length > 0 ? (
             <div className="grid grid-cols-3 gap-4">
-              {Array.from({ length: Math.min(attendanceThu5, 6) }).map((_, index) => (
-                <div key={index} className="bg-white rounded-[14px] p-4 h-[104px]">
+              {thu5Records.map((record) => (
+                <div key={record.id} className="bg-white rounded-[14px] p-4 h-[104px]">
                   <div className="flex items-center gap-2 mb-1">
                     <CalendarIcon />
-                    <span className="text-sm font-medium text-black">27/11/2025</span>
+                    <span className="text-sm font-medium text-black">{formatDate(record.attendance_date)}</span>
                   </div>
                   <div className="flex items-center gap-2 mb-2">
                     <ClockIcon />
-                    <span className="text-sm font-light text-[#666d80]">Điểm danh lúc: 18:36</span>
+                    <span className="text-sm font-light text-[#666d80]">Điểm danh lúc: {formatTime(record.check_in_time)}</span>
                   </div>
                   <p className="text-xs text-[#666d80]">
-                    &quot;QR Scan - {student.saint_name && `${student.saint_name} `}{student.full_name}&quot;
+                    &quot;{getCheckInMethodLabel(record.check_in_method)} - {record.created_by_user ? `${record.created_by_user.saint_name ? record.created_by_user.saint_name + ' ' : ''}${record.created_by_user.full_name}` : 'Không rõ'}&quot;
                   </p>
                 </div>
               ))}
@@ -320,20 +407,20 @@ export default function StudentAttendancePage() {
           </div>
 
           {/* Records Grid */}
-          {attendanceCn > 0 ? (
+          {cnRecords.length > 0 ? (
             <div className="grid grid-cols-3 gap-4">
-              {Array.from({ length: Math.min(attendanceCn, 6) }).map((_, index) => (
-                <div key={index} className="bg-white rounded-[14px] p-4 h-[104px]">
+              {cnRecords.map((record) => (
+                <div key={record.id} className="bg-white rounded-[14px] p-4 h-[104px]">
                   <div className="flex items-center gap-2 mb-1">
                     <CalendarIcon />
-                    <span className="text-sm font-medium text-black">27/11/2025</span>
+                    <span className="text-sm font-medium text-black">{formatDate(record.attendance_date)}</span>
                   </div>
                   <div className="flex items-center gap-2 mb-2">
                     <ClockIcon />
-                    <span className="text-sm font-light text-[#666d80]">Điểm danh lúc: 18:36</span>
+                    <span className="text-sm font-light text-[#666d80]">Điểm danh lúc: {formatTime(record.check_in_time)}</span>
                   </div>
                   <p className="text-xs text-[#666d80]">
-                    &quot;QR Scan - {student.saint_name && `${student.saint_name} `}{student.full_name}&quot;
+                    &quot;{getCheckInMethodLabel(record.check_in_method)} - {record.created_by_user ? `${record.created_by_user.saint_name ? record.created_by_user.saint_name + ' ' : ''}${record.created_by_user.full_name}` : 'Không rõ'}&quot;
                   </p>
                 </div>
               ))}
