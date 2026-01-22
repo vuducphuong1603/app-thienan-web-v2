@@ -62,18 +62,19 @@ export default function QRAttendanceModal({
         await videoRef.current.play()
         setCameraStatus('active')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error accessing camera:', error)
       setCameraStatus('error')
+      const err = error as { name?: string; message?: string }
 
-      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         setErrorMessage('Vui lòng cấp quyền truy cập camera')
-      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         setErrorMessage('Không tìm thấy camera')
-      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
         setErrorMessage('Camera đang được sử dụng bởi ứng dụng khác')
       } else {
-        setErrorMessage(error.message || 'Không thể kết nối camera')
+        setErrorMessage(err.message || 'Không thể kết nối camera')
       }
     }
   }

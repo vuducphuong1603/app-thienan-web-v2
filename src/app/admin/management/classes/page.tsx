@@ -18,7 +18,6 @@ export default function ClassesPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterBranch, setFilterBranch] = useState<FilterBranch>('all')
-  const [selectedClasses, setSelectedClasses] = useState<string[]>([])
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false)
   const [showAddClassForm, setShowAddClassForm] = useState(false)
   const [showEditClassForm, setShowEditClassForm] = useState(false)
@@ -141,25 +140,6 @@ export default function ClassesPage() {
   const totalBranches = BRANCHES.length
   const totalStudents = classes.reduce((sum, cls) => sum + (cls.student_count || 0), 0)
 
-  // Handle select all in a branch
-  const handleSelectAllInBranch = (branch: Branch) => {
-    const branchClassIds = groupedClasses[branch]?.map((cls) => cls.id) || []
-    const allSelected = branchClassIds.every((id) => selectedClasses.includes(id))
-
-    if (allSelected) {
-      setSelectedClasses((prev) => prev.filter((id) => !branchClassIds.includes(id)))
-    } else {
-      setSelectedClasses((prev) => Array.from(new Set([...prev, ...branchClassIds])))
-    }
-  }
-
-  // Handle select one
-  const handleSelectClass = (classId: string) => {
-    setSelectedClasses((prev) =>
-      prev.includes(classId) ? prev.filter((id) => id !== classId) : [...prev, classId]
-    )
-  }
-
   // Handle delete class
   const handleOpenDeleteModal = (cls: ClassWithDetails) => {
     setClassToDelete(cls)
@@ -179,7 +159,6 @@ export default function ClassesPage() {
       return
     }
 
-    setSelectedClasses((prev) => prev.filter((id) => id !== classToDelete.id))
     setIsDeleteModalOpen(false)
     setClassToDelete(null)
     fetchClasses()
@@ -324,15 +303,7 @@ export default function ClassesPage() {
               </div>
 
               {/* Table Header */}
-              <div className="grid grid-cols-[48px_1fr_1.5fr_100px_120px] gap-4 px-4 py-3 bg-[#FAFAFA] border-b border-[#E5E1DC]">
-                <div className="flex items-center justify-center">
-                  <input
-                    type="checkbox"
-                    checked={branchClasses.every((cls) => selectedClasses.includes(cls.id))}
-                    onChange={() => handleSelectAllInBranch(branch as Branch)}
-                    className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand cursor-pointer"
-                  />
-                </div>
+              <div className="grid grid-cols-[1fr_1.5fr_100px_120px] gap-4 px-4 py-3 bg-[#FAFAFA] border-b border-[#E5E1DC]">
                 <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Tên lớp</div>
                 <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Giáo lý viên</div>
                 <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider text-center">Thiếu nhi</div>
@@ -344,18 +315,8 @@ export default function ClassesPage() {
                 {branchClasses.map((cls) => (
                   <div
                     key={cls.id}
-                    className="grid grid-cols-[48px_1fr_1.5fr_100px_120px] gap-4 px-4 py-3 items-center hover:bg-[#FAFAFA] transition-colors"
+                    className="grid grid-cols-[1fr_1.5fr_100px_120px] gap-4 px-4 py-3 items-center hover:bg-[#FAFAFA] transition-colors"
                   >
-                    {/* Checkbox */}
-                    <div className="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedClasses.includes(cls.id)}
-                        onChange={() => handleSelectClass(cls.id)}
-                        className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand cursor-pointer"
-                      />
-                    </div>
-
                     {/* Class Name */}
                     <div className="text-sm font-medium text-black">{cls.name}</div>
 

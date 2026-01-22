@@ -26,9 +26,9 @@ export default function DeleteStudentModal({ isOpen, onClose, onConfirm, student
     try {
       await onConfirm()
       onClose()
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting student:', err)
-      setError(err?.message || 'Có lỗi xảy ra khi xóa')
+      setError((err as { message?: string })?.message || 'Có lỗi xảy ra khi xóa')
     } finally {
       setIsDeleting(false)
     }

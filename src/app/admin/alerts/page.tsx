@@ -441,10 +441,14 @@ export default function AlertsPage() {
 
   const [activeTab, setActiveTab] = useState<TabType>('alerts')
   const [alerts, setAlerts] = useState<Alert[]>(mockAlerts)
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
-  const [filterPriority, setFilterPriority] = useState<FilterPriority>('all')
-  const [filterType, setFilterType] = useState<FilterType>('all')
-  const [filterTime, setFilterTime] = useState<FilterTime>('7days')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [filterStatus, _setFilterStatus] = useState<FilterStatus>('all')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [filterPriority, _setFilterPriority] = useState<FilterPriority>('all')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [filterType, _setFilterType] = useState<FilterType>('all')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_filterTime, _setFilterTime] = useState<FilterTime>('7days')
 
   // Auth check
   useEffect(() => {

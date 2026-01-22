@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {

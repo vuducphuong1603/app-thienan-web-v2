@@ -304,7 +304,7 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
         } else {
           success++
         }
-      } catch (err) {
+      } catch {
         failed++
         errors.push(`${user.username}: Lỗi không xác định`)
       }

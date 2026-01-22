@@ -632,7 +632,7 @@ export default function ActivitiesPage() {
         setReportScoreStudents(reportScoreData)
 
         // Calculate stats
-        let totalStudents = reportScoreData.length
+        const totalStudents = reportScoreData.length
         let sumHK1 = 0, countHK1 = 0
         let sumHK2 = 0, countHK2 = 0
         let sumYear = 0, countYear = 0
@@ -1757,7 +1757,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, score45HK1: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">45' HKI</span>
+                    <span className="text-sm text-black">45&apos; HKI</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1775,7 +1775,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, score45HK2: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">45' HKII</span>
+                    <span className="text-sm text-black">45&apos; HKII</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input

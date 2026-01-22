@@ -271,7 +271,7 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
         } else {
           success++
         }
-      } catch (err) {
+      } catch {
         failed++
         errors.push(`${student.full_name}: Lỗi không xác định`)
       }

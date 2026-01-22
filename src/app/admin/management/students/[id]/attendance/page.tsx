@@ -188,8 +188,10 @@ export default function StudentAttendancePage() {
     return rows
   }
 
-  const thu5Rows = getWeeksRows(thu5Weeks)
-  const cnRows = getWeeksRows(cnWeeks)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _thu5Rows = getWeeksRows(thu5Weeks)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _cnRows = getWeeksRows(cnWeeks)
 
   // Format date for display
   const formatDate = (dateString: string) => {
