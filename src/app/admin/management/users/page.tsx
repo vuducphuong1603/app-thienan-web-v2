@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase, UserProfile, UserRole, ROLE_LABELS } from '@/lib/supabase'
 import { Search, ChevronDown, FileSpreadsheet, Plus, Edit2, KeyRound, Trash2, X } from 'lucide-react'
 import Image from 'next/image'
@@ -30,6 +31,7 @@ const STATUS_BADGE_STYLES = {
 }
 
 export default function UsersPage() {
+  const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -363,7 +365,10 @@ export default function UsersPage() {
                 className="grid grid-cols-[1fr_140px_140px_140px_100px_120px] gap-4 px-4 py-3 items-center hover:bg-[#FAFAFA] transition-colors"
               >
                 {/* User Info */}
-                <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => router.push(`/admin/management/users/${user.id}/view`)}
+                >
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-orange-100 flex items-center justify-center flex-shrink-0">
                     {user.avatar_url ? (
                       <Image
@@ -380,7 +385,7 @@ export default function UsersPage() {
                     )}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-black">{user.saint_name} {user.full_name}</span>
+                    <span className="text-sm font-medium text-black hover:text-brand transition-colors">{user.saint_name} {user.full_name}</span>
                     <span className="text-xs text-primary-3">{user.username || user.email}</span>
                   </div>
                 </div>

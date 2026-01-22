@@ -554,7 +554,10 @@ export default function StudentsPage() {
                   <tr key={student.id} className="hover:bg-[#F8F8F8] transition-colors">
                     {/* Student Info - Avatar + Name + Code */}
                     <td className={`py-3 ${rowBgClass} ${isEditing ? 'border-l-4 border-l-brand pl-3' : 'pl-4'}`}>
-                      <div className="flex items-center gap-3">
+                      <div
+                        className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => router.push(`/admin/management/students/${student.id}/view`)}
+                      >
                         {/* Avatar */}
                         <div className="w-10 h-10 rounded-full bg-[#E8E8E8] flex items-center justify-center overflow-hidden flex-shrink-0">
                           {student.avatar_url ? (
@@ -571,7 +574,7 @@ export default function StudentsPage() {
                         </div>
                         {/* Name and Code */}
                         <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-medium text-black leading-tight">
+                          <span className="text-sm font-medium text-black leading-tight hover:text-brand transition-colors">
                             {student.saint_name && `${student.saint_name} `}
                             {student.full_name.split(' ').slice(0, -1).join(' ')}
                           </span>
