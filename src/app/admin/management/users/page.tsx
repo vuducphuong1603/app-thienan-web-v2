@@ -36,7 +36,6 @@ export default function UsersPage() {
   const [filterRole, setFilterRole] = useState<FilterRole>('all')
   const [filterBranch, setFilterBranch] = useState<FilterBranch>('all')
   const [filterClass, setFilterClass] = useState<string>('all')
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false)
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false)
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false)
@@ -91,22 +90,6 @@ export default function UsersPage() {
     return matchesSearch && matchesRole
   })
 
-  // Handle select all
-  const handleSelectAll = () => {
-    if (selectedUsers.length === filteredUsers.length) {
-      setSelectedUsers([])
-    } else {
-      setSelectedUsers(filteredUsers.map((u) => u.id))
-    }
-  }
-
-  // Handle select one
-  const handleSelectUser = (userId: string) => {
-    setSelectedUsers((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-    )
-  }
-
   // Clear all filters
   const handleClearFilters = () => {
     setSearchQuery('')
@@ -136,9 +119,6 @@ export default function UsersPage() {
       console.error('Error deleting user:', error)
       throw error
     }
-
-    // Remove from selected users if selected
-    setSelectedUsers((prev) => prev.filter((id) => id !== userToDelete.id))
 
     // Refresh the users list
     fetchUsers()
@@ -351,15 +331,7 @@ export default function UsersPage() {
       {/* Users Table */}
       <div className="bg-white border border-[#E5E1DC] rounded-2xl overflow-hidden">
         {/* Table Header */}
-        <div className="grid grid-cols-[48px_1fr_140px_140px_140px_100px_120px] gap-4 px-4 py-3 bg-[#FAFAFA] border-b border-[#E5E1DC]">
-          <div className="flex items-center justify-center">
-            <input
-              type="checkbox"
-              checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
-              onChange={handleSelectAll}
-              className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand cursor-pointer"
-            />
-          </div>
+        <div className="grid grid-cols-[1fr_140px_140px_140px_100px_120px] gap-4 px-4 py-3 bg-[#FAFAFA] border-b border-[#E5E1DC]">
           <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Người dùng</div>
           <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Vai trò</div>
           <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Ngành/ Lớp</div>
@@ -388,18 +360,8 @@ export default function UsersPage() {
             {filteredUsers.map((user) => (
               <div
                 key={user.id}
-                className="grid grid-cols-[48px_1fr_140px_140px_140px_100px_120px] gap-4 px-4 py-3 items-center hover:bg-[#FAFAFA] transition-colors"
+                className="grid grid-cols-[1fr_140px_140px_140px_100px_120px] gap-4 px-4 py-3 items-center hover:bg-[#FAFAFA] transition-colors"
               >
-                {/* Checkbox */}
-                <div className="flex items-center justify-center">
-                  <input
-                    type="checkbox"
-                    checked={selectedUsers.includes(user.id)}
-                    onChange={() => handleSelectUser(user.id)}
-                    className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand cursor-pointer"
-                  />
-                </div>
-
                 {/* User Info */}
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-orange-100 flex items-center justify-center flex-shrink-0">
