@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ChevronLeft, User } from 'lucide-react'
 import { supabase, Class, BRANCHES } from '@/lib/supabase'
+import CustomDatePicker from '@/components/ui/CustomDatePicker'
 
 interface StudentFormData {
   student_code: string
@@ -440,11 +441,10 @@ export default function EditStudentPage() {
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">
                   Ngày sinh
                 </label>
-                <input
-                  type="date"
+                <CustomDatePicker
                   value={formData.date_of_birth}
-                  onChange={(e) => handleChange('date_of_birth', e.target.value)}
-                  className="w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black focus:outline-none focus:ring-1 focus:ring-brand"
+                  onChange={(date) => handleChange('date_of_birth', date)}
+                  placeholder="Chọn ngày sinh"
                 />
               </div>
               <div className="flex-1">

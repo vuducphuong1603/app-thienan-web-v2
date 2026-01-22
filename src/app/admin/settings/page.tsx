@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from 'react'
 import { DashboardHeader } from '@/components/dashboard'
 import Image from 'next/image'
 import { Eye, EyeOff, Check, X } from 'lucide-react'
+import CustomDatePicker from '@/components/ui/CustomDatePicker'
 
 type SettingsTab = 'personal' | 'password' | 'school-year' | 'notifications' | 'system'
 
@@ -1024,22 +1025,23 @@ export default function SettingsPage() {
                         <label className="text-sm font-medium text-primary-3">
                           Ngày bắt đầu
                         </label>
-                        <input
-                          type="date"
+                        <CustomDatePicker
                           value={schoolYearForm.startDate}
-                          onChange={(e) => handleSchoolYearFormChange('startDate', e.target.value)}
-                          className="h-[38px] px-3 bg-[#f6f6f6] rounded-xl text-sm text-black border-none focus:ring-2 focus:ring-brand/30"
+                          onChange={(date) => handleSchoolYearFormChange('startDate', date)}
+                          placeholder="Chọn ngày bắt đầu"
+                          className="w-full"
                         />
                       </div>
                       <div className="flex-1 flex flex-col gap-1.5">
                         <label className="text-sm font-medium text-primary-3">
                           Ngày kết thúc
                         </label>
-                        <input
-                          type="date"
+                        <CustomDatePicker
                           value={schoolYearForm.endDate}
-                          onChange={(e) => handleSchoolYearFormChange('endDate', e.target.value)}
-                          className="h-[38px] px-3 bg-[#f6f6f6] rounded-xl text-sm text-black border-none focus:ring-2 focus:ring-brand/30"
+                          onChange={(date) => handleSchoolYearFormChange('endDate', date)}
+                          placeholder="Chọn ngày kết thúc"
+                          minDate={schoolYearForm.startDate}
+                          className="w-full"
                         />
                       </div>
                     </div>
