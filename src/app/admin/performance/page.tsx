@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
-import { ROLE_LABELS, supabase, Branch } from '@/lib/supabase'
+import { ROLE_LABELS, supabase, Branch, BRANCHES } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
@@ -10,12 +10,14 @@ import {
   Bell,
   Clock,
   TrendingUp,
+  ChevronDown,
 } from 'lucide-react'
 import { DashboardHeader } from '@/components/dashboard'
 
 // Types
 type ChartType = 'sunday' | 'thursday'
 type ViewType = 'trend' | 'class'
+type DayType = 'cn' | 'thu5'
 
 interface WeekData {
   date: string // YYYY-MM-DD
@@ -42,6 +44,26 @@ interface BranchStatsItem {
   value: number
   total: number
   color: 'primary' | 'default'
+}
+
+// Types for class view
+interface ClassStats {
+  totalClasses: number
+  totalStudents: number
+  presentCount: number
+  averageRate: number
+}
+
+interface ClassAttendanceData {
+  classId: string
+  className: string
+  totalStudents: number
+  presentCount: number
+}
+
+interface DateOption {
+  value: string // YYYY-MM-DD
+  label: string // "CN 23/11/2025"
 }
 
 // Sidebar Button Component
@@ -75,6 +97,326 @@ function SidebarButton({
   )
 }
 
+// Dropdown Component
+function Dropdown({
+  value,
+  options,
+  onChange,
+  className = '',
+}: {
+  value: string
+  options: { value: string; label: string }[]
+  onChange: (value: string) => void
+  className?: string
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const selectedOption = options.find(o => o.value === value)
+
+  return (
+    <div className={`relative ${className}`}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="h-[38px] px-4 bg-white border border-white/60 rounded-full flex items-center gap-2 text-base font-semibold text-black whitespace-nowrap"
+      >
+        <span>{selectedOption?.label || value}</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute top-full mt-1 left-0 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20 min-w-full">
+            {options.map(option => (
+              <button
+                key={option.value}
+                onClick={() => {
+                  onChange(option.value)
+                  setIsOpen(false)
+                }}
+                className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${option.value === value ? 'text-brand font-medium' : 'text-black'
+                  }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Class Stats Card Component (matching Figma design exactly)
+function ClassStatsCard({
+  title,
+  value,
+  variant = 'default',
+  chartType = 'bar',
+}: {
+  title: string
+  value: string | number
+  variant?: 'primary' | 'default'
+  chartType?: 'wave' | 'bar' | 'progress'
+}) {
+  const isPrimary = variant === 'primary'
+
+  const renderChart = () => {
+    if (chartType === 'wave' && isPrimary) {
+      // Wave/line chart for primary card (Tổng lớp) - exact from Figma
+      return (
+        <div className="relative w-[90px] h-[31px]">
+          <svg width="90" height="31" viewBox="0 0 90 31" fill="none">
+            <path
+              d="M1.28564 24.1426C37.2424 -35.4106 37.0448 54.4943 62.9258 20.6937C67.5032 14.7155 78.6519 7.35759 88.6092 22.9932"
+              stroke="url(#paint0_linear_120_2162)"
+              strokeWidth="2.60004"
+            />
+            <path
+              d="M0.890137 18.3944C33.6859 49.206 27.1662 -24.1436 56.2082 22.0733C59.7644 29.4314 72.4085 36.3295 88.2137 13.3359"
+              stroke="url(#paint1_linear_120_2162)"
+              strokeWidth="2.60004"
+            />
+            <path
+              d="M22.6223 0.519531C23.7914 0.519531 24.8683 1.65143 24.8684 3.21875C24.8684 4.78625 23.7915 5.91797 22.6223 5.91797C21.4533 5.91779 20.3762 4.78612 20.3762 3.21875C20.3764 1.65155 21.4534 0.519711 22.6223 0.519531Z"
+              fill="#FA865E"
+              stroke="white"
+              strokeWidth="1.04002"
+            />
+            <defs>
+              <linearGradient id="paint0_linear_120_2162" x1="1.28564" y1="15.8746" x2="88.4116" y2="15.8746" gradientUnits="userSpaceOnUse">
+                <stop stopColor="white" stopOpacity="0"/>
+                <stop offset="0.256989" stopColor="white"/>
+                <stop offset="0.527457" stopColor="white"/>
+                <stop offset="0.788704" stopColor="white"/>
+                <stop offset="1" stopColor="white" stopOpacity="0"/>
+              </linearGradient>
+              <linearGradient id="paint1_linear_120_2162" x1="0.890137" y1="17.7143" x2="88.0161" y2="17.7143" gradientUnits="userSpaceOnUse">
+                <stop stopColor="white" stopOpacity="0"/>
+                <stop offset="0.597182" stopColor="white"/>
+                <stop offset="1" stopColor="white" stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+      )
+    }
+
+    if (chartType === 'bar') {
+      // Mini bar chart for white cards
+      const bars = [
+        { height: 3.3, color: '#E5E1DC' },
+        { height: 5.9, color: '#E5E1DC' },
+        { height: 9.2, color: '#E5E1DC' },
+        { height: 16.7, color: '#FA865E' },
+        { height: 25, color: '#FA865E' },
+        { height: 15, color: '#FA865E' },
+        { height: 10, color: '#E5E1DC' },
+        { height: 3.3, color: '#E5E1DC' },
+      ]
+      return (
+        <div className="flex items-end gap-[2px] h-[26px]">
+          {bars.map((bar, i) => (
+            <div
+              key={i}
+              className="w-[10.8px] rounded-[4.8px]"
+              style={{
+                height: `${bar.height}px`,
+                backgroundColor: bar.color,
+                minHeight: '3px',
+                borderRadius: bar.height < 5 ? '2.4px' : '4.8px',
+              }}
+            />
+          ))}
+        </div>
+      )
+    }
+
+    if (chartType === 'progress') {
+      // Vertical progress bars for average rate
+      const columns = [
+        { topH: 3.8, filled: true },
+        { topH: 6.4, filled: true },
+        { topH: 3.2, filled: false },
+        { topH: 2.6, filled: true },
+        { topH: 3.2, filled: false },
+        { topH: 2.6, filled: true },
+        { topH: 3.2, filled: false },
+        { topH: 3.2, filled: true },
+        { topH: 6.4, filled: true },
+        { topH: 3.2, filled: false },
+        { topH: 8.3, filled: true },
+      ]
+
+      return (
+        <div className="flex gap-[0.88px]">
+          {columns.map((col, i) => (
+            <div key={i} className="flex flex-col items-center gap-[1.92px] w-[8.88px] h-[26px]">
+              <div
+                className="w-[2.56px] rounded-[2.56px]"
+                style={{
+                  height: `${col.topH}px`,
+                  backgroundColor: col.filled ? 'white' : '#FA865E',
+                }}
+              />
+              <div
+                className="flex-1 w-[2.56px] rounded-[2.56px]"
+                style={{
+                  backgroundColor: col.filled ? '#FA865E' : 'white',
+                }}
+              />
+              <div
+                className="w-[3.84px] h-[3.84px] rounded-full"
+                style={{
+                  backgroundColor: col.filled ? '#FA865E' : 'white',
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    return null
+  }
+
+  return (
+    <div
+      className={`relative rounded-[15px] p-4 flex-1 min-w-[200px] h-[130px] overflow-hidden flex flex-col justify-between ${isPrimary
+        ? 'bg-brand text-white'
+        : 'bg-white border border-white/60'
+        }`}
+    >
+      {/* Title */}
+      <p className={`text-sm font-medium ${isPrimary ? 'text-white/80' : 'text-black/80'}`}>
+        {title}
+      </p>
+
+      {/* Value and Chart Row */}
+      <div className="flex items-end justify-between">
+        <span className={`text-[40px] font-bold leading-none ${isPrimary ? 'text-white' : 'text-black'}`}>
+          {value}
+        </span>
+
+        {/* Icon button in corner */}
+        <div
+          className={`absolute top-3 right-3 w-11 h-11 rounded-full flex items-center justify-center ${isPrimary ? 'bg-white/10' : 'bg-[#F6F6F6]'
+            }`}
+        >
+          <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
+            <path
+              d="M0.636663 8.41748L5.85676 3.2292C6.56248 2.52779 6.91534 2.17708 7.35301 2.17713C7.79068 2.17718 8.14346 2.52797 8.84901 3.22955L9.01832 3.3979C9.72449 4.10009 10.0776 4.45119 10.5155 4.45103C10.9535 4.45087 11.3064 4.09952 12.012 3.39681L14.7839 0.636478M0.636663 8.41748L0.636664 4.49456M0.636663 8.41748L4.58527 8.41748"
+              stroke={isPrimary ? 'white' : 'black'}
+              strokeWidth="1.27325"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+
+        {/* Chart */}
+        <div className="absolute bottom-4 right-4">
+          {renderChart()}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Class Bar Chart Component (matching Figma design)
+function ClassBarChart({
+  data,
+  branchName,
+  totalClasses,
+  dayLabel,
+}: {
+  data: ClassAttendanceData[]
+  branchName: string
+  totalClasses: number
+  dayLabel: string
+}) {
+  // Calculate max value for scaling (round up to nearest 8)
+  const maxValue = Math.max(...data.map(d => d.presentCount), 1)
+  const chartMax = Math.ceil(maxValue / 8) * 8
+  const yAxisLabels = Array.from({ length: 5 }, (_, i) => chartMax - (i * chartMax / 4))
+  const chartHeight = 260
+
+  return (
+    <div className="bg-white rounded-[20px] p-6 shadow-[0px_20px_50px_rgba(191,21,108,0.05)]">
+      {/* Header Row */}
+      <div className="flex items-start justify-between mb-6">
+        {/* Left: Title */}
+        <div>
+          <h3 className="text-[18px] font-bold text-black">{branchName}</h3>
+          <p className="text-[14px] font-medium text-[#666D80]">{totalClasses} lớp</p>
+        </div>
+
+        {/* Right: Day indicator */}
+        <div className="flex items-center gap-2 px-2 py-1 rounded-[5px]">
+          <div className="w-[12px] h-[12px] rounded-full bg-white border-[3px] border-[#FA865E]" />
+          <span className="text-[12px] text-[#8A8C90]">{dayLabel}</span>
+        </div>
+      </div>
+
+      {/* Chart Area */}
+      <div className="flex">
+        {/* Y-axis */}
+        <div className="flex flex-col justify-between pr-4 text-right" style={{ height: `${chartHeight}px` }}>
+          {yAxisLabels.map((label, i) => (
+            <span key={i} className="text-[12px] text-[#8A8C90] w-8">
+              {label}
+            </span>
+          ))}
+        </div>
+
+        {/* Chart container */}
+        <div className="flex-1 relative">
+          {/* Grid area */}
+          <div className="relative border-l border-r border-[#E5E1DC]" style={{ height: `${chartHeight}px` }}>
+            {/* Horizontal grid lines */}
+            {[0, 25, 50, 75, 100].map((percent, index) => (
+              <div
+                key={index}
+                className="absolute left-0 right-0 border-t border-[#E5E1DC]"
+                style={{ top: `${percent}%` }}
+              />
+            ))}
+
+            {/* Bars */}
+            <div className="absolute bottom-0 left-0 right-0 flex justify-around items-end px-4">
+              {data.map((item, index) => {
+                const barHeight = (item.presentCount / chartMax) * chartHeight
+
+                return (
+                  <div key={index} className="flex flex-col items-center">
+                    {/* Value label */}
+                    <span className="text-[10px] text-[#666D80] mb-1">{item.presentCount}</span>
+                    {/* Bar */}
+                    <div
+                      className="bg-[#E5E1DC]"
+                      style={{
+                        width: '82px',
+                        height: `${Math.max(barHeight, 4)}px`,
+                      }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* X-axis labels */}
+          <div className="flex justify-around mt-4 px-4">
+            {data.map((item, index) => (
+              <span key={index} className="text-[12px] text-[#8A8C90] w-[82px] text-center">
+                {item.className}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Stats Card Component
 function StatsCard({
   title,
@@ -92,22 +434,15 @@ function StatsCard({
         <p className="text-sm font-medium text-black/80">{title}</p>
         {/* Icon in top right corner */}
         <div className="w-10 h-10 rounded-full bg-black/[0.03] backdrop-blur-[4px] flex items-center justify-center border border-white/20">
-          {type === 'line' && (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M7 17L17 7M17 7H7M17 7V17" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-          {type === 'bar' && (
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path d="M7.46 8.22L12.54 16.07L15.63 10.85H19.31V9.15H14.52L12.54 13.77L7.46 5.93L4.36 11.15H0.69V12.85H5.48L7.46 8.22Z" stroke="black" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            </svg>
-          )}
-          {type === 'progress' && (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="7" stroke="black" strokeWidth="1.2" />
-              <path d="M12 5C15.9 5 19 8.1 19 12" stroke="black" strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-          )}
+          <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
+            <path
+              d="M14.784 0.636719L9.56389 5.825C8.85818 6.52641 8.50532 6.87712 8.06765 6.87707C7.62997 6.87702 7.2772 6.52623 6.57164 5.82465L6.40234 5.6563C5.69616 4.95411 5.34308 4.60301 4.90511 4.60317C4.46714 4.60333 4.1143 4.95468 3.40864 5.65739L0.636719 8.41772M14.784 0.636719V4.55964M14.784 0.636719H10.8354"
+              stroke="black"
+              strokeWidth="1.27325"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </div>
       </div>
 
@@ -446,7 +781,7 @@ function getLast3Weeks(dayType: 'thu5' | 'cn'): WeekData[] {
   const fullDayLabel = dayType === 'cn' ? 'Chủ nhật' : 'Thứ năm'
 
   // Find the most recent target day (including today if it matches)
-  let current = new Date(today)
+  const current = new Date(today)
   const currentDay = current.getDay()
 
   // Calculate days to go back to reach target day
@@ -491,10 +826,24 @@ export default function PerformancePage() {
   const [chartType, setChartType] = useState<ChartType>('sunday')
   const [dataLoading, setDataLoading] = useState(true)
 
-  // Data states
+  // Data states for trend view
   const [chartData, setChartData] = useState<ChartDataItem[]>([])
   const [statsData, setStatsData] = useState<StatsDataItem[]>([])
   const [branchStats, setBranchStats] = useState<BranchStatsItem[]>([])
+
+  // States for class view
+  const [selectedBranch, setSelectedBranch] = useState<Branch>('Ấu Nhi')
+  const [selectedDayType, setSelectedDayType] = useState<DayType>('cn')
+  const [selectedDate, setSelectedDate] = useState<string>('')
+  const [availableDates, setAvailableDates] = useState<DateOption[]>([])
+  const [classStats, setClassStats] = useState<ClassStats>({
+    totalClasses: 0,
+    totalStudents: 0,
+    presentCount: 0,
+    averageRate: 0,
+  })
+  const [classAttendanceData, setClassAttendanceData] = useState<ClassAttendanceData[]>([])
+  const [classDataLoading, setClassDataLoading] = useState(false)
 
   // Fetch attendance data from Supabase
   const fetchAttendanceData = useCallback(async () => {
@@ -640,6 +989,153 @@ export default function PerformancePage() {
     }
   }, [chartType])
 
+  // Fetch available dates for selected day type
+  const fetchAvailableDates = useCallback(async () => {
+    const weeks: DateOption[] = []
+    const today = new Date()
+
+    // Target day: 0=Sunday, 4=Thursday
+    const targetDay = selectedDayType === 'cn' ? 0 : 4
+    const dayPrefix = selectedDayType === 'cn' ? 'CN' : 'T5'
+
+    // Find the most recent target day
+    const current = new Date(today)
+    const currentDay = current.getDay()
+    let daysBack = currentDay - targetDay
+    if (daysBack < 0) daysBack += 7
+    current.setDate(current.getDate() - daysBack)
+
+    // Get last 8 weeks
+    for (let i = 0; i < 8; i++) {
+      const weekDate = new Date(current)
+      weekDate.setDate(weekDate.getDate() - (i * 7))
+
+      const dateStr = weekDate.toISOString().split('T')[0]
+      const day = weekDate.getDate()
+      const month = weekDate.getMonth() + 1
+      const year = weekDate.getFullYear()
+
+      weeks.push({
+        value: dateStr,
+        label: `${dayPrefix} ${day}/${month}/${year}`,
+      })
+    }
+
+    setAvailableDates(weeks)
+    if (weeks.length > 0 && !selectedDate) {
+      setSelectedDate(weeks[0].value)
+    }
+  }, [selectedDayType, selectedDate])
+
+  // Fetch class-level attendance data
+  const fetchClassAttendanceData = useCallback(async () => {
+    if (!selectedDate || !selectedBranch) return
+
+    setClassDataLoading(true)
+    try {
+      // Fetch all classes for the selected branch
+      const { data: classesData, error: classesError } = await supabase
+        .from('classes')
+        .select('id, name, branch')
+        .eq('branch', selectedBranch)
+        .eq('status', 'ACTIVE')
+        .order('display_order', { ascending: true })
+
+      if (classesError) throw classesError
+
+      if (!classesData || classesData.length === 0) {
+        setClassStats({
+          totalClasses: 0,
+          totalStudents: 0,
+          presentCount: 0,
+          averageRate: 0,
+        })
+        setClassAttendanceData([])
+        return
+      }
+
+      const classIds = classesData.map(c => c.id)
+
+      // Fetch all students for these classes
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('thieu_nhi')
+        .select('id, class_id')
+        .in('class_id', classIds)
+        .eq('status', 'ACTIVE')
+
+      if (studentsError) throw studentsError
+
+      // Count students by class
+      const studentsByClass: Record<string, number> = {}
+      classIds.forEach(id => { studentsByClass[id] = 0 })
+      studentsData?.forEach(student => {
+        if (student.class_id) {
+          studentsByClass[student.class_id] = (studentsByClass[student.class_id] || 0) + 1
+        }
+      })
+
+      // Fetch attendance records for the selected date
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('attendance_records')
+        .select('id, student_id, class_id, status')
+        .in('class_id', classIds)
+        .eq('attendance_date', selectedDate)
+        .eq('day_type', selectedDayType)
+        .eq('status', 'present')
+
+      if (attendanceError) throw attendanceError
+
+      // Count attendance by class
+      const attendanceByClass: Record<string, number> = {}
+      classIds.forEach(id => { attendanceByClass[id] = 0 })
+      attendanceData?.forEach(record => {
+        if (record.class_id) {
+          attendanceByClass[record.class_id] = (attendanceByClass[record.class_id] || 0) + 1
+        }
+      })
+
+      // Build class attendance data
+      const classData: ClassAttendanceData[] = classesData.map(cls => ({
+        classId: cls.id,
+        className: cls.name,
+        totalStudents: studentsByClass[cls.id] || 0,
+        presentCount: attendanceByClass[cls.id] || 0,
+      }))
+
+      setClassAttendanceData(classData)
+
+      // Calculate stats
+      const totalClasses = classesData.length
+      const totalStudents = Object.values(studentsByClass).reduce((a, b) => a + b, 0)
+      const presentCount = Object.values(attendanceByClass).reduce((a, b) => a + b, 0)
+      const averageRate = totalStudents > 0 ? (presentCount / totalStudents) * 100 : 0
+
+      setClassStats({
+        totalClasses,
+        totalStudents,
+        presentCount,
+        averageRate: Math.round(averageRate * 10) / 10,
+      })
+
+    } catch (error) {
+      console.error('Error fetching class attendance data:', error)
+    } finally {
+      setClassDataLoading(false)
+    }
+  }, [selectedBranch, selectedDate, selectedDayType])
+
+  // Update available dates when day type changes
+  useEffect(() => {
+    fetchAvailableDates()
+  }, [selectedDayType, fetchAvailableDates])
+
+  // Fetch class data when branch, date, or day type changes
+  useEffect(() => {
+    if (activeView === 'class' && selectedDate) {
+      fetchClassAttendanceData()
+    }
+  }, [activeView, selectedBranch, selectedDate, selectedDayType, fetchClassAttendanceData])
+
   // Auth check
   useEffect(() => {
     if (!loading && !user) {
@@ -750,101 +1246,212 @@ export default function PerformancePage() {
 
           {/* Main Content Column */}
           <div className="flex-1 flex flex-col gap-6">
-            {/* Top Stats Row */}
-            <div className="flex gap-4 items-start">
-              {/* Stats Cards */}
-              <div className="flex-1 flex gap-3">
-                {statsData.length > 0 ? (
-                  statsData.map((stat, index) => (
-                    <StatsCard key={index} title={stat.date} value={stat.value} type={stat.type} />
-                  ))
-                ) : (
-                  // Default empty cards while loading
-                  ['line', 'bar', 'progress'].map((type, index) => (
-                    <StatsCard key={index} title="Đang tải..." value={0} type={type as 'line' | 'bar' | 'progress'} />
-                  ))
-                )}
-              </div>
+            {activeView === 'trend' ? (
+              <>
+                {/* Top Stats Row */}
+                <div className="flex gap-4 items-start">
+                  {/* Stats Cards */}
+                  <div className="flex-1 flex gap-3">
+                    {statsData.length > 0 ? (
+                      statsData.map((stat, index) => (
+                        <StatsCard key={index} title={stat.date} value={stat.value} type={stat.type} />
+                      ))
+                    ) : (
+                      // Default empty cards while loading
+                      ['line', 'bar', 'progress'].map((type, index) => (
+                        <StatsCard key={index} title="Đang tải..." value={0} type={type as 'line' | 'bar' | 'progress'} />
+                      ))
+                    )}
+                  </div>
 
-              {/* Right Controls */}
-              <div className="flex flex-col gap-3 w-[280px] flex-shrink-0">
-                {/* Date display - horizontal row */}
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-base font-semibold text-black whitespace-nowrap">{capitalizedDate}</span>
-                  <button className="h-[44px] px-5 bg-[#E5E1DC] border border-white/60 rounded-full text-base text-[#8A8C90] transition-all whitespace-nowrap">
-                    Hôm nay
-                  </button>
-                </div>
+                  {/* Right Controls */}
+                  <div className="flex flex-col gap-3 w-[280px] flex-shrink-0">
+                    {/* Date display - horizontal row */}
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-base font-semibold text-black whitespace-nowrap">{capitalizedDate}</span>
+                      <button className="h-[44px] px-5 bg-[#E5E1DC] border border-white/60 rounded-full text-base text-[#8A8C90] transition-all whitespace-nowrap">
+                        Hôm nay
+                      </button>
+                    </div>
 
-                {/* Chart type buttons - stacked vertically */}
-                <button
-                  onClick={() => setChartType('thursday')}
-                  className={`h-[48px] w-full rounded-full text-base font-medium transition-all whitespace-nowrap border border-white/60 ${chartType === 'thursday'
-                    ? 'bg-[#FA865E] text-white'
-                    : 'bg-white text-black'
-                    }`}
-                >
-                  Biểu đồ Thứ Năm
-                </button>
-                <button
-                  onClick={() => setChartType('sunday')}
-                  className={`h-[48px] w-full rounded-full text-base font-medium transition-all whitespace-nowrap border border-white/60 ${chartType === 'sunday'
-                    ? 'bg-[#FA865E] text-white'
-                    : 'bg-white text-black'
-                    }`}
-                >
-                  Biểu đồ Chúa Nhật
-                </button>
-              </div>
-            </div>
-
-            {/* Chart Section */}
-            <div>
-              {dataLoading ? (
-                <div className="bg-white rounded-[15px] p-6 border border-white/60 h-[400px] flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-4">
-                    <svg
-                      className="animate-spin h-8 w-8 text-brand"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
+                    {/* Chart type buttons - stacked vertically */}
+                    <button
+                      onClick={() => setChartType('thursday')}
+                      className={`h-[48px] w-full rounded-full text-base font-medium transition-all whitespace-nowrap border border-white/60 ${chartType === 'thursday'
+                        ? 'bg-[#FA865E] text-white'
+                        : 'bg-white text-black'
+                        }`}
                     >
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p className="text-gray-500 text-sm">Đang tải dữ liệu...</p>
+                      Biểu đồ Thứ Năm
+                    </button>
+                    <button
+                      onClick={() => setChartType('sunday')}
+                      className={`h-[48px] w-full rounded-full text-base font-medium transition-all whitespace-nowrap border border-white/60 ${chartType === 'sunday'
+                        ? 'bg-[#FA865E] text-white'
+                        : 'bg-white text-black'
+                        }`}
+                    >
+                      Biểu đồ Chúa Nhật
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <BarChart data={chartData} chartType={chartType} />
-              )}
-            </div>
 
-            {/* Branch Cards */}
-            <div className="flex gap-4">
-              {branchStats.length > 0 ? (
-                branchStats.map((branch, index) => (
-                  <BranchCard
-                    key={index}
-                    name={branch.name}
-                    value={branch.value}
-                    total={branch.total}
-                    variant={branch.color}
+                {/* Chart Section */}
+                <div>
+                  {dataLoading ? (
+                    <div className="bg-white rounded-[15px] p-6 border border-white/60 h-[400px] flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <svg
+                          className="animate-spin h-8 w-8 text-brand"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p className="text-gray-500 text-sm">Đang tải dữ liệu...</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <BarChart data={chartData} chartType={chartType} />
+                  )}
+                </div>
+
+                {/* Branch Cards */}
+                <div className="flex gap-4">
+                  {branchStats.length > 0 ? (
+                    branchStats.map((branch, index) => (
+                      <BranchCard
+                        key={index}
+                        name={branch.name}
+                        value={branch.value}
+                        total={branch.total}
+                        variant={branch.color}
+                      />
+                    ))
+                  ) : (
+                    // Default empty cards while loading
+                    ['Nghĩa sĩ', 'Thiếu nhi', 'Ấu nhi', 'Chiên con'].map((name, index) => (
+                      <BranchCard
+                        key={index}
+                        name={name}
+                        value={0}
+                        total={0}
+                        variant={index === 0 ? 'primary' : 'default'}
+                      />
+                    ))
+                  )}
+                </div>
+              </>
+            ) : (
+              /* Class View - Thống kê theo lớp trong ngành */
+              <>
+                {/* Filter Row + Date */}
+                <div className="flex items-center justify-between">
+                  {/* Left: Date + Today button */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-[18px] text-black">{capitalizedDate}</span>
+                    <button className="h-[38px] px-4 bg-white border border-white/60 rounded-full text-[18px] text-black">
+                      Hôm nay
+                    </button>
+                  </div>
+
+                  {/* Right: Filter dropdowns */}
+                  <div className="flex items-center gap-2">
+                    {/* Branch dropdown */}
+                    <Dropdown
+                      value={selectedBranch}
+                      options={BRANCHES.map(b => ({ value: b, label: branchDisplayNames[b] }))}
+                      onChange={(val) => setSelectedBranch(val as Branch)}
+                    />
+
+                    {/* Day type dropdown */}
+                    <Dropdown
+                      value={selectedDayType}
+                      options={[
+                        { value: 'cn', label: 'Chúa nhật' },
+                        { value: 'thu5', label: 'Thứ năm' },
+                      ]}
+                      onChange={(val) => setSelectedDayType(val as DayType)}
+                    />
+
+                    {/* Date dropdown */}
+                    <Dropdown
+                      value={selectedDate}
+                      options={availableDates}
+                      onChange={(val) => setSelectedDate(val)}
+                    />
+                  </div>
+                </div>
+
+                {/* Title Section */}
+                <div>
+                  <h2 className="text-[26px] font-semibold text-black">
+                    Thống kê theo lớp - {branchDisplayNames[selectedBranch]}
+                  </h2>
+                  <p className="text-[14px] font-medium text-[#666D80]">
+                    {selectedDate ? `Ngày: ${availableDates.find(d => d.value === selectedDate)?.label || selectedDate}` : 'Chọn ngày để xem thống kê'}
+                  </p>
+                </div>
+
+                {/* Stats Cards Row */}
+                <div className="flex gap-4">
+                  <ClassStatsCard
+                    title="Tổng lớp"
+                    value={classStats.totalClasses}
+                    variant="primary"
+                    chartType="wave"
                   />
-                ))
-              ) : (
-                // Default empty cards while loading
-                ['Nghĩa sĩ', 'Thiếu nhi', 'Ấu nhi', 'Chiên con'].map((name, index) => (
-                  <BranchCard
-                    key={index}
-                    name={name}
-                    value={0}
-                    total={0}
-                    variant={index === 0 ? 'primary' : 'default'}
+                  <ClassStatsCard
+                    title="Tổng học sinh"
+                    value={classStats.totalStudents}
+                    chartType="bar"
                   />
-                ))
-              )}
-            </div>
+                  <ClassStatsCard
+                    title="Có mặt"
+                    value={classStats.presentCount}
+                    chartType="bar"
+                  />
+                  <ClassStatsCard
+                    title="Tỷ lệ trung bình"
+                    value={`${classStats.averageRate}%`}
+                    chartType="progress"
+                  />
+                </div>
+
+                {/* Class Bar Chart */}
+                <div>
+                  {classDataLoading ? (
+                    <div className="bg-white rounded-[20px] p-6 shadow-[0px_20px_50px_rgba(191,21,108,0.05)] h-[400px] flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <svg
+                          className="animate-spin h-8 w-8 text-brand"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p className="text-gray-500 text-sm">Đang tải dữ liệu...</p>
+                      </div>
+                    </div>
+                  ) : classAttendanceData.length > 0 ? (
+                    <ClassBarChart
+                      data={classAttendanceData}
+                      branchName={branchDisplayNames[selectedBranch]}
+                      totalClasses={classStats.totalClasses}
+                      dayLabel={selectedDayType === 'cn' ? 'Chủ nhật' : 'Thứ năm'}
+                    />
+                  ) : (
+                    <div className="bg-white rounded-[20px] p-6 shadow-[0px_20px_50px_rgba(191,21,108,0.05)] h-[400px] flex items-center justify-center">
+                      <p className="text-gray-500 text-sm">Không có dữ liệu cho ngành này</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </main>
