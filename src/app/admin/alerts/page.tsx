@@ -69,7 +69,7 @@ function AlertStatsCard({
     }
   }
 
-  // Generate random bars for the mini chart
+  // Generate random bars for the mini chart (not for unread)
   const bars = Array.from({ length: 9 }, () => Math.random() * 100)
 
   return (
@@ -109,25 +109,157 @@ function AlertStatsCard({
         {value}
       </p>
 
-      {/* Mini Chart */}
-      <div className="absolute bottom-4 right-4 flex items-end gap-1.5 h-[46px]">
-        {bars.map((height, i) => (
-          <div key={i} className="flex flex-col gap-0.5">
-            <div
-              className={`w-1.5 rounded ${
-                variant === 'primary' ? 'bg-white/20' : 'bg-brand/20'
-              }`}
-              style={{ height: `${46 - (height * 46) / 100}px` }}
-            />
-            <div
-              className={`w-1.5 rounded ${
-                variant === 'primary' ? 'bg-white' : 'bg-brand'
-              }`}
-              style={{ height: `${(height * 46) / 100}px` }}
-            />
-          </div>
-        ))}
-      </div>
+      {/* Mini Chart - Different styles based on icon type */}
+      {icon === 'unread' ? (
+        // Line chart for unread
+        <svg
+          className="absolute bottom-4 right-4 w-[144px] h-[44px]"
+          viewBox="0 0 144 44"
+          fill="none"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="gradient-unread" x1="72" y1="0" x2="72" y2="44" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#FA865E" stopOpacity="0.14" />
+              <stop offset="1" stopColor="#FA865E" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {/* Gradient fill area */}
+          <path
+            d="M0 2L8 7L16 0L23.5 15.5L30 21L37 12L43 10L55 21L61 19L68 28L74 16L80 12L91 19H99L106.5 28H113L123 19L131 33L144 44H0V2Z"
+            fill="url(#gradient-unread)"
+          />
+          {/* Line stroke */}
+          <path
+            d="M0 2L8 7L16 0L23.5 15.5L30 21L37 12L43 10L55 21L61 19L68 28L74 16L80 12L91 19H99L106.5 28H113L123 19L131 33L144 44"
+            stroke="#FA865E"
+            strokeWidth="1"
+            fill="none"
+          />
+        </svg>
+      ) : icon === 'high' ? (
+        // Stacked bar chart for high priority
+        <svg
+          className="absolute bottom-4 right-4 w-[132px] h-[56px]"
+          viewBox="0 0 132 56"
+          fill="none"
+        >
+          {/* Bar 1 */}
+          <rect x="0" y="3" width="6" height="53" rx="3" fill="#FA865E" fillOpacity="0.2" />
+          <rect x="0" y="19" width="6" height="37" rx="3" fill="#FA865E" fillOpacity="0.4" />
+          <rect x="0" y="38" width="6" height="18" rx="3" fill="#FA865E" />
+          {/* Bar 2 */}
+          <rect x="14" y="26" width="6" height="30" rx="3" fill="#FA865E" fillOpacity="0.2" />
+          <rect x="14" y="41" width="6" height="15" rx="3" fill="#FA865E" fillOpacity="0.4" />
+          <rect x="14" y="48" width="6" height="8" rx="3" fill="#FA865E" />
+          {/* Bar 3 */}
+          <rect x="28" y="24" width="6" height="32" rx="3" fill="#FA865E" fillOpacity="0.2" />
+          <rect x="28" y="29" width="6" height="27" rx="3" fill="#FA865E" fillOpacity="0.4" />
+          <rect x="28" y="39" width="6" height="17" rx="3" fill="#FA865E" />
+          {/* Bar 4 */}
+          <rect x="42" y="42" width="6" height="14" rx="3" fill="#FA865E" fillOpacity="0.2" />
+          <rect x="42" y="47" width="6" height="9" rx="3" fill="#FA865E" fillOpacity="0.4" />
+          <rect x="42" y="50" width="6" height="6" rx="3" fill="#FA865E" />
+          {/* Bar 5 */}
+          <rect x="56" y="28" width="6" height="28" rx="3" fill="#FA865E" fillOpacity="0.2" />
+          <rect x="56" y="37" width="6" height="19" rx="3" fill="#FA865E" fillOpacity="0.4" />
+          <rect x="56" y="43" width="6" height="13" rx="3" fill="#FA865E" />
+          {/* Bar 6 */}
+          <rect x="70" y="26" width="6" height="30" rx="3" fill="#FA865E" fillOpacity="0.2" />
+          <rect x="70" y="33" width="6" height="23" rx="3" fill="#FA865E" fillOpacity="0.4" />
+          <rect x="70" y="38" width="6" height="18" rx="3" fill="#FA865E" />
+          {/* Bar 7 */}
+          <rect x="84" y="38" width="6" height="18" rx="3" fill="#FA865E" fillOpacity="0.2" />
+          <rect x="84" y="43" width="6" height="13" rx="3" fill="#FA865E" fillOpacity="0.4" />
+          <rect x="84" y="51" width="6" height="5" rx="3" fill="#FA865E" />
+          {/* Bar 8 */}
+          <rect x="98" y="33" width="6" height="23" rx="3" fill="#FA865E" fillOpacity="0.2" />
+          <rect x="98" y="39" width="6" height="17" rx="3" fill="#FA865E" fillOpacity="0.4" />
+          <rect x="98" y="46" width="6" height="10" rx="3" fill="#FA865E" />
+          {/* Bar 9 */}
+          <rect x="112" y="37" width="6" height="19" rx="3" fill="#FA865E" fillOpacity="0.2" />
+          <rect x="112" y="42" width="6" height="14" rx="3" fill="#FA865E" fillOpacity="0.4" />
+          <rect x="112" y="46" width="6" height="10" rx="3" fill="#FA865E" />
+          {/* Bar 10 */}
+          <rect x="126" y="46" width="6" height="10" rx="3" fill="#FA865E" fillOpacity="0.2" />
+          <rect x="126" y="50" width="6" height="6" rx="3" fill="#FA865E" fillOpacity="0.4" />
+          <rect x="126" y="53" width="6" height="3" rx="3" fill="#FA865E" />
+        </svg>
+      ) : icon === 'resolved' ? (
+        // Segmented bar chart for resolved
+        <svg
+          className="absolute bottom-4 right-4 w-[152px] h-[60px]"
+          viewBox="0 0 152 60"
+          fill="none"
+        >
+          {/* Bar 1 */}
+          <rect x="0" y="0" width="4" height="50" rx="2" fill="#E5E1DC" />
+          <rect x="0" y="52" width="4" height="8" rx="2" fill="#FA865E" />
+          {/* Bar 2 */}
+          <rect x="12" y="0" width="4" height="18" rx="2" fill="#E5E1DC" />
+          <rect x="12" y="20" width="4" height="40" rx="2" fill="#FA865E" />
+          {/* Bar 3 */}
+          <rect x="24" y="0" width="4" height="23" rx="2" fill="#E5E1DC" />
+          <rect x="24" y="24" width="4" height="26" rx="2" fill="#FA865E" />
+          <rect x="24" y="52" width="4" height="8" rx="2" fill="#E5E1DC" />
+          {/* Bar 4 */}
+          <rect x="36" y="0" width="4" height="25" rx="2" fill="#FA865E" />
+          <rect x="36" y="27" width="4" height="11" rx="2" fill="#E5E1DC" />
+          <rect x="36" y="40" width="4" height="20" rx="2" fill="#E5E1DC" />
+          {/* Bar 5 */}
+          <rect x="48" y="0" width="4" height="30" rx="2" fill="#E5E1DC" />
+          <rect x="48" y="32" width="4" height="18" rx="2" fill="#FA865E" />
+          <rect x="48" y="52" width="4" height="8" rx="2" fill="#E5E1DC" />
+          {/* Bar 6 */}
+          <rect x="60" y="0" width="4" height="10" rx="2" fill="#E5E1DC" />
+          <rect x="60" y="12" width="4" height="27" rx="2" fill="#FA865E" />
+          <rect x="60" y="41" width="4" height="19" rx="2" fill="#E5E1DC" />
+          {/* Bar 7 */}
+          <rect x="72" y="0" width="4" height="36" rx="2" fill="#E5E1DC" />
+          <rect x="72" y="38" width="4" height="12" rx="2" fill="#FA865E" />
+          <rect x="72" y="52" width="4" height="8" rx="2" fill="#E5E1DC" />
+          {/* Bar 8 */}
+          <rect x="84" y="0" width="4" height="10" rx="2" fill="#E5E1DC" />
+          <rect x="84" y="12" width="4" height="31" rx="2" fill="#FA865E" />
+          <rect x="84" y="45" width="4" height="15" rx="2" fill="#E5E1DC" />
+          {/* Bar 9 */}
+          <rect x="96" y="0" width="4" height="50" rx="2" fill="#FA865E" />
+          <rect x="96" y="52" width="4" height="8" rx="2" fill="#E5E1DC" />
+          {/* Bar 10 */}
+          <rect x="108" y="0" width="4" height="24" rx="2" fill="#E5E1DC" />
+          <rect x="108" y="26" width="4" height="34" rx="2" fill="#FA865E" />
+          {/* Bar 11 */}
+          <rect x="120" y="0" width="4" height="7" rx="2" fill="#FA865E" />
+          <rect x="120" y="9" width="4" height="51" rx="2" fill="#E5E1DC" />
+          {/* Bar 12 */}
+          <rect x="132" y="0" width="4" height="26" rx="2" fill="#E5E1DC" />
+          <rect x="132" y="28" width="4" height="22" rx="2" fill="#FA865E" />
+          <rect x="132" y="52" width="4" height="8" rx="2" fill="#E5E1DC" />
+          {/* Bar 13 */}
+          <rect x="144" y="0" width="4" height="50" rx="2" fill="#E5E1DC" />
+          <rect x="144" y="52" width="4" height="8" rx="2" fill="#FA865E" />
+        </svg>
+      ) : (
+        // Default bar chart for others (total)
+        <div className="absolute bottom-4 right-4 flex items-end gap-1.5 h-[46px]">
+          {bars.map((height, i) => (
+            <div key={i} className="flex flex-col gap-0.5">
+              <div
+                className={`w-1.5 rounded ${
+                  variant === 'primary' ? 'bg-white/20' : 'bg-brand/20'
+                }`}
+                style={{ height: `${46 - (height * 46) / 100}px` }}
+              />
+              <div
+                className={`w-1.5 rounded ${
+                  variant === 'primary' ? 'bg-white' : 'bg-brand'
+                }`}
+                style={{ height: `${(height * 46) / 100}px` }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
