@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, ChevronDown, User } from 'lucide-react'
 import Image from 'next/image'
 import { supabase, UserRole, ROLE_LABELS, BRANCHES, Class } from '@/lib/supabase'
+import CustomDatePicker from '@/components/ui/CustomDatePicker'
 
 interface AddUserFormProps {
   onBack: () => void
@@ -380,11 +381,10 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                 <label className="text-sm font-medium text-primary-3">
                   Ngay sinh <span className="text-[#DF1C41]">*</span>
                 </label>
-                <input
-                  type="date"
+                <CustomDatePicker
                   value={formData.birthday}
-                  onChange={(e) => handleInputChange('birthday', e.target.value)}
-                  className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black border-none focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  onChange={(date) => handleInputChange('birthday', date)}
+                  placeholder="Chọn ngày sinh"
                 />
               </div>
               <div className="flex-1 flex flex-col gap-1.5">

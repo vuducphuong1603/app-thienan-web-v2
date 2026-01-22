@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, UserProfile, UserRole, ROLE_LABELS } from '@/lib/supabase'
+import { supabase, UserProfile, UserRole, ROLE_LABELS, BRANCHES, Class } from '@/lib/supabase'
 import { Search, ChevronDown, FileSpreadsheet, Plus, Edit2, KeyRound, Trash2, X } from 'lucide-react'
 import Image from 'next/image'
 import ImportUsersModal from '@/components/management/ImportUsersModal'
@@ -49,6 +49,37 @@ export default function UsersPage() {
   const [showAddUserForm, setShowAddUserForm] = useState(false)
   const [showEditUserForm, setShowEditUserForm] = useState(false)
   const [userToEdit, setUserToEdit] = useState<User | null>(null)
+  const [classes, setClasses] = useState<Class[]>([])
+
+  // Fetch classes based on selected branch
+  const fetchClasses = useCallback(async () => {
+    if (filterBranch === 'all') {
+      setClasses([])
+      setFilterClass('all')
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('branch', filterBranch)
+        .eq('status', 'ACTIVE')
+        .order('display_order', { ascending: true })
+
+      if (error) {
+        console.error('Error fetching classes:', error)
+      } else {
+        setClasses(data || [])
+      }
+    } catch (err) {
+      console.error('Error:', err)
+    }
+  }, [filterBranch])
+
+  useEffect(() => {
+    fetchClasses()
+  }, [fetchClasses])
 
   // Fetch users from Supabase
   const fetchUsers = useCallback(async () => {
@@ -89,7 +120,13 @@ export default function UsersPage() {
     // Role filter
     const matchesRole = filterRole === 'all' || user.role === filterRole
 
-    return matchesSearch && matchesRole
+    // Branch filter
+    const matchesBranch = filterBranch === 'all' || user.branch === filterBranch
+
+    // Class filter
+    const matchesClass = filterClass === 'all' || user.class_id === filterClass
+
+    return matchesSearch && matchesRole && matchesBranch && matchesClass
   })
 
   // Clear all filters
@@ -277,11 +314,12 @@ export default function UsersPage() {
               >
                 Tất cả ngành
               </button>
-              {['Ấu nhi', 'Thiếu nhi', 'Nghĩa sĩ', 'Hiệp sĩ'].map((branch) => (
+              {BRANCHES.map((branch) => (
                 <button
                   key={branch}
                   onClick={() => {
                     setFilterBranch(branch)
+                    setFilterClass('all')
                     setIsBranchDropdownOpen(false)
                   }}
                   className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterBranch === branch ? 'bg-brand/10 text-brand' : 'text-black'}`}
@@ -297,20 +335,55 @@ export default function UsersPage() {
         <div className="relative">
           <button
             onClick={() => {
-              setIsClassDropdownOpen(!isClassDropdownOpen)
-              setIsRoleDropdownOpen(false)
-              setIsBranchDropdownOpen(false)
+              if (filterBranch !== 'all') {
+                setIsClassDropdownOpen(!isClassDropdownOpen)
+                setIsRoleDropdownOpen(false)
+                setIsBranchDropdownOpen(false)
+              }
             }}
-            className="flex items-center justify-between gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl min-w-[180px] text-sm text-primary-3 hover:bg-gray-50 transition-colors"
+            disabled={filterBranch === 'all'}
+            className={`flex items-center justify-between gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl min-w-[180px] text-sm text-primary-3 transition-colors ${
+              filterBranch === 'all' ? 'cursor-not-allowed opacity-60' : 'hover:bg-gray-50'
+            }`}
           >
-            <span>{filterClass === 'all' ? 'Chọn ngành trước' : filterClass}</span>
+            <span>
+              {filterBranch === 'all'
+                ? 'Chọn ngành trước'
+                : filterClass === 'all'
+                  ? 'Tất cả lớp'
+                  : classes.find(c => c.id === filterClass)?.name || 'Tất cả lớp'}
+            </span>
             <ChevronDown className={`w-4 h-4 transition-transform ${isClassDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
-          {isClassDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden">
-              <div className="px-4 py-2.5 text-sm text-primary-3">
-                Vui lòng chọn ngành trước
-              </div>
+          {isClassDropdownOpen && filterBranch !== 'all' && (
+            <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden max-h-[200px] overflow-y-auto">
+              <button
+                onClick={() => {
+                  setFilterClass('all')
+                  setIsClassDropdownOpen(false)
+                }}
+                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterClass === 'all' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+              >
+                Tất cả lớp
+              </button>
+              {classes.length > 0 ? (
+                classes.map((cls) => (
+                  <button
+                    key={cls.id}
+                    onClick={() => {
+                      setFilterClass(cls.id)
+                      setIsClassDropdownOpen(false)
+                    }}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterClass === cls.id ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                  >
+                    {cls.name}
+                  </button>
+                ))
+              ) : (
+                <div className="px-4 py-2.5 text-sm text-primary-3">
+                  Không có lớp nào
+                </div>
+              )}
             </div>
           )}
         </div>

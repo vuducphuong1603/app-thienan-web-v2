@@ -21,7 +21,9 @@ interface StudentWithDetails extends ThieuNhiProfile {
   avg_catechism?: number
   attendance_thu5?: number
   attendance_cn?: number
-  avg_attendance?: number
+  score_thu5?: number      // Điểm T5 = (attendance_thu5 * 0.4) * (10 / total_weeks)
+  score_cn?: number        // Điểm CN = (attendance_cn * 0.6) * (10 / total_weeks)
+  avg_attendance?: number  // TB Điểm danh = score_thu5 + score_cn
   total_avg?: number
 }
 
@@ -108,8 +110,12 @@ export default function StudentsPage() {
 
         // TB Giáo lý = (45' HK1 + 45' HK2 + Thi HK1×2 + Thi HK2×2) / 6
         const avg_catechism = (score_45_hk1 + score_45_hk2 + score_exam_hk1 * 2 + score_exam_hk2 * 2) / 6
-        // TB Điểm danh = (số buổi T5 × 0.4 + số buổi CN × 0.6) × (10 / tổng tuần)
-        const avg_attendance = (attendance_thu5 * 0.4 + attendance_cn * 0.6) * (10 / currentTotalWeeks)
+        // Điểm T5 = (số buổi T5 × 0.4) × (10 / tổng tuần)
+        const score_thu5 = (attendance_thu5 * 0.4) * (10 / currentTotalWeeks)
+        // Điểm CN = (số buổi CN × 0.6) × (10 / tổng tuần)
+        const score_cn = (attendance_cn * 0.6) * (10 / currentTotalWeeks)
+        // TB Điểm danh = Điểm T5 + Điểm CN
+        const avg_attendance = score_thu5 + score_cn
         // Tổng TB = TB Giáo lý × 0.6 + TB Điểm danh × 0.4
         const total_avg = avg_catechism * 0.6 + avg_attendance * 0.4
 
@@ -125,6 +131,8 @@ export default function StudentsPage() {
           avg_catechism,
           attendance_thu5,
           attendance_cn,
+          score_thu5,
+          score_cn,
           avg_attendance,
           total_avg,
         }
@@ -673,12 +681,12 @@ export default function StudentsPage() {
 
                     {/* Điểm danh T5 */}
                     <td className={`px-1 py-3 text-center ${rowBgClass}`}>
-                      <span className="text-sm text-[#8B8685]">{student.attendance_thu5?.toFixed(1) || '0.0'}</span>
+                      <span className="text-sm text-[#8B8685]">{student.score_thu5?.toFixed(1) || '0.0'}</span>
                     </td>
 
                     {/* Điểm danh CN */}
                     <td className={`px-1 py-3 text-center ${rowBgClass}`}>
-                      <span className="text-sm text-[#8B8685]">{student.attendance_cn?.toFixed(1) || '0.0'}</span>
+                      <span className="text-sm text-[#8B8685]">{student.score_cn?.toFixed(1) || '0.0'}</span>
                     </td>
 
                     {/* TB Điểm danh (calculated) */}

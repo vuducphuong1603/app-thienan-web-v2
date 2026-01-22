@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { Check, X, List, FileText, Loader2, Plus, Calendar } from 'lucide-react'
+import CustomCalendar from '@/components/ui/CustomCalendar'
 import QRAttendanceModal from '@/components/QRAttendanceModal'
 import AttendanceConfirmModal from '@/components/AttendanceConfirmModal'
 import ImportExcelModal from '@/components/ImportExcelModal'
@@ -287,6 +288,41 @@ export default function ActivitiesPage() {
   const presentCount = students.filter(s => s.attendance_status === 'present').length
   const notCheckedCount = students.filter(s => s.attendance_status === null).length
 
+  // Helper function to update attendance count in thieu_nhi table
+  const updateAttendanceCount = async (studentId: string) => {
+    try {
+      // Count present days for thu5
+      const { count: thu5Count } = await supabase
+        .from('attendance_records')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', studentId)
+        .eq('day_type', 'thu5')
+        .eq('status', 'present')
+        .eq('school_year_id', schoolYear?.id)
+
+      // Count present days for cn (Sunday)
+      const { count: cnCount } = await supabase
+        .from('attendance_records')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', studentId)
+        .eq('day_type', 'cn')
+        .eq('status', 'present')
+        .eq('school_year_id', schoolYear?.id)
+
+      // Update thieu_nhi table
+      await supabase
+        .from('thieu_nhi')
+        .update({
+          attendance_thu5: thu5Count || 0,
+          attendance_cn: cnCount || 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', studentId)
+    } catch (error) {
+      console.error('Error updating attendance count:', error)
+    }
+  }
+
   // Handle attendance marking - save to database
   const markAttendance = async (studentId: string, status: 'present' | 'absent') => {
     if (!dayType) {
@@ -342,6 +378,9 @@ export default function ActivitiesPage() {
             }
           : s
       ))
+
+      // Update attendance count in thieu_nhi table
+      await updateAttendanceCount(studentId)
 
       showNotification('success', status === 'present' ? 'Đã điểm danh có mặt' : 'Đã điểm danh vắng mặt')
     } catch (error) {
@@ -407,6 +446,9 @@ export default function ActivitiesPage() {
         attendance_by: s.attendance_by || user?.full_name || 'Người dùng hiện tại',
       })))
 
+      // Update attendance count for all marked students
+      await Promise.all(studentsToMark.map(student => updateAttendanceCount(student.id)))
+
       showNotification('success', `Đã điểm danh ${studentsToMark.length} thiếu nhi`)
     } catch (error) {
       console.error('Error:', error)
@@ -452,6 +494,9 @@ export default function ActivitiesPage() {
           ? { ...s, attendance_status: null, attendance_time: undefined, attendance_by: undefined, attendance_record_id: undefined }
           : s
       ))
+
+      // Update attendance count in thieu_nhi table
+      await updateAttendanceCount(studentId)
 
       showNotification('success', 'Đã xóa điểm danh')
     } catch (error) {
@@ -1010,15 +1055,13 @@ export default function ActivitiesPage() {
                   </button>
 
                   {isDatePickerOpen && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 p-4">
-                      <input
-                        type="date"
+                    <div className="absolute top-full left-0 mt-1 z-20">
+                      <CustomCalendar
                         value={selectedDate}
-                        onChange={(e) => {
-                          setSelectedDate(e.target.value)
-                          setIsDatePickerOpen(false)
-                        }}
-                        className="px-4 py-3 border border-[#E5E1DC] rounded-lg text-base focus:outline-none focus:border-brand"
+                        onChange={(date) => setSelectedDate(date)}
+                        onClose={() => setIsDatePickerOpen(false)}
+                        showConfirmButton={true}
+                        highlightWeek={true}
                       />
                     </div>
                   )}
@@ -1448,15 +1491,13 @@ export default function ActivitiesPage() {
                         <Calendar className="w-5 h-5 text-[#8A8C90]" />
                       </button>
                       {isReportFromDatePickerOpen && (
-                        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 p-3">
-                          <input
-                            type="date"
+                        <div className="absolute top-full left-0 mt-1 z-20">
+                          <CustomCalendar
                             value={reportFromDate}
-                            onChange={(e) => {
-                              setReportFromDate(e.target.value)
-                              setIsReportFromDatePickerOpen(false)
-                            }}
-                            className="w-full px-3 py-2 border border-[#E5E1DC] rounded-lg text-sm"
+                            onChange={(date) => setReportFromDate(date)}
+                            onClose={() => setIsReportFromDatePickerOpen(false)}
+                            showConfirmButton={true}
+                            highlightWeek={false}
                           />
                         </div>
                       )}
@@ -1478,15 +1519,14 @@ export default function ActivitiesPage() {
                         <Calendar className="w-5 h-5 text-[#8A8C90]" />
                       </button>
                       {isReportToDatePickerOpen && (
-                        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 p-3">
-                          <input
-                            type="date"
+                        <div className="absolute top-full left-0 mt-1 z-20">
+                          <CustomCalendar
                             value={reportToDate}
-                            onChange={(e) => {
-                              setReportToDate(e.target.value)
-                              setIsReportToDatePickerOpen(false)
-                            }}
-                            className="w-full px-3 py-2 border border-[#E5E1DC] rounded-lg text-sm"
+                            onChange={(date) => setReportToDate(date)}
+                            onClose={() => setIsReportToDatePickerOpen(false)}
+                            showConfirmButton={true}
+                            highlightWeek={false}
+                            minDate={reportFromDate}
                           />
                         </div>
                       )}
@@ -1513,20 +1553,19 @@ export default function ActivitiesPage() {
                       <Calendar className="w-5 h-5 text-[#8A8C90]" />
                     </button>
                     {isReportWeekPickerOpen && (
-                      <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 p-3">
-                        <p className="text-xs text-[#666d80] mb-2">Chọn ngày bắt đầu tuần:</p>
-                        <input
-                          type="date"
+                      <div className="absolute top-full left-0 mt-1 z-20">
+                        <CustomCalendar
                           value={reportWeekStart}
-                          onChange={(e) => {
-                            const start = new Date(e.target.value)
+                          onChange={(date) => {
+                            const start = new Date(date)
                             const end = new Date(start)
                             end.setDate(start.getDate() + 6)
-                            setReportWeekStart(e.target.value)
+                            setReportWeekStart(date)
                             setReportWeekEnd(end.toISOString().split('T')[0])
-                            setIsReportWeekPickerOpen(false)
                           }}
-                          className="w-full px-3 py-2 border border-[#E5E1DC] rounded-lg text-sm"
+                          onClose={() => setIsReportWeekPickerOpen(false)}
+                          showConfirmButton={true}
+                          highlightWeek={true}
                         />
                       </div>
                     )}
