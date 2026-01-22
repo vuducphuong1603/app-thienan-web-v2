@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { Check, X, List, FileText, Loader2, Plus, Calendar } from 'lucide-react'
@@ -8,6 +8,8 @@ import QRAttendanceModal from '@/components/QRAttendanceModal'
 import AttendanceConfirmModal from '@/components/AttendanceConfirmModal'
 import ImportExcelModal from '@/components/ImportExcelModal'
 import ExportSuccessModal from '@/components/ExportSuccessModal'
+import ReportExportTemplate from '@/components/ReportExportTemplate'
+import html2canvas from 'html2canvas'
 
 // Report related interfaces
 interface ReportStudent {
@@ -17,6 +19,24 @@ interface ReportStudent {
   saint_name?: string
   avatar_url?: string
   attendance: Record<string, 'present' | 'absent' | null> // date -> status
+}
+
+// Score report interface
+interface ReportStudentScore {
+  id: string
+  student_code?: string
+  full_name: string
+  saint_name?: string
+  avatar_url?: string
+  score_di_le_t5: number | null
+  score_hoc_gl: number | null
+  score_45_hk1: number | null
+  score_exam_hk1: number | null
+  score_45_hk2: number | null
+  score_exam_hk2: number | null
+  average_hk1: number | null
+  average_hk2: number | null
+  average_year: number | null
 }
 
 type TimeFilterMode = 'week' | 'dateRange'
@@ -35,6 +55,7 @@ type TabType = 'attendance' | 'report'
 
 export default function ActivitiesPage() {
   const { user } = useAuth()
+  const reportExportRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab] = useState<TabType>('attendance')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState<string | null>(null) // studentId being saved
@@ -80,6 +101,18 @@ export default function ActivitiesPage() {
     notChecked: 0,
     totalAttendance: 0,
   })
+  // Score report states
+  const [reportScoreStudents, setReportScoreStudents] = useState<ReportStudentScore[]>([])
+  const [reportScoreStats, setReportScoreStats] = useState({
+    totalStudents: 0,
+    averageHK1: 0,
+    averageHK2: 0,
+    averageYear: 0,
+    excellentCount: 0,  // >= 8.0
+    goodCount: 0,       // >= 6.5
+    averageCount: 0,    // >= 5.0
+    belowAverageCount: 0, // < 5.0
+  })
   const [isExportSuccessModalOpen, setIsExportSuccessModalOpen] = useState(false)
   const [exportSuccessMessage, setExportSuccessMessage] = useState('')
 
@@ -91,6 +124,18 @@ export default function ActivitiesPage() {
   const [isReportFromDatePickerOpen, setIsReportFromDatePickerOpen] = useState(false)
   const [isReportToDatePickerOpen, setIsReportToDatePickerOpen] = useState(false)
   const [isReportWeekPickerOpen, setIsReportWeekPickerOpen] = useState(false)
+
+  // Score report column selection (default all unchecked = show all)
+  const [scoreColumns, setScoreColumns] = useState({
+    diLeT5: false,
+    hocGL: false,
+    diemTB: false,
+    score45HK1: false,
+    scoreExamHK1: false,
+    score45HK2: false,
+    scoreExamHK2: false,
+    diemTong: false,
+  })
 
   // Get day of week from selected date
   const getDayOfWeek = (dateString: string) => {
@@ -517,7 +562,7 @@ export default function ActivitiesPage() {
     setIsReportWeekPickerOpen(false)
   }
 
-  // Generate report (placeholder - to be implemented with actual data fetching)
+  // Generate report
   const generateReport = async () => {
     if (!reportClassId) {
       showNotification('error', 'Vui lòng chọn lớp')
@@ -526,111 +571,222 @@ export default function ActivitiesPage() {
 
     setReportLoading(true)
     try {
-      // Get date range based on filter mode
-      let fromDate = reportFromDate
-      let toDate = reportToDate
-      if (reportTimeFilterMode === 'week' && reportWeekStart && reportWeekEnd) {
-        fromDate = reportWeekStart
-        toDate = reportWeekEnd
-      }
+      if (reportType === 'score') {
+        // Generate score report
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('thieu_nhi')
+          .select('id, student_code, full_name, saint_name, avatar_url, score_di_le_t5, score_hoc_gl, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2')
+          .eq('class_id', reportClassId)
+          .eq('status', 'ACTIVE')
+          .order('full_name', { ascending: true })
 
-      // Fetch students in the class
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('thieu_nhi')
-        .select('id, student_code, full_name, saint_name, avatar_url')
-        .eq('class_id', reportClassId)
-        .eq('status', 'ACTIVE')
-        .order('full_name', { ascending: true })
-
-      if (studentsError) {
-        throw studentsError
-      }
-
-      // Build query for attendance records
-      let query = supabase
-        .from('attendance_records')
-        .select('*')
-        .eq('class_id', reportClassId)
-        .gte('attendance_date', fromDate)
-        .lte('attendance_date', toDate)
-
-      // Filter by attendance type if not 'all'
-      if (reportAttendanceType !== 'all') {
-        query = query.eq('day_type', reportAttendanceType)
-      }
-
-      const { data: attendanceData, error: attendanceError } = await query
-
-      if (attendanceError) {
-        console.warn('Attendance fetch error:', attendanceError)
-      }
-
-      // Get unique dates from attendance records
-      const uniqueDates = new Set<string>()
-      attendanceData?.forEach(record => {
-        uniqueDates.add(record.attendance_date)
-      })
-      const sortedDates = Array.from(uniqueDates).sort()
-      setReportDates(sortedDates)
-
-      // Map attendance to students
-      const attendanceMap = new Map<string, Map<string, 'present' | 'absent'>>()
-      attendanceData?.forEach(record => {
-        if (!attendanceMap.has(record.student_id)) {
-          attendanceMap.set(record.student_id, new Map())
+        if (studentsError) {
+          throw studentsError
         }
-        attendanceMap.get(record.student_id)?.set(record.attendance_date, record.status)
-      })
 
-      // Build report students
-      const reportStudentsData: ReportStudent[] = (studentsData || []).map(student => {
-        const studentAttendance: Record<string, 'present' | 'absent' | null> = {}
-        sortedDates.forEach(date => {
-          studentAttendance[date] = attendanceMap.get(student.id)?.get(date) || null
-        })
-        return {
-          ...student,
-          attendance: studentAttendance,
-        }
-      })
+        // Calculate averages for each student
+        const reportScoreData: ReportStudentScore[] = (studentsData || []).map(student => {
+          const scoreDiLeT5 = student.score_di_le_t5 !== null ? Number(student.score_di_le_t5) : null
+          const scoreHocGL = student.score_hoc_gl !== null ? Number(student.score_hoc_gl) : null
+          const score45HK1 = student.score_45_hk1 !== null ? Number(student.score_45_hk1) : null
+          const scoreExamHK1 = student.score_exam_hk1 !== null ? Number(student.score_exam_hk1) : null
+          const score45HK2 = student.score_45_hk2 !== null ? Number(student.score_45_hk2) : null
+          const scoreExamHK2 = student.score_exam_hk2 !== null ? Number(student.score_exam_hk2) : null
 
-      setReportStudents(reportStudentsData)
-
-      // Calculate stats
-      let presentThu5 = 0
-      let presentCn = 0
-      let notChecked = 0
-      let totalAttendance = 0
-
-      attendanceData?.forEach(record => {
-        if (record.status === 'present') {
-          totalAttendance++
-          if (record.day_type === 'thu5') {
-            presentThu5++
-          } else if (record.day_type === 'cn') {
-            presentCn++
+          // Calculate average HK1 (45 min counts 1, exam counts 2)
+          let averageHK1: number | null = null
+          if (score45HK1 !== null && scoreExamHK1 !== null) {
+            averageHK1 = Math.round(((score45HK1 + scoreExamHK1 * 2) / 3) * 100) / 100
           }
-        }
-      })
 
-      // Count not checked
-      reportStudentsData.forEach(student => {
-        sortedDates.forEach(date => {
-          if (student.attendance[date] === null) {
-            notChecked++
+          // Calculate average HK2 (45 min counts 1, exam counts 2)
+          let averageHK2: number | null = null
+          if (score45HK2 !== null && scoreExamHK2 !== null) {
+            averageHK2 = Math.round(((score45HK2 + scoreExamHK2 * 2) / 3) * 100) / 100
+          }
+
+          // Calculate average year (HK1 counts 1, HK2 counts 2)
+          let averageYear: number | null = null
+          if (averageHK1 !== null && averageHK2 !== null) {
+            averageYear = Math.round(((averageHK1 + averageHK2 * 2) / 3) * 100) / 100
+          }
+
+          return {
+            id: student.id,
+            student_code: student.student_code,
+            full_name: student.full_name,
+            saint_name: student.saint_name,
+            avatar_url: student.avatar_url,
+            score_di_le_t5: scoreDiLeT5,
+            score_hoc_gl: scoreHocGL,
+            score_45_hk1: score45HK1,
+            score_exam_hk1: scoreExamHK1,
+            score_45_hk2: score45HK2,
+            score_exam_hk2: scoreExamHK2,
+            average_hk1: averageHK1,
+            average_hk2: averageHK2,
+            average_year: averageYear,
           }
         })
-      })
 
-      setReportStats({
-        presentThu5,
-        presentCn,
-        notChecked,
-        totalAttendance,
-      })
+        setReportScoreStudents(reportScoreData)
 
-      setIsReportGenerated(true)
-      showNotification('success', 'Đã tạo báo cáo thành công')
+        // Calculate stats
+        let totalStudents = reportScoreData.length
+        let sumHK1 = 0, countHK1 = 0
+        let sumHK2 = 0, countHK2 = 0
+        let sumYear = 0, countYear = 0
+        let excellentCount = 0
+        let goodCount = 0
+        let averageCount = 0
+        let belowAverageCount = 0
+
+        reportScoreData.forEach(student => {
+          if (student.average_hk1 !== null) {
+            sumHK1 += student.average_hk1
+            countHK1++
+          }
+          if (student.average_hk2 !== null) {
+            sumHK2 += student.average_hk2
+            countHK2++
+          }
+          if (student.average_year !== null) {
+            sumYear += student.average_year
+            countYear++
+            // Classify by year average
+            if (student.average_year >= 8.0) {
+              excellentCount++
+            } else if (student.average_year >= 6.5) {
+              goodCount++
+            } else if (student.average_year >= 5.0) {
+              averageCount++
+            } else {
+              belowAverageCount++
+            }
+          }
+        })
+
+        setReportScoreStats({
+          totalStudents,
+          averageHK1: countHK1 > 0 ? Math.round((sumHK1 / countHK1) * 100) / 100 : 0,
+          averageHK2: countHK2 > 0 ? Math.round((sumHK2 / countHK2) * 100) / 100 : 0,
+          averageYear: countYear > 0 ? Math.round((sumYear / countYear) * 100) / 100 : 0,
+          excellentCount,
+          goodCount,
+          averageCount,
+          belowAverageCount,
+        })
+
+        setIsReportGenerated(true)
+        showNotification('success', 'Đã tạo báo cáo điểm số thành công')
+      } else {
+        // Generate attendance report
+        // Get date range based on filter mode
+        let fromDate = reportFromDate
+        let toDate = reportToDate
+        if (reportTimeFilterMode === 'week' && reportWeekStart && reportWeekEnd) {
+          fromDate = reportWeekStart
+          toDate = reportWeekEnd
+        }
+
+        // Fetch students in the class
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('thieu_nhi')
+          .select('id, student_code, full_name, saint_name, avatar_url')
+          .eq('class_id', reportClassId)
+          .eq('status', 'ACTIVE')
+          .order('full_name', { ascending: true })
+
+        if (studentsError) {
+          throw studentsError
+        }
+
+        // Build query for attendance records
+        let query = supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('class_id', reportClassId)
+          .gte('attendance_date', fromDate)
+          .lte('attendance_date', toDate)
+
+        // Filter by attendance type if not 'all'
+        if (reportAttendanceType !== 'all') {
+          query = query.eq('day_type', reportAttendanceType)
+        }
+
+        const { data: attendanceData, error: attendanceError } = await query
+
+        if (attendanceError) {
+          console.warn('Attendance fetch error:', attendanceError)
+        }
+
+        // Get unique dates from attendance records
+        const uniqueDates = new Set<string>()
+        attendanceData?.forEach(record => {
+          uniqueDates.add(record.attendance_date)
+        })
+        const sortedDates = Array.from(uniqueDates).sort()
+        setReportDates(sortedDates)
+
+        // Map attendance to students
+        const attendanceMap = new Map<string, Map<string, 'present' | 'absent'>>()
+        attendanceData?.forEach(record => {
+          if (!attendanceMap.has(record.student_id)) {
+            attendanceMap.set(record.student_id, new Map())
+          }
+          attendanceMap.get(record.student_id)?.set(record.attendance_date, record.status)
+        })
+
+        // Build report students
+        const reportStudentsData: ReportStudent[] = (studentsData || []).map(student => {
+          const studentAttendance: Record<string, 'present' | 'absent' | null> = {}
+          sortedDates.forEach(date => {
+            studentAttendance[date] = attendanceMap.get(student.id)?.get(date) || null
+          })
+          return {
+            ...student,
+            attendance: studentAttendance,
+          }
+        })
+
+        setReportStudents(reportStudentsData)
+
+        // Calculate stats
+        let presentThu5 = 0
+        let presentCn = 0
+        let notChecked = 0
+        let totalAttendance = 0
+
+        attendanceData?.forEach(record => {
+          if (record.status === 'present') {
+            totalAttendance++
+            if (record.day_type === 'thu5') {
+              presentThu5++
+            } else if (record.day_type === 'cn') {
+              presentCn++
+            }
+          }
+        })
+
+        // Count not checked
+        reportStudentsData.forEach(student => {
+          sortedDates.forEach(date => {
+            if (student.attendance[date] === null) {
+              notChecked++
+            }
+          })
+        })
+
+        setReportStats({
+          presentThu5,
+          presentCn,
+          notChecked,
+          totalAttendance,
+        })
+
+        setIsReportGenerated(true)
+        showNotification('success', 'Đã tạo báo cáo thành công')
+      }
     } catch (error) {
       console.error('Error generating report:', error)
       showNotification('error', 'Không thể tạo báo cáo')
@@ -639,11 +795,35 @@ export default function ActivitiesPage() {
     }
   }
 
-  // Export image (placeholder)
-  const handleExportImage = () => {
-    setExportSuccessMessage('Đã xuất ảnh!')
-    setIsExportSuccessModalOpen(true)
-    setTimeout(() => setIsExportSuccessModalOpen(false), 2000)
+  // Export image
+  const handleExportImage = async () => {
+    if (!reportExportRef.current) {
+      showNotification('error', 'Không thể xuất ảnh')
+      return
+    }
+
+    try {
+      const canvas = await html2canvas(reportExportRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+      })
+
+      const link = document.createElement('a')
+      const today = new Date().toISOString().split('T')[0]
+      const reportTypeName = reportType === 'attendance' ? 'diem_danh' : 'diem_so'
+      link.download = `${reportTypeName}_${today}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+
+      setExportSuccessMessage('Đã xuất ảnh thành công!')
+      setIsExportSuccessModalOpen(true)
+      setTimeout(() => setIsExportSuccessModalOpen(false), 2000)
+    } catch (error) {
+      console.error('Error exporting image:', error)
+      showNotification('error', 'Lỗi khi xuất ảnh')
+    }
   }
 
   // Export Excel (placeholder)
@@ -1383,6 +1563,15 @@ export default function ActivitiesPage() {
                       >
                         Báo cáo điểm danh
                       </button>
+                      <button
+                        onClick={() => {
+                          setReportType('score')
+                          setIsReportTypeDropdownOpen(false)
+                        }}
+                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportType === 'score' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                      >
+                        Báo cáo điểm số
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1483,47 +1672,132 @@ export default function ActivitiesPage() {
                 </div>
               </div>
 
-              {/* Loại điểm danh */}
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-[#666d80] mb-2">Loại điểm danh</label>
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      closeAllReportDropdowns()
-                      setIsReportAttendanceTypeDropdownOpen(!isReportAttendanceTypeDropdownOpen)
-                    }}
-                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
-                  >
-                    <span className="text-sm text-black">
-                      {reportAttendanceType === 'all' ? 'Tất cả' : reportAttendanceType === 'thu5' ? 'Thứ 5' : 'Chủ nhật'}
-                    </span>
-                    <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportAttendanceTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
-                      <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
-                    </svg>
-                  </button>
-                  {isReportAttendanceTypeDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden">
-                      {[
-                        { value: 'all', label: 'Tất cả' },
-                        { value: 'thu5', label: 'Thứ 5' },
-                        { value: 'cn', label: 'Chủ nhật' },
-                      ].map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => {
-                            setReportAttendanceType(option.value as AttendanceTypeFilter)
-                            setIsReportAttendanceTypeDropdownOpen(false)
-                          }}
-                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportAttendanceType === option.value ? 'bg-brand/10 text-brand' : 'text-black'}`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              {/* Loại điểm danh - chỉ hiển thị khi báo cáo điểm danh */}
+              {reportType === 'attendance' && (
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-[#666d80] mb-2">Loại điểm danh</label>
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        closeAllReportDropdowns()
+                        setIsReportAttendanceTypeDropdownOpen(!isReportAttendanceTypeDropdownOpen)
+                      }}
+                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                    >
+                      <span className="text-sm text-black">
+                        {reportAttendanceType === 'all' ? 'Tất cả' : reportAttendanceType === 'thu5' ? 'Thứ 5' : 'Chủ nhật'}
+                      </span>
+                      <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportAttendanceTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                        <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
+                      </svg>
+                    </button>
+                    {isReportAttendanceTypeDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden">
+                        {[
+                          { value: 'all', label: 'Tất cả' },
+                          { value: 'thu5', label: 'Thứ 5' },
+                          { value: 'cn', label: 'Chủ nhật' },
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              setReportAttendanceType(option.value as AttendanceTypeFilter)
+                              setIsReportAttendanceTypeDropdownOpen(false)
+                            }}
+                            className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportAttendanceType === option.value ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Score columns selection - chỉ hiển thị khi báo cáo điểm số */}
+            {reportType === 'score' && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-[#666d80] mb-3">
+                  Chọn cột điểm số để xuất ảnh (để trống sẽ xuất tất cả)
+                </label>
+                <div className="grid grid-cols-5 gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scoreColumns.diLeT5}
+                      onChange={(e) => setScoreColumns(prev => ({ ...prev, diLeT5: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                    />
+                    <span className="text-sm text-black">Đi Lễ T5</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scoreColumns.hocGL}
+                      onChange={(e) => setScoreColumns(prev => ({ ...prev, hocGL: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                    />
+                    <span className="text-sm text-black">Học GL</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scoreColumns.diemTB}
+                      onChange={(e) => setScoreColumns(prev => ({ ...prev, diemTB: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                    />
+                    <span className="text-sm text-black">Điểm TB</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scoreColumns.score45HK1}
+                      onChange={(e) => setScoreColumns(prev => ({ ...prev, score45HK1: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                    />
+                    <span className="text-sm text-black">45' HKI</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scoreColumns.scoreExamHK1}
+                      onChange={(e) => setScoreColumns(prev => ({ ...prev, scoreExamHK1: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                    />
+                    <span className="text-sm text-black">Thi HKI</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scoreColumns.score45HK2}
+                      onChange={(e) => setScoreColumns(prev => ({ ...prev, score45HK2: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                    />
+                    <span className="text-sm text-black">45' HKII</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scoreColumns.scoreExamHK2}
+                      onChange={(e) => setScoreColumns(prev => ({ ...prev, scoreExamHK2: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                    />
+                    <span className="text-sm text-black">Thi HKII</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scoreColumns.diemTong}
+                      onChange={(e) => setScoreColumns(prev => ({ ...prev, diemTong: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                    />
+                    <span className="text-sm text-black">Điểm Tổng</span>
+                  </label>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Divider */}
             <div className="h-px bg-[#e5e1dc] mb-6" />
@@ -1557,7 +1831,7 @@ export default function ActivitiesPage() {
                       <path d="M12.0001 12C15.0793 12 18.0179 13.8185 20.1133 17.1592C20.8187 18.2839 20.8187 19.7161 20.1133 20.8408C18.0179 24.1815 15.0793 26 12.0001 26C8.92077 26 5.98224 24.1815 3.88678 20.8408C3.18144 19.7161 3.18144 18.2839 3.88678 17.1592C5.98224 13.8185 8.92077 12 12.0001 12ZM12.0001 14C9.77455 14 7.40822 15.3088 5.58112 18.2217C5.28324 18.6966 5.28324 19.3034 5.58112 19.7783C7.40822 22.6912 9.77455 24 12.0001 24C14.2256 24 16.5919 22.6912 18.419 19.7783C18.7169 19.3034 18.7169 18.6966 18.419 18.2217C16.5919 15.3088 14.2256 14 12.0001 14ZM12.0001 15C14.2092 15 16.0001 16.7909 16.0001 19C16.0001 21.2091 14.2092 23 12.0001 23C9.79092 23 8.00006 21.2091 8.00006 19C8.00006 16.7909 9.79092 15 12.0001 15ZM11.9141 17.0039C11.9687 17.1594 12.0001 17.3259 12.0001 17.5C12.0001 18.3284 11.3285 19 10.5001 19C10.326 19 10.1594 18.9686 10.004 18.9141C10.0028 18.9426 10.0001 18.9712 10.0001 19C10.0001 20.1046 10.8955 21 12.0001 21C13.1046 21 14.0001 20.1045 14.0001 19C14.0001 17.8955 13.1046 17 12.0001 17C11.9713 17 11.9426 17.0027 11.9141 17.0039Z" fill="#8A8C90" transform="translate(0, -7)"/>
                     </svg>
                     <span className="text-sm text-[#666D80]">
-                      Xem trước báo cáo: <span className="font-medium text-black">Báo cáo điểm danh</span>
+                      Xem trước báo cáo: <span className="font-medium text-black">{reportType === 'attendance' ? 'Báo cáo điểm danh' : 'Báo cáo điểm số'}</span>
                     </span>
                     {reportClassId && (
                       <span className="h-[26px] px-4 bg-[#8A8C90] rounded-[13px] text-xs font-medium text-white uppercase flex items-center">
@@ -1588,256 +1862,345 @@ export default function ActivitiesPage() {
                 </div>
 
                 {/* Stats Cards */}
-                <div className="flex items-stretch gap-[3px] mb-6">
-                  {/* Có mặt thứ 5 */}
-                  <div className="flex-1 h-[130px] bg-brand rounded-[15px] px-4 py-4 flex flex-col justify-between relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-white/80">Có mặt 5</span>
-                      <div className="w-[44px] h-[44px] rounded-full bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
-                        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="white" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+                {reportType === 'attendance' ? (
+                  <div className="flex items-stretch gap-[3px] mb-6">
+                    {/* Có mặt thứ 5 */}
+                    <div className="flex-1 h-[130px] bg-brand rounded-[15px] px-4 py-4 flex flex-col justify-between relative overflow-hidden">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-white/80">Có mặt 5</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="white" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <span className="text-[40px] font-bold text-white leading-none">{reportStats.presentThu5}</span>
                       </div>
                     </div>
-                    <div className="flex items-end justify-between">
-                      <span className="text-[40px] font-bold text-white leading-none">{reportStats.presentThu5}</span>
-                    </div>
-                    {/* Trend lines decoration */}
-                    <svg className="absolute right-4 bottom-3" width="88" height="45" viewBox="0 0 88 45" fill="none">
-                      <path d="M0 35C36 -12 36 88.5 62 55C66.6 49 78 41.5 88 57" stroke="url(#trendGrad1)" strokeWidth="2.6" strokeLinecap="round"/>
-                      <path d="M0 52.5C33 23 26 10 56 56C60 64 72 70.5 88 47.5" stroke="url(#trendGrad2)" strokeWidth="2.6" strokeLinecap="round"/>
-                      <circle cx="22" cy="35" r="3" fill="#FA865E" stroke="white"/>
-                      <defs>
-                        <linearGradient id="trendGrad1" x1="0" y1="50" x2="88" y2="50" gradientUnits="userSpaceOnUse">
-                          <stop stopColor="white" stopOpacity="0"/>
-                          <stop offset="0.26" stopColor="white"/>
-                          <stop offset="0.79" stopColor="white"/>
-                          <stop offset="1" stopColor="white" stopOpacity="0"/>
-                        </linearGradient>
-                        <linearGradient id="trendGrad2" x1="0" y1="50" x2="88" y2="50" gradientUnits="userSpaceOnUse">
-                          <stop stopColor="white" stopOpacity="0"/>
-                          <stop offset="0.6" stopColor="white"/>
-                          <stop offset="1" stopColor="white" stopOpacity="0"/>
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                  </div>
 
-                  {/* Có mặt chủ nhật */}
-                  <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-black/80">Có mặt chủ nhật</span>
-                      <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
-                        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+                    {/* Có mặt chủ nhật */}
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-black/80">Có mặt chủ nhật</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <span className="text-[40px] font-bold text-black leading-none">{reportStats.presentCn}</span>
                       </div>
                     </div>
-                    <div className="flex items-end justify-between">
-                      <span className="text-[40px] font-bold text-black leading-none">{reportStats.presentCn}</span>
-                      {/* Bar chart decoration */}
-                      <div className="flex items-end gap-[1px]">
-                        <div className="w-[11px] h-[3px] bg-[#E5E1DC] rounded-full"></div>
-                        <div className="w-[11px] h-[6px] bg-[#E5E1DC] rounded-[3px]"></div>
-                        <div className="w-[11px] h-[9px] bg-[#E5E1DC] rounded-[4.6px]"></div>
-                        <div className="w-[11px] h-[17px] bg-brand rounded-[4.8px]"></div>
-                        <div className="w-[11px] h-[25px] bg-brand rounded-[4.8px]"></div>
-                        <div className="w-[11px] h-[15px] bg-brand rounded-[4.8px]"></div>
-                        <div className="w-[11px] h-[10px] bg-[#E5E1DC] rounded-[4.8px]"></div>
-                        <div className="w-[11px] h-[3px] bg-[#E5E1DC] rounded-full"></div>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Học sinh chưa điểm danh */}
-                  <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-black/80">Học sinh chưa điểm danh</span>
-                      <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
-                        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+                    {/* Học sinh chưa điểm danh */}
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-black/80">Chưa điểm danh</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <span className="text-[40px] font-bold text-black leading-none">{reportStats.notChecked}</span>
                       </div>
                     </div>
-                    <div className="flex items-end justify-between">
-                      <span className="text-[40px] font-bold text-black leading-none">{reportStats.notChecked}</span>
-                      {/* Bar chart decoration */}
-                      <div className="flex items-end gap-[1px]">
-                        <div className="w-[11px] h-[3px] bg-[#E5E1DC] rounded-full"></div>
-                        <div className="w-[11px] h-[6px] bg-[#E5E1DC] rounded-[3px]"></div>
-                        <div className="w-[11px] h-[9px] bg-[#E5E1DC] rounded-[4.6px]"></div>
-                        <div className="w-[11px] h-[17px] bg-brand rounded-[4.8px]"></div>
-                        <div className="w-[11px] h-[25px] bg-brand rounded-[4.8px]"></div>
-                        <div className="w-[11px] h-[15px] bg-brand rounded-[4.8px]"></div>
-                        <div className="w-[11px] h-[10px] bg-[#E5E1DC] rounded-[4.8px]"></div>
-                        <div className="w-[11px] h-[3px] bg-[#E5E1DC] rounded-full"></div>
+
+                    {/* Tổng lượt điểm danh */}
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-black/80">Tổng lượt điểm danh</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <span className="text-[40px] font-bold text-black leading-none">{reportStats.totalAttendance}</span>
                       </div>
                     </div>
                   </div>
-
-                  {/* Tổng lượt điểm danh */}
-                  <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-black/80">Tổng lượt điểm danh</span>
-                      <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
-                        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+                ) : (
+                  <div className="flex items-stretch gap-[3px] mb-6">
+                    {/* TB HK1 */}
+                    <div className="flex-1 h-[130px] bg-brand rounded-[15px] px-4 py-4 flex flex-col justify-between relative overflow-hidden">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-white/80">TB HK1</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="white" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <span className="text-[40px] font-bold text-white leading-none">{reportScoreStats.averageHK1}</span>
                       </div>
                     </div>
-                    <div className="flex items-end justify-between">
-                      <span className="text-[40px] font-bold text-black leading-none">{reportStats.totalAttendance}</span>
-                      {/* Attendance bars decoration */}
-                      <div className="flex items-end gap-[1px]">
-                        <div className="w-[2.6px] flex flex-col gap-[2px]">
-                          <div className="h-[4px] bg-white rounded-full"></div>
-                          <div className="h-[15px] bg-brand rounded-full"></div>
-                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
+
+                    {/* TB HK2 */}
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-black/80">TB HK2</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
                         </div>
-                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
-                          <div className="h-[6px] bg-white rounded-full"></div>
-                          <div className="h-[12px] bg-brand rounded-full"></div>
-                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <span className="text-[40px] font-bold text-black leading-none">{reportScoreStats.averageHK2}</span>
+                      </div>
+                    </div>
+
+                    {/* TB cả năm */}
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-black/80">TB cả năm</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
                         </div>
-                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
-                          <div className="h-[3px] bg-brand rounded-full"></div>
-                          <div className="h-[15px] bg-white rounded-full"></div>
-                          <div className="w-[4px] h-[4px] bg-white rounded-full -ml-[0.7px]"></div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <span className="text-[40px] font-bold text-black leading-none">{reportScoreStats.averageYear}</span>
+                      </div>
+                    </div>
+
+                    {/* Tổng số học sinh */}
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-black/80">Tổng học sinh</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
                         </div>
-                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
-                          <div className="h-[3px] bg-white rounded-full"></div>
-                          <div className="h-[16px] bg-brand rounded-full"></div>
-                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
-                        </div>
-                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
-                          <div className="h-[3px] bg-brand rounded-full"></div>
-                          <div className="h-[15px] bg-white rounded-full"></div>
-                          <div className="w-[4px] h-[4px] bg-white rounded-full -ml-[0.7px]"></div>
-                        </div>
-                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
-                          <div className="h-[3px] bg-white rounded-full"></div>
-                          <div className="h-[16px] bg-brand rounded-full"></div>
-                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
-                        </div>
-                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
-                          <div className="h-[3px] bg-brand rounded-full"></div>
-                          <div className="h-[15px] bg-white rounded-full"></div>
-                          <div className="w-[4px] h-[4px] bg-white rounded-full -ml-[0.7px]"></div>
-                        </div>
-                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
-                          <div className="h-[3px] bg-white rounded-full"></div>
-                          <div className="h-[15px] bg-brand rounded-full"></div>
-                          <div className="w-[4px] h-[4px] bg-white rounded-full -ml-[0.7px]"></div>
-                        </div>
-                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
-                          <div className="h-[6px] bg-white rounded-full"></div>
-                          <div className="h-[12px] bg-brand rounded-full"></div>
-                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
-                        </div>
-                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
-                          <div className="h-[3px] bg-brand rounded-full"></div>
-                          <div className="h-[15px] bg-white rounded-full"></div>
-                          <div className="w-[4px] h-[4px] bg-white rounded-full -ml-[0.7px]"></div>
-                        </div>
-                        <div className="w-[2.6px] flex flex-col gap-[2px] ml-[6px]">
-                          <div className="h-[8px] bg-white rounded-full"></div>
-                          <div className="h-[10px] bg-brand rounded-full"></div>
-                          <div className="w-[4px] h-[4px] bg-brand rounded-full -ml-[0.7px]"></div>
-                        </div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <span className="text-[40px] font-bold text-black leading-none">{reportScoreStats.totalStudents}</span>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Attendance Table */}
-                <div className="overflow-hidden relative">
-                  {/* Table Header */}
-                  <div className="relative h-[38px] bg-[#E5E1DC] rounded-[15px] border border-white/60">
-                    <span className="absolute left-[30px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">STT</span>
-                    <span className="absolute left-[150px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">Tên thánh</span>
-                    <span className="absolute left-[350px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">Họ và tên</span>
-                    {reportDates.map((date, idx) => (
-                      <span
-                        key={date}
-                        className="absolute top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]"
-                        style={{ right: `${(reportDates.length - 1 - idx) * 134 + 40}px` }}
-                      >
-                        {formatShortDate(date)}
-                      </span>
-                    ))}
-                    {reportDates.length === 0 && (
-                      <span className="absolute right-[40px] top-1/2 -translate-y-1/2 text-[16px] text-[#666d80]">Không có dữ liệu</span>
+                {/* Data Table */}
+                {reportType === 'attendance' ? (
+                  <div className="overflow-hidden relative">
+                    {/* Table Header */}
+                    <div className="relative h-[38px] bg-[#E5E1DC] rounded-[15px] border border-white/60">
+                      <span className="absolute left-[30px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">STT</span>
+                      <span className="absolute left-[150px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">Tên thánh</span>
+                      <span className="absolute left-[350px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">Họ và tên</span>
+                      {reportDates.map((date, idx) => (
+                        <span
+                          key={date}
+                          className="absolute top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]"
+                          style={{ right: `${(reportDates.length - 1 - idx) * 134 + 40}px` }}
+                        >
+                          {formatShortDate(date)}
+                        </span>
+                      ))}
+                      {reportDates.length === 0 && (
+                        <span className="absolute right-[40px] top-1/2 -translate-y-1/2 text-[16px] text-[#666d80]">Không có dữ liệu</span>
+                      )}
+                    </div>
+
+                    {/* Table Body */}
+                    {reportStudents.length === 0 ? (
+                      <div className="py-12 text-center text-[16px] text-[#666d80]">
+                        Không có học sinh trong lớp này
+                      </div>
+                    ) : (
+                      reportStudents.map((student, index) => {
+                        const nameParts = student.full_name.split(' ')
+                        const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
+                        const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
+
+                        return (
+                          <div key={student.id} className="relative h-[56px]">
+                            <span className="absolute left-[37px] top-1/2 -translate-y-1/2 text-[14px] font-medium text-black">{index + 1}</span>
+                            <div className="absolute left-[90px] top-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-[12px] bg-[#F3F3F3] flex items-center justify-center overflow-hidden">
+                              {student.avatar_url ? (
+                                <img src={student.avatar_url} alt={student.full_name} className="w-full h-full object-cover" />
+                              ) : null}
+                            </div>
+                            <span className="absolute left-[150px] top-1/2 -translate-y-1/2 text-[14px] font-medium text-black">{student.saint_name || '-'}</span>
+                            <span className="absolute left-[350px] top-1/2 -translate-y-1/2 w-[150px] text-[14px] font-semibold text-[#8A8C90]">{familyMiddleName}</span>
+                            <span className="absolute left-[700px] top-1/2 -translate-y-1/2 text-[14px] font-semibold text-black">{givenName}</span>
+
+                            {reportDates.map((date, dateIndex) => {
+                              const rightPosition = (reportDates.length - 1 - dateIndex) * 134
+                              return (
+                                <div key={date} className="absolute top-0 h-[56px]" style={{ right: `${rightPosition}px`, width: '134px' }}>
+                                  <div className="absolute left-0 top-0 w-[1px] h-full bg-[#8A8C90]" />
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    {student.attendance[date] === 'present' ? (
+                                      <div className="w-[24px] h-[24px] rounded-full bg-green-500 flex items-center justify-center">
+                                        <Check className="w-4 h-4 text-white" />
+                                      </div>
+                                    ) : student.attendance[date] === 'absent' ? (
+                                      <div className="w-[24px] h-[24px] rounded-full bg-red-500 flex items-center justify-center">
+                                        <X className="w-4 h-4 text-white" />
+                                      </div>
+                                    ) : (
+                                      <span className="text-[#666d80]">-</span>
+                                    )}
+                                  </div>
+                                  <div className="absolute right-0 top-0 w-[1px] h-full bg-[#8A8C90]" />
+                                </div>
+                              )
+                            })}
+                            <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[#8A8C90]" />
+                          </div>
+                        )
+                      })
                     )}
                   </div>
-
-                  {/* Table Body */}
-                  {reportStudents.length === 0 ? (
-                    <div className="py-12 text-center text-[16px] text-[#666d80]">
-                      Không có học sinh trong lớp này
-                    </div>
-                  ) : (
-                    reportStudents.map((student, index) => {
-                      // Split name: last word is "Tên" (given name), rest is "Họ và tên đệm"
-                      const nameParts = student.full_name.split(' ')
-                      const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
-                      const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
+                ) : (
+                  <div className="overflow-x-auto">
+                    {/* Score Table */}
+                    {(() => {
+                      // Check if any column is selected
+                      const anySelected = Object.values(scoreColumns).some(v => v)
+                      // If none selected, show all columns
+                      const showAll = !anySelected
+                      const showDiLeT5 = showAll || scoreColumns.diLeT5
+                      const showHocGL = showAll || scoreColumns.hocGL
+                      const show45HK1 = showAll || scoreColumns.score45HK1
+                      const showExamHK1 = showAll || scoreColumns.scoreExamHK1
+                      const show45HK2 = showAll || scoreColumns.score45HK2
+                      const showExamHK2 = showAll || scoreColumns.scoreExamHK2
+                      const showDiemTong = showAll || scoreColumns.diemTong
+                      // Count visible columns for colSpan
+                      const visibleScoreCols = [showDiLeT5, showHocGL, show45HK1, showExamHK1, show45HK2, showExamHK2, showDiemTong].filter(Boolean).length
 
                       return (
-                        <div key={student.id} className="relative h-[56px]">
-                          {/* STT */}
-                          <span className="absolute left-[37px] top-1/2 -translate-y-1/2 text-[14px] font-medium text-black">{index + 1}</span>
-                          {/* Avatar placeholder */}
-                          <div className="absolute left-[90px] top-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-[12px] bg-[#F3F3F3] flex items-center justify-center overflow-hidden">
-                            {student.avatar_url ? (
-                              <img src={student.avatar_url} alt={student.full_name} className="w-full h-full object-cover" />
-                            ) : null}
-                          </div>
-                          {/* Tên thánh */}
-                          <span className="absolute left-[150px] top-1/2 -translate-y-1/2 text-[14px] font-medium text-black">{student.saint_name || '-'}</span>
-                          {/* Họ và tên đệm */}
-                          <span className="absolute left-[350px] top-1/2 -translate-y-1/2 w-[150px] text-[14px] font-semibold text-[#8A8C90]">{familyMiddleName}</span>
-                          {/* Tên - positioned at center of table */}
-                          <span className="absolute left-[700px] top-1/2 -translate-y-1/2 text-[14px] font-semibold text-black">{givenName}</span>
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-[#E5E1DC] h-[38px]">
+                              <th className="text-left px-4 text-[14px] font-medium text-[#666d80] w-[60px]">STT</th>
+                              <th className="text-left px-4 text-[14px] font-medium text-[#666d80] w-[120px]">Tên thánh</th>
+                              <th className="text-left px-4 text-[14px] font-medium text-[#666d80] w-[180px]">Họ và tên</th>
+                              {showDiLeT5 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">Đi Lễ T5</th>}
+                              {showHocGL && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">Học GL</th>}
+                              {show45HK1 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">45p HK1</th>}
+                              {showExamHK1 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">Thi HK1</th>}
+                              {(show45HK1 || showExamHK1) && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">TB HK1</th>}
+                              {show45HK2 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">45p HK2</th>}
+                              {showExamHK2 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">Thi HK2</th>}
+                              {(show45HK2 || showExamHK2) && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">TB HK2</th>}
+                              {showDiemTong && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">TB Năm</th>}
+                              <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[100px]">Xếp loại</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {reportScoreStudents.length === 0 ? (
+                              <tr>
+                                <td colSpan={4 + visibleScoreCols + ((show45HK1 || showExamHK1) ? 1 : 0) + ((show45HK2 || showExamHK2) ? 1 : 0)} className="py-12 text-center text-[16px] text-[#666d80]">
+                                  Không có học sinh trong lớp này
+                                </td>
+                              </tr>
+                            ) : (
+                              reportScoreStudents.map((student, index) => {
+                                let classification = '-'
+                                let classColor = 'text-[#666d80]'
+                                if (student.average_year !== null) {
+                                  if (student.average_year >= 8.0) {
+                                    classification = 'Giỏi'
+                                    classColor = 'text-green-600 font-semibold'
+                                  } else if (student.average_year >= 6.5) {
+                                    classification = 'Khá'
+                                    classColor = 'text-blue-600 font-semibold'
+                                  } else if (student.average_year >= 5.0) {
+                                    classification = 'TB'
+                                    classColor = 'text-yellow-600 font-semibold'
+                                  } else {
+                                    classification = 'Yếu'
+                                    classColor = 'text-red-600 font-semibold'
+                                  }
+                                }
 
-                          {/* Date columns - positioned from right */}
-                          {reportDates.map((date, dateIndex) => {
-                            const rightPosition = (reportDates.length - 1 - dateIndex) * 134
-                            return (
-                              <div key={date} className="absolute top-0 h-[56px]" style={{ right: `${rightPosition}px`, width: '134px' }}>
-                                {/* Vertical separator on left */}
-                                <div className="absolute left-0 top-0 w-[1px] h-full bg-[#8A8C90]" />
-                                <div className="w-full h-full flex items-center justify-center">
-                                  {student.attendance[date] === 'present' ? (
-                                    <div className="w-full h-full bg-[rgba(250,134,94,0.2)] flex items-center justify-center">
-                                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M10.5369 0.251055C10.8717 -0.083685 11.4143 -0.083685 11.749 0.251055C12.0837 0.585795 12.0837 1.12839 11.749 1.46313L7.2121 6.00002L11.749 10.5369C12.0837 10.8717 12.0837 11.4143 11.749 11.749C11.4143 12.0837 10.8717 12.0837 10.5369 11.749L6.00002 7.2121L1.46313 11.749C1.12839 12.0837 0.585795 12.0837 0.251055 11.749C-0.083685 11.4143 -0.083685 10.8717 0.251055 10.5369L4.78795 6.00002L0.251055 1.46313C-0.083685 1.12839 -0.083685 0.585795 0.251055 0.251055C0.585795 -0.083685 1.12839 -0.083685 1.46313 0.251055L6.00002 4.78795L10.5369 0.251055Z" fill="#8A8C90"/>
-                                      </svg>
-                                    </div>
-                                  ) : student.attendance[date] === 'absent' ? (
-                                    <div className="w-full h-full bg-[rgba(250,134,94,0.2)] flex items-center justify-center">
-                                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M10.5369 0.251055C10.8717 -0.083685 11.4143 -0.083685 11.749 0.251055C12.0837 0.585795 12.0837 1.12839 11.749 1.46313L7.2121 6.00002L11.749 10.5369C12.0837 10.8717 12.0837 11.4143 11.749 11.749C11.4143 12.0837 10.8717 12.0837 10.5369 11.749L6.00002 7.2121L1.46313 11.749C1.12839 12.0837 0.585795 12.0837 0.251055 11.749C-0.083685 11.4143 -0.083685 10.8717 0.251055 10.5369L4.78795 6.00002L0.251055 1.46313C-0.083685 1.12839 -0.083685 0.585795 0.251055 0.251055C0.585795 -0.083685 1.12839 -0.083685 1.46313 0.251055L6.00002 4.78795L10.5369 0.251055Z" fill="#8A8C90"/>
-                                      </svg>
-                                    </div>
-                                  ) : (
-                                    <span className="text-[#666d80]">-</span>
-                                  )}
-                                </div>
-                                {/* Vertical separator on right */}
-                                <div className="absolute right-0 top-0 w-[1px] h-full bg-[#8A8C90]" />
-                              </div>
-                            )
-                          })}
-                          {/* Bottom separator line */}
-                          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[#8A8C90]" />
-                        </div>
+                                return (
+                                  <tr key={student.id} className="border-b border-[#E5E1DC] h-[52px] hover:bg-gray-50">
+                                    <td className="px-4 text-[14px] text-black">{index + 1}</td>
+                                    <td className="px-4 text-[14px] text-black">{student.saint_name || '-'}</td>
+                                    <td className="px-4 text-[14px] font-medium text-black">{student.full_name}</td>
+                                    {showDiLeT5 && <td className="text-center px-2 text-[14px] text-black">{student.score_di_le_t5 !== null ? student.score_di_le_t5 : '-'}</td>}
+                                    {showHocGL && <td className="text-center px-2 text-[14px] text-black">{student.score_hoc_gl !== null ? student.score_hoc_gl : '-'}</td>}
+                                    {show45HK1 && <td className="text-center px-2 text-[14px] text-black">{student.score_45_hk1 !== null ? student.score_45_hk1 : '-'}</td>}
+                                    {showExamHK1 && <td className="text-center px-2 text-[14px] text-black">{student.score_exam_hk1 !== null ? student.score_exam_hk1 : '-'}</td>}
+                                    {(show45HK1 || showExamHK1) && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.average_hk1 !== null ? student.average_hk1 : '-'}</td>}
+                                    {show45HK2 && <td className="text-center px-2 text-[14px] text-black">{student.score_45_hk2 !== null ? student.score_45_hk2 : '-'}</td>}
+                                    {showExamHK2 && <td className="text-center px-2 text-[14px] text-black">{student.score_exam_hk2 !== null ? student.score_exam_hk2 : '-'}</td>}
+                                    {(show45HK2 || showExamHK2) && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.average_hk2 !== null ? student.average_hk2 : '-'}</td>}
+                                    {showDiemTong && <td className="text-center px-2 text-[14px] font-bold text-brand">{student.average_year !== null ? student.average_year : '-'}</td>}
+                                    <td className={`text-center px-2 text-[14px] ${classColor}`}>{classification}</td>
+                                  </tr>
+                                )
+                              })
+                            )}
+                          </tbody>
+                        </table>
                       )
-                    })
-                  )}
-                </div>
+                    })()}
+
+                    {/* Classification Summary */}
+                    {reportScoreStudents.length > 0 && (
+                      <div className="mt-6 flex items-center gap-6 text-sm">
+                        <span className="text-[#666d80]">Phân loại:</span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-3 h-3 rounded-full bg-green-600"></span>
+                          <span className="text-green-600 font-medium">Giỏi: {reportScoreStats.excellentCount}</span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-3 h-3 rounded-full bg-blue-600"></span>
+                          <span className="text-blue-600 font-medium">Khá: {reportScoreStats.goodCount}</span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-3 h-3 rounded-full bg-yellow-600"></span>
+                          <span className="text-yellow-600 font-medium">TB: {reportScoreStats.averageCount}</span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-3 h-3 rounded-full bg-red-600"></span>
+                          <span className="text-red-600 font-medium">Yếu: {reportScoreStats.belowAverageCount}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
+        )}
+      </div>
+
+      {/* Hidden Report Export Template */}
+      <div className="fixed left-[-9999px] top-0">
+        {isReportGenerated && reportType === 'attendance' && (
+          <ReportExportTemplate
+            ref={reportExportRef}
+            type="attendance"
+            students={reportStudents}
+            dates={reportDates}
+            className={getReportClassName(reportClassId)}
+            fromDate={reportTimeFilterMode === 'week' ? reportWeekStart : reportFromDate}
+            toDate={reportTimeFilterMode === 'week' ? reportWeekEnd : reportToDate}
+          />
+        )}
+        {isReportGenerated && reportType === 'score' && (
+          <ReportExportTemplate
+            ref={reportExportRef}
+            type="score"
+            students={reportScoreStudents}
+            className={getReportClassName(reportClassId)}
+            schoolYear={schoolYear?.name || ''}
+            scoreColumns={scoreColumns}
+          />
         )}
       </div>
 
