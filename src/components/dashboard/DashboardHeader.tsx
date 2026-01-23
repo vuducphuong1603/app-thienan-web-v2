@@ -40,7 +40,7 @@ export default function DashboardHeader({
     <header className="bg-transparent px-6 py-3">
       <div className="flex items-center justify-between">
         {/* Left: Logo + Navigation */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-20">
           {/* Logo */}
           <Link href="/admin/dashboard" className="w-[52px] h-[52px] rounded-full overflow-hidden flex-shrink-0">
             <Image
