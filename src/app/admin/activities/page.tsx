@@ -1068,7 +1068,7 @@ export default function ActivitiesPage() {
                   </button>
 
                   {isDatePickerOpen && (
-                    <div className="absolute top-full left-0 mt-1 z-20">
+                    <div className="absolute top-full right-0 mt-1 z-20">
                       <CustomCalendar
                         value={selectedDate}
                         onChange={(date) => setSelectedDate(date)}
@@ -1504,7 +1504,7 @@ export default function ActivitiesPage() {
                         <Calendar className="w-5 h-5 text-[#8A8C90]" />
                       </button>
                       {isReportFromDatePickerOpen && (
-                        <div className="absolute top-full left-0 mt-1 z-20">
+                        <div className="absolute top-full right-0 mt-1 z-20">
                           <CustomCalendar
                             value={reportFromDate}
                             onChange={(date) => setReportFromDate(date)}
@@ -1532,7 +1532,7 @@ export default function ActivitiesPage() {
                         <Calendar className="w-5 h-5 text-[#8A8C90]" />
                       </button>
                       {isReportToDatePickerOpen && (
-                        <div className="absolute top-full left-0 mt-1 z-20">
+                        <div className="absolute top-full right-0 mt-1 z-20">
                           <CustomCalendar
                             value={reportToDate}
                             onChange={(date) => setReportToDate(date)}
@@ -1566,7 +1566,7 @@ export default function ActivitiesPage() {
                       <Calendar className="w-5 h-5 text-[#8A8C90]" />
                     </button>
                     {isReportWeekPickerOpen && (
-                      <div className="absolute top-full left-0 mt-1 z-20">
+                      <div className="absolute top-full right-0 mt-1 z-20">
                         <CustomCalendar
                           value={reportWeekStart}
                           onChange={(date) => {
