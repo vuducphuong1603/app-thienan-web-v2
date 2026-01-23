@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context'
 import { Search, Calendar, Check, X, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import CustomCalendar from '@/components/ui/CustomCalendar'
+import QRAttendanceModal from '@/components/QRAttendanceModal'
 
 interface StudentWithCompensatoryStatus extends ThieuNhiProfile {
   class_name?: string
@@ -22,6 +23,10 @@ export default function CompensatoryAttendancePage() {
   const [students, setStudents] = useState<StudentWithCompensatoryStatus[]>([])
   const [schoolYear, setSchoolYear] = useState<SchoolYear | null>(null)
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
+
+  // QR modal states
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false)
+  const [selectedStudentForQR, setSelectedStudentForQR] = useState<StudentWithCompensatoryStatus | null>(null)
 
   // Filter states
   const [selectedClassId, setSelectedClassId] = useState<string>('')
@@ -331,6 +336,27 @@ export default function CompensatoryAttendancePage() {
     }
   }
 
+  // Open QR modal for a student
+  const openQRModal = (student: StudentWithCompensatoryStatus) => {
+    setSelectedStudentForQR(student)
+    setIsQRModalOpen(true)
+  }
+
+  // Handle manual attendance from QR modal
+  const handleManualAttendanceFromModal = () => {
+    if (selectedStudentForQR) {
+      markCompensatoryAttendance(selectedStudentForQR.id)
+    }
+    setIsQRModalOpen(false)
+    setSelectedStudentForQR(null)
+  }
+
+  // Close QR modal
+  const closeQRModal = () => {
+    setIsQRModalOpen(false)
+    setSelectedStudentForQR(null)
+  }
+
   return (
     <div className="space-y-4">
       {/* Header with back button */}
@@ -525,7 +551,7 @@ export default function CompensatoryAttendancePage() {
         ) : (
           <div className="divide-y divide-gray-100">
             {filteredStudents.map((student) => (
-              <div key={student.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
+              <div key={student.id} className="p-4 flex items-center justify-between hover:bg-gray-50 gap-3">
                 <div className="flex items-center gap-3">
                   {/* Avatar */}
                   <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
@@ -564,26 +590,40 @@ export default function CompensatoryAttendancePage() {
                       <span className="text-sm font-medium">Da bo sung</span>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => markCompensatoryAttendance(student.id)}
-                      disabled={saving === student.id}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {saving === student.id ? (
-                        <>
-                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          <span className="text-sm">Dang luu...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-4 h-4" />
-                          <span className="text-sm font-medium">Bo sung</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {/* QR Scan Icon */}
+                      <button
+                        onClick={() => openQRModal(student)}
+                        disabled={saving === student.id}
+                        className="flex items-center justify-center hover:opacity-70 transition-opacity disabled:opacity-50"
+                        title="Quét QR điểm danh"
+                      >
+                        <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M15.2915 19.0834V17.1667H18.1665V14.2917H20.0832V17.6459C20.0832 18.0292 19.8915 18.3167 19.604 18.6042C19.3165 18.8917 18.9332 19.0834 18.6457 19.0834H15.2915ZM5.70825 19.0834H2.354C1.97067 19.0834 1.68317 18.8917 1.39567 18.6042C1.10817 18.3167 0.916504 17.9334 0.916504 17.6459V14.2917H2.83317V17.1667H5.70825V19.0834ZM15.2915 0.916748H18.6457C19.029 0.916748 19.3165 1.10841 19.604 1.39591C19.8915 1.68341 20.0832 1.97091 20.0832 2.35425V5.70841H18.1665V2.83341H15.2915V0.916748ZM5.70825 0.916748V2.83341H2.83317V5.70841H0.916504V2.35425C0.916504 1.97091 1.10817 1.68341 1.39567 1.39591C1.68317 1.10841 1.97067 0.916748 2.354 0.916748H5.70825ZM17.2082 9.54175H3.79159V11.4584H17.2082V9.54175Z" fill="#FA865E"/>
+                        </svg>
+                      </button>
+                      {/* Manual attendance button */}
+                      <button
+                        onClick={() => markCompensatoryAttendance(student.id)}
+                        disabled={saving === student.id}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {saving === student.id ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span className="text-sm">Dang luu...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4" />
+                            <span className="text-sm font-medium">Bo sung</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -591,6 +631,15 @@ export default function CompensatoryAttendancePage() {
           </div>
         )}
       </div>
+
+      {/* QR Attendance Modal */}
+      <QRAttendanceModal
+        isOpen={isQRModalOpen}
+        onClose={closeQRModal}
+        onManualAttendance={handleManualAttendanceFromModal}
+        studentName={selectedStudentForQR ? `${selectedStudentForQR.saint_name || ''} ${selectedStudentForQR.full_name}`.trim() : undefined}
+        studentCode={selectedStudentForQR?.student_code}
+      />
     </div>
   )
 }

@@ -80,6 +80,7 @@ export default function ActivitiesPage() {
   // QR Modal states
   const [isQRModalOpen, setIsQRModalOpen] = useState(false)
   const [selectedStudentForQR, setSelectedStudentForQR] = useState<StudentWithAttendance | null>(null)
+  const [isQRForCompensatory, setIsQRForCompensatory] = useState(false)
 
   // Confirmation Modal states
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
@@ -903,24 +904,31 @@ export default function ActivitiesPage() {
   }
 
   // Open QR modal for a student
-  const openQRModal = (student: StudentWithAttendance) => {
+  const openQRModal = (student: StudentWithAttendance, forCompensatory = false) => {
     setSelectedStudentForQR(student)
+    setIsQRForCompensatory(forCompensatory)
     setIsQRModalOpen(true)
   }
 
   // Handle manual attendance from QR modal
   const handleManualAttendanceFromModal = () => {
     if (selectedStudentForQR) {
-      markAttendance(selectedStudentForQR.id, 'present')
+      if (isQRForCompensatory) {
+        markCompensatoryAttendance(selectedStudentForQR.id)
+      } else {
+        markAttendance(selectedStudentForQR.id, 'present')
+      }
     }
     setIsQRModalOpen(false)
     setSelectedStudentForQR(null)
+    setIsQRForCompensatory(false)
   }
 
   // Close QR modal
   const closeQRModal = () => {
     setIsQRModalOpen(false)
     setSelectedStudentForQR(null)
+    setIsQRForCompensatory(false)
   }
 
   // Open confirmation modal for a student
@@ -1817,7 +1825,7 @@ export default function ActivitiesPage() {
 
                             {/* Actions Column */}
                             <div className="w-[80px] flex items-center justify-end gap-3">
-                              {student.has_compensatory_attendance && (
+                              {student.has_compensatory_attendance ? (
                                 <button
                                   onClick={() => clearCompensatoryAttendance(student.id)}
                                   disabled={saving === student.id}
@@ -1826,6 +1834,17 @@ export default function ActivitiesPage() {
                                 >
                                   <svg width="18" height="18" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M12.293 0.292896C12.6836 -0.0976321 13.3166 -0.0976321 13.7071 0.292896C14.0976 0.683425 14.0976 1.31645 13.7071 1.70697L8.41408 7L13.7071 12.293C14.0976 12.6836 14.0976 13.3166 13.7071 13.7071C13.3166 14.0976 12.6836 14.0976 12.293 13.7071L7 8.41408L1.70697 13.7071C1.31645 14.0976 0.683425 14.0976 0.292896 13.7071C-0.0976321 13.3166 -0.0976321 12.6836 0.292896 12.293L5.58592 7L0.292896 1.70697C-0.0976321 1.31645 -0.0976321 0.683425 0.292896 0.292896C0.683425 -0.0976321 1.31645 -0.0976321 1.70697 0.292896L7 5.58592L12.293 0.292896Z" fill="#8A8C90"/>
+                                  </svg>
+                                </button>
+                              ) : !student.has_thursday_attendance && (
+                                <button
+                                  onClick={() => openQRModal(student, true)}
+                                  disabled={saving === student.id}
+                                  className="flex items-center justify-center hover:opacity-70 transition-opacity disabled:opacity-50"
+                                  title="Quét QR điểm danh bổ sung"
+                                >
+                                  <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.2915 19.0834V17.1667H18.1665V14.2917H20.0832V17.6459C20.0832 18.0292 19.8915 18.3167 19.604 18.6042C19.3165 18.8917 18.9332 19.0834 18.6457 19.0834H15.2915ZM5.70825 19.0834H2.354C1.97067 19.0834 1.68317 18.8917 1.39567 18.6042C1.10817 18.3167 0.916504 17.9334 0.916504 17.6459V14.2917H2.83317V17.1667H5.70825V19.0834ZM15.2915 0.916748H18.6457C19.029 0.916748 19.3165 1.10841 19.604 1.39591C19.8915 1.68341 20.0832 1.97091 20.0832 2.35425V5.70841H18.1665V2.83341H15.2915V0.916748ZM5.70825 0.916748V2.83341H2.83317V5.70841H0.916504V2.35425C0.916504 1.97091 1.10817 1.68341 1.39567 1.39591C1.68317 1.10841 1.97067 0.916748 2.354 0.916748H5.70825ZM17.2082 9.54175H3.79159V11.4584H17.2082V9.54175Z" fill="#FA865E"/>
                                   </svg>
                                 </button>
                               )}
