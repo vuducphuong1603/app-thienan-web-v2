@@ -131,27 +131,31 @@ export default function AdminDashboard() {
           {/* Welcome Section */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-300 mb-1">Chúc ngày tốt lành</p>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-base text-[#666D80] dark:text-gray-300 mb-1">Chúc ngày tốt lành</p>
+              <h1 className="text-[40px] font-bold text-black dark:text-white leading-tight">
                 Chào mừng, {firstName}. <span className="inline-block animate-wave">👋</span>
               </h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               {/* Date Display */}
-              <div className="flex items-center gap-2">
-                <span className="text-4xl font-bold text-gray-900 dark:text-white">{dayOfMonth}</span>
+              <div className="flex items-center gap-3">
+                <div className="w-[57px] h-[57px] rounded-full border border-[#E5E1DC] bg-white dark:bg-white/10 flex items-center justify-center">
+                  <span className="text-[28px] font-bold text-black dark:text-white">{dayOfMonth}</span>
+                </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{formattedDayOfWeek},</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-300">{month}</p>
+                  <p className="text-base font-medium text-black dark:text-white">{formattedDayOfWeek},</p>
+                  <p className="text-base text-black dark:text-gray-300">{month}</p>
                 </div>
               </div>
+              {/* Separator */}
+              <div className="w-px h-[34px] bg-black dark:bg-white/40" />
               {/* Notification Button */}
-              <button className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl hover:bg-orange-500 transition-colors">
-                <span className="text-sm font-medium">Xem thông báo</span>
+              <button className="flex items-center gap-2 px-8 py-3.5 bg-[#FA865E] text-white rounded-full hover:bg-[#e8764f] transition-colors shadow-[0px_0px_14px_rgba(110,98,229,0.04)]">
+                <span className="text-base font-medium">Xem thông báo</span>
               </button>
               {/* Calendar Button */}
-              <button className="w-10 h-10 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-xl flex items-center justify-center hover:bg-gray-50 dark:hover:bg-white/20 transition-colors">
-                <Calendar className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+              <button className="w-[54px] h-[54px] bg-white dark:bg-white/10 border border-white/60 rounded-full flex items-center justify-center hover:bg-gray-50 dark:hover:bg-white/20 transition-colors">
+                <Calendar className="w-5 h-5 text-black dark:text-gray-300" strokeWidth={1.5} />
               </button>
             </div>
           </div>
