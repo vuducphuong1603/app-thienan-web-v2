@@ -971,7 +971,7 @@ export default function ActivitiesPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 bg-[#F6F6F6] border border-white rounded-2xl min-h-[768px]">
+      <div className="flex-1 min-w-0 bg-[#F6F6F6] border border-white rounded-2xl min-h-[768px]">
         {activeTab === 'attendance' ? (
           <>
             {/* Header Section */}
@@ -1874,7 +1874,7 @@ export default function ActivitiesPage() {
 
             {/* Report Result Section */}
             {isReportGenerated && (
-              <div className="bg-white rounded-[24px] p-6">
+              <div className="bg-white rounded-[24px] p-6 overflow-hidden">
                 {/* Report Preview Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
