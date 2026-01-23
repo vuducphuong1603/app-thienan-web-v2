@@ -604,14 +604,12 @@ export default function ActivitiesPage() {
           : s
       ))
 
-      // Update attendance count in thieu_nhi table
-      await updateAttendanceCount(studentId)
-
+      setSaving(null)
       showNotification('success', status === 'present' ? 'Đã điểm danh có mặt' : 'Đã điểm danh vắng mặt')
+      updateAttendanceCount(studentId)
     } catch (error) {
       console.error('Error:', error)
       showNotification('error', 'Đã có lỗi xảy ra')
-    } finally {
       setSaving(null)
     }
   }
@@ -671,14 +669,12 @@ export default function ActivitiesPage() {
         attendance_by: s.attendance_by || user?.full_name || 'Người dùng hiện tại',
       })))
 
-      // Update attendance count for all marked students
-      await Promise.all(studentsToMark.map(student => updateAttendanceCount(student.id)))
-
+      setSaving(null)
       showNotification('success', `Đã điểm danh ${studentsToMark.length} thiếu nhi`)
+      Promise.all(studentsToMark.map(student => updateAttendanceCount(student.id)))
     } catch (error) {
       console.error('Error:', error)
       showNotification('error', 'Đã có lỗi xảy ra')
-    } finally {
       setSaving(null)
     }
   }
@@ -720,14 +716,12 @@ export default function ActivitiesPage() {
           : s
       ))
 
-      // Update attendance count in thieu_nhi table
-      await updateAttendanceCount(studentId)
-
+      setSaving(null)
       showNotification('success', 'Đã xóa điểm danh')
+      updateAttendanceCount(studentId)
     } catch (error) {
       console.error('Error:', error)
       showNotification('error', 'Đã có lỗi xảy ra')
-    } finally {
       setSaving(null)
     }
   }
@@ -851,14 +845,12 @@ export default function ActivitiesPage() {
           : s
       ))
 
-      // Update attendance count
-      await updateAttendanceCount(studentId)
-
+      setSaving(null)
       showNotification('success', `Đã bổ sung điểm danh cho ${student.full_name}`)
+      updateAttendanceCount(studentId)
     } catch (error) {
       console.error('Error:', error)
       showNotification('error', 'Đã có lỗi xảy ra')
-    } finally {
       setSaving(null)
     }
   }
@@ -887,12 +879,12 @@ export default function ActivitiesPage() {
           : s
       ))
 
-      await updateAttendanceCount(studentId)
+      setSaving(null)
       showNotification('success', 'Đã xóa điểm danh bổ sung')
+      updateAttendanceCount(studentId)
     } catch (error) {
       console.error('Error:', error)
       showNotification('error', 'Đã có lỗi xảy ra')
-    } finally {
       setSaving(null)
     }
   }
