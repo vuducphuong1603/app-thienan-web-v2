@@ -1540,27 +1540,27 @@ export default function ActivitiesPage() {
                             : presentCount
                           }
                         </span>
-                        {/* Decorative wave chart */}
-                        <div className="absolute bottom-0 left-0 right-0 h-[45px]">
-                          <svg viewBox="0 0 300 45" fill="none" preserveAspectRatio="none" className="w-full h-full">
-                            <path d="M0 20C30 35 50 8 90 25C130 42 150 12 190 28C220 40 240 20 267 30" stroke="url(#wave1)" strokeWidth="2.6" fill="none"/>
-                            <path d="M0 15C25 35 60 5 100 22C140 38 165 10 200 25C240 38 255 18 267 28" stroke="url(#wave2)" strokeWidth="2.6" fill="none"/>
+                        {/* Decorative graph */}
+                        <div className="absolute bottom-4 right-4">
+                          <svg width="93" height="25" viewBox="0 0 93 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1.17773 19.5001C38.5648 -28.6006 38.3594 44.0149 65.2699 16.7144C70.0294 11.8859 81.6216 5.94291 91.9749 18.5717" stroke="url(#paint0_wave)" strokeWidth="2.6"/>
+                            <path d="M0.766602 14.8571C34.8669 39.7433 28.0879 -19.5005 58.2852 17.8285C61.9828 23.7716 75.1299 29.3431 91.5638 10.7714" stroke="url(#paint1_wave)" strokeWidth="2.6"/>
+                            <path d="M23.3638 0.519531C24.7153 0.519554 25.719 1.49912 25.7192 2.59961C25.7192 3.70027 24.7155 4.67967 23.3638 4.67969C22.012 4.67969 21.0073 3.70028 21.0073 2.59961C21.0076 1.49911 22.0122 0.519531 23.3638 0.519531Z" fill="#FA865E" stroke="white" strokeWidth="1.04"/>
                             <defs>
-                              <linearGradient id="wave1" x1="0" y1="20" x2="267" y2="20">
+                              <linearGradient id="paint0_wave" x1="1.17773" y1="12.8221" x2="91.7695" y2="12.8221" gradientUnits="userSpaceOnUse">
                                 <stop stopColor="white" stopOpacity="0"/>
-                                <stop offset="0.25" stopColor="white"/>
-                                <stop offset="0.75" stopColor="white"/>
+                                <stop offset="0.257" stopColor="white"/>
+                                <stop offset="0.527" stopColor="white"/>
+                                <stop offset="0.789" stopColor="white"/>
                                 <stop offset="1" stopColor="white" stopOpacity="0"/>
                               </linearGradient>
-                              <linearGradient id="wave2" x1="0" y1="20" x2="267" y2="20">
+                              <linearGradient id="paint1_wave" x1="0.766602" y1="14.3078" x2="91.3584" y2="14.3078" gradientUnits="userSpaceOnUse">
                                 <stop stopColor="white" stopOpacity="0"/>
-                                <stop offset="0.6" stopColor="white"/>
+                                <stop offset="0.597" stopColor="white"/>
                                 <stop offset="1" stopColor="white" stopOpacity="0"/>
                               </linearGradient>
                             </defs>
                           </svg>
-                          {/* Dot indicator */}
-                          <div className="absolute left-[85px] top-[15px] w-[9px] h-[9px] rounded-full bg-brand border-2 border-white"/>
                         </div>
                       </div>
 
