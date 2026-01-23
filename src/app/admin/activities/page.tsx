@@ -53,6 +53,9 @@ interface StudentWithAttendance extends ThieuNhiProfile {
   // Compensatory attendance fields
   has_thursday_attendance?: boolean
   has_compensatory_attendance?: boolean
+  compensatory_record_id?: string
+  compensatory_time?: string
+  compensatory_by?: string
 }
 
 type TabType = 'attendance' | 'report'
@@ -267,47 +270,83 @@ export default function ActivitiesPage() {
         // Compensatory mode: check Thursday attendance and existing compensatory records
         const studentIds = (studentsData || []).map(s => s.id)
 
-        // Fetch attendance records for this week
-        const { data: weekAttendanceData } = await supabase
-          .from('attendance_records')
-          .select('*')
-          .in('student_id', studentIds)
-          .gte('attendance_date', weekStart)
-          .lte('attendance_date', weekEnd)
+        // Query all Thursday records (both regular and compensatory now share attendance_date = thursdayOfWeek)
+        // Filter out compensatory records to identify only regular Thursday attendance
+        const thursdayAttendanceSet = new Set<string>()
+        if (studentIds.length > 0) {
+          const { data: thursdayData } = await supabase
+            .from('attendance_records')
+            .select('student_id, is_compensatory')
+            .in('student_id', studentIds)
+            .eq('attendance_date', thursdayOfWeek)
+            .eq('day_type', 'thu5')
+            .eq('status', 'present')
+
+          if (thursdayData) {
+            thursdayData.forEach(record => {
+              // Only count as regular Thursday attendance if is_compensatory is not true
+              if (!record.is_compensatory) {
+                thursdayAttendanceSet.add(record.student_id)
+              }
+            })
+          }
+        }
 
         // Check for compensatory attendance that compensates for this week's Thursday
-        const { data: compensatoryData } = await supabase
-          .from('attendance_records')
-          .select('*')
-          .in('student_id', studentIds)
-          .eq('is_compensatory', true)
-          .eq('compensated_for_date', thursdayOfWeek)
+        const compensatoryMap = new Map<string, { id: string; check_in_time?: string; created_by?: string }>()
+        if (studentIds.length > 0) {
+          try {
+            const { data: compensatoryData } = await supabase
+              .from('attendance_records')
+              .select('id, student_id, check_in_time, created_by')
+              .in('student_id', studentIds)
+              .eq('is_compensatory', true)
+              .eq('compensated_for_date', thursdayOfWeek)
+              .eq('status', 'present')
+
+            if (compensatoryData) {
+              compensatoryData.forEach(record => {
+                compensatoryMap.set(record.student_id, {
+                  id: record.id,
+                  check_in_time: record.check_in_time,
+                  created_by: record.created_by,
+                })
+              })
+            }
+          } catch {
+            // Column might not exist yet
+          }
+        }
+
+        // Resolve created_by user IDs to names
+        const createdByIds = Array.from(compensatoryMap.values())
+          .map(v => v.created_by)
+          .filter((id): id is string => !!id)
+        const userNameMap = new Map<string, string>()
+        if (createdByIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, full_name')
+            .in('id', Array.from(new Set(createdByIds)))
+
+          if (usersData) {
+            usersData.forEach(u => userNameMap.set(u.id, u.full_name))
+          }
+        }
 
         const studentsWithStatus: StudentWithAttendance[] = (studentsData || []).map(student => {
-          const thursdayAttendance = weekAttendanceData?.find(
-            record => record.student_id === student.id &&
-                      record.attendance_date === thursdayOfWeek &&
-                      record.day_type === 'thu5' &&
-                      record.status === 'present' &&
-                      !record.is_compensatory
-          )
-
-          const compensatoryAttendance = compensatoryData?.find(
-            record => record.student_id === student.id &&
-                      record.status === 'present'
-          ) || weekAttendanceData?.find(
-            record => record.student_id === student.id &&
-                      record.is_compensatory === true &&
-                      record.compensated_for_date === thursdayOfWeek &&
-                      record.status === 'present'
-          )
+          const hasThursday = thursdayAttendanceSet.has(student.id)
+          const compensatory = compensatoryMap.get(student.id)
 
           return {
             ...student,
             class_name: selectedClass?.name,
-            attendance_status: null,
-            has_thursday_attendance: !!thursdayAttendance,
-            has_compensatory_attendance: !!compensatoryAttendance,
+            attendance_status: (hasThursday || !!compensatory) ? 'present' as const : null,
+            has_thursday_attendance: hasThursday,
+            has_compensatory_attendance: !!compensatory,
+            compensatory_record_id: compensatory?.id,
+            compensatory_time: compensatory?.check_in_time?.substring(0, 5),
+            compensatory_by: compensatory?.created_by ? userNameMap.get(compensatory.created_by) : undefined,
           }
         })
 
@@ -331,10 +370,57 @@ export default function ActivitiesPage() {
           console.warn('Could not fetch attendance records - table may not exist')
         }
 
-        // Map attendance records to students
+        // If Thursday, also check for compensatory records for this Thursday
+        const compensatoryMap = new Map<string, { id: string; check_in_time?: string; created_by?: string }>()
+        if (dayType === 'thu5') {
+          const studentIds = (studentsData || []).map(s => s.id)
+          if (studentIds.length > 0) {
+            try {
+              const { data: compensatoryData } = await supabase
+                .from('attendance_records')
+                .select('id, student_id, check_in_time, created_by')
+                .in('student_id', studentIds)
+                .eq('is_compensatory', true)
+                .eq('compensated_for_date', selectedDate)
+                .eq('status', 'present')
+
+              if (compensatoryData) {
+                compensatoryData.forEach(record => {
+                  compensatoryMap.set(record.student_id, {
+                    id: record.id,
+                    check_in_time: record.check_in_time,
+                    created_by: record.created_by,
+                  })
+                })
+              }
+            } catch {
+              console.warn('Could not fetch compensatory records')
+            }
+          }
+        }
+
+        // Resolve created_by user IDs to names for compensatory records
+        const compensatoryUserIds = Array.from(compensatoryMap.values())
+          .map(v => v.created_by)
+          .filter((id): id is string => !!id)
+        const compensatoryUserNameMap = new Map<string, string>()
+        if (compensatoryUserIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, full_name')
+            .in('id', Array.from(new Set(compensatoryUserIds)))
+
+          if (usersData) {
+            usersData.forEach(u => compensatoryUserNameMap.set(u.id, u.full_name))
+          }
+        }
+
+        // Map attendance records to students (exclude compensatory records from regular attendance)
         const attendanceMap = new Map<string, AttendanceRecord & { created_by_user?: { full_name: string } }>()
         if (attendanceData) {
           attendanceData.forEach(record => {
+            // Skip compensatory records - they are handled separately via compensatoryMap
+            if ((record as unknown as { is_compensatory?: boolean }).is_compensatory === true) return
             attendanceMap.set(record.student_id, record)
           })
         }
@@ -342,6 +428,7 @@ export default function ActivitiesPage() {
         // Combine students with attendance data
         const studentsWithAttendance: StudentWithAttendance[] = (studentsData || []).map(student => {
           const attendance = attendanceMap.get(student.id)
+          const compensatory = compensatoryMap.get(student.id)
           return {
             ...student,
             class_name: selectedClass?.name,
@@ -349,6 +436,10 @@ export default function ActivitiesPage() {
             attendance_time: attendance?.check_in_time?.substring(0, 5) || undefined,
             attendance_by: attendance?.created_by_user?.full_name || undefined,
             attendance_record_id: attendance?.id || undefined,
+            has_compensatory_attendance: !!compensatory,
+            compensatory_record_id: compensatory?.id,
+            compensatory_time: compensatory?.check_in_time?.substring(0, 5),
+            compensatory_by: compensatory?.created_by ? compensatoryUserNameMap.get(compensatory.created_by) : undefined,
           }
         })
 
@@ -429,7 +520,41 @@ export default function ActivitiesPage() {
       return
     }
 
+    // Case 2: Block marking Thursday attendance if student already compensated for this Thursday
+    if (dayType === 'thu5') {
+      const student = students.find(s => s.id === studentId)
+      if (student?.has_compensatory_attendance) {
+        showNotification('error', 'Thiếu nhi này đã điểm danh bù cho Thứ 5 này rồi')
+        return
+      }
+    }
+
     setSaving(studentId)
+
+    // Server-side check for Thursday: verify no compensatory record exists
+    if (dayType === 'thu5') {
+      try {
+        const { data: existingCompensatory } = await supabase
+          .from('attendance_records')
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('is_compensatory', true)
+          .eq('compensated_for_date', selectedDate)
+          .eq('status', 'present')
+          .limit(1)
+
+        if (existingCompensatory && existingCompensatory.length > 0) {
+          setStudents(prev => prev.map(s =>
+            s.id === studentId ? { ...s, has_compensatory_attendance: true, compensatory_record_id: existingCompensatory[0].id } : s
+          ))
+          showNotification('error', 'Thiếu nhi này đã điểm danh bù cho Thứ 5 này rồi, không thể điểm danh trực tiếp')
+          setSaving(null)
+          return
+        }
+      } catch {
+        // If query fails (column doesn't exist), proceed normally
+      }
+    }
     try {
       const now = new Date()
       const checkInTime = now.toTimeString().substring(0, 8)
@@ -497,7 +622,7 @@ export default function ActivitiesPage() {
       return
     }
 
-    const studentsToMark = students.filter(s => s.attendance_status === null)
+    const studentsToMark = students.filter(s => s.attendance_status === null && !s.has_compensatory_attendance)
     if (studentsToMark.length === 0) {
       showNotification('success', 'Tất cả đã được điểm danh')
       return
@@ -628,25 +753,78 @@ export default function ActivitiesPage() {
 
     setSaving(studentId)
     try {
+      // Server-side check: verify student hasn't already attended Thursday this week
+      const { data: existingThursday } = await supabase
+        .from('attendance_records')
+        .select('id')
+        .eq('student_id', studentId)
+        .eq('attendance_date', thursdayOfWeek)
+        .eq('day_type', 'thu5')
+        .eq('status', 'present')
+        .is('is_compensatory', null)
+        .limit(1)
+
+      // Also check for is_compensatory = false
+      const { data: existingThursdayFalse } = await supabase
+        .from('attendance_records')
+        .select('id')
+        .eq('student_id', studentId)
+        .eq('attendance_date', thursdayOfWeek)
+        .eq('day_type', 'thu5')
+        .eq('status', 'present')
+        .eq('is_compensatory', false)
+        .limit(1)
+
+      if ((existingThursday && existingThursday.length > 0) || (existingThursdayFalse && existingThursdayFalse.length > 0)) {
+        // Update local state to reflect actual Thursday attendance
+        setStudents(prev => prev.map(s =>
+          s.id === studentId ? { ...s, has_thursday_attendance: true } : s
+        ))
+        showNotification('error', 'Thiếu nhi này đã điểm danh Thứ 5 tuần này rồi, không thể bổ sung')
+        setSaving(null)
+        return
+      }
+
+      // Server-side check: verify student hasn't already compensated for this Thursday
+      const { data: existingCompensatory } = await supabase
+        .from('attendance_records')
+        .select('id')
+        .eq('student_id', studentId)
+        .eq('is_compensatory', true)
+        .eq('compensated_for_date', thursdayOfWeek)
+        .eq('status', 'present')
+        .limit(1)
+
+      if (existingCompensatory && existingCompensatory.length > 0) {
+        setStudents(prev => prev.map(s =>
+          s.id === studentId ? { ...s, has_compensatory_attendance: true, compensatory_record_id: existingCompensatory[0].id } : s
+        ))
+        showNotification('error', 'Thiếu nhi này đã bổ sung điểm danh cho Thứ 5 tuần này rồi')
+        setSaving(null)
+        return
+      }
+
       const now = new Date()
       const checkInTime = now.toTimeString().substring(0, 8)
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('attendance_records')
         .insert({
           student_id: studentId,
           class_id: selectedClassId,
           school_year_id: schoolYear?.id,
-          attendance_date: selectedDate,
+          attendance_date: thursdayOfWeek,
           day_type: 'thu5',
           status: 'present',
           check_in_time: checkInTime,
           check_in_method: 'manual',
           is_compensatory: true,
           compensated_for_date: thursdayOfWeek,
-          notes: `Bổ sung điểm danh cho Thứ 5 ngày ${thursdayOfWeek}`,
+          notes: `Bổ sung điểm danh ngày ${selectedDate} cho Thứ 5 ngày ${thursdayOfWeek}`,
           created_by: user?.id,
         })
+        .select('id')
+        .single()
 
       if (error) {
         console.error('Error saving compensatory attendance:', error)
@@ -661,7 +839,14 @@ export default function ActivitiesPage() {
       // Update local state
       setStudents(prev => prev.map(s =>
         s.id === studentId
-          ? { ...s, has_compensatory_attendance: true }
+          ? {
+              ...s,
+              attendance_status: 'present' as const,
+              has_compensatory_attendance: true,
+              compensatory_record_id: data?.id,
+              compensatory_time: checkInTime.substring(0, 5),
+              compensatory_by: user?.full_name,
+            }
           : s
       ))
 
@@ -669,6 +854,40 @@ export default function ActivitiesPage() {
       await updateAttendanceCount(studentId)
 
       showNotification('success', `Đã bổ sung điểm danh cho ${student.full_name}`)
+    } catch (error) {
+      console.error('Error:', error)
+      showNotification('error', 'Đã có lỗi xảy ra')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  // Clear compensatory attendance
+  const clearCompensatoryAttendance = async (studentId: string) => {
+    const student = students.find(s => s.id === studentId)
+    if (!student?.compensatory_record_id) return
+
+    setSaving(studentId)
+    try {
+      const { error } = await supabase
+        .from('attendance_records')
+        .delete()
+        .eq('id', student.compensatory_record_id)
+
+      if (error) {
+        console.error('Error deleting compensatory attendance:', error)
+        showNotification('error', 'Không thể xóa điểm danh bổ sung: ' + error.message)
+        return
+      }
+
+      setStudents(prev => prev.map(s =>
+        s.id === studentId
+          ? { ...s, attendance_status: null, has_compensatory_attendance: false, compensatory_record_id: undefined, compensatory_time: undefined }
+          : s
+      ))
+
+      await updateAttendanceCount(studentId)
+      showNotification('success', 'Đã xóa điểm danh bổ sung')
     } catch (error) {
       console.error('Error:', error)
       showNotification('error', 'Đã có lỗi xảy ra')
@@ -1424,19 +1643,21 @@ export default function ActivitiesPage() {
                       {/* Actions - Right side */}
                       <div className="flex-1 flex flex-col gap-2">
                         {isCompensatoryMode ? (
-                          /* Compensatory mode info */
-                          <div className="h-[130px] bg-blue-50 border border-blue-200 rounded-[18px] p-5 flex flex-col justify-between">
-                            <div className="flex flex-col gap-1">
-                              <span className="text-sm font-medium text-blue-800">Bổ sung điểm danh Thứ 5</span>
-                              <span className="text-xs text-blue-600">
-                                Tuần: {formatDate(weekStart)} - {formatDate(weekEnd)}
-                              </span>
+                          /* Compensatory mode actions */
+                          <>
+                            <div className="h-[130px] bg-blue-50 border border-blue-200 rounded-[18px] p-5 flex flex-col justify-between">
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm font-medium text-blue-800">Bổ sung điểm danh Thứ 5</span>
+                                <span className="text-xs text-blue-600">
+                                  Tuần: {formatDate(weekStart)} - {formatDate(weekEnd)}
+                                </span>
+                              </div>
+                              <div className="text-xs text-blue-700 space-y-0.5">
+                                <p>Đã đi/bổ sung: <strong>{students.filter(s => s.has_thursday_attendance || s.has_compensatory_attendance).length}</strong></p>
+                                <p>Chưa điểm danh: <strong>{students.filter(s => !s.has_thursday_attendance && !s.has_compensatory_attendance).length}</strong></p>
+                              </div>
                             </div>
-                            <div className="text-xs text-blue-700 space-y-0.5">
-                              <p>Đã đi/bổ sung: <strong>{students.filter(s => s.has_thursday_attendance || s.has_compensatory_attendance).length}</strong></p>
-                              <p>Chưa điểm danh: <strong>{students.filter(s => !s.has_thursday_attendance && !s.has_compensatory_attendance).length}</strong></p>
-                            </div>
-                          </div>
+                          </>
                         ) : (
                           <>
                             {/* Mark All Present Checkbox */}
@@ -1478,24 +1699,27 @@ export default function ActivitiesPage() {
                           </svg>
                         </div>
                       ) : isCompensatoryMode ? (
-                        /* Compensatory mode student list */
+                        /* Compensatory mode student list - same layout as regular attendance */
                         students.map((student, index) => (
                           <div
                             key={student.id}
                             className={`flex items-center py-5 ${index !== students.length - 1 ? 'border-b border-[#f0f0f0]' : ''} ${saving === student.id ? 'opacity-50' : ''}`}
                           >
-                            {/* Status Icon Column */}
+                            {/* Checkbox Column */}
                             <div className="w-[60px] flex items-center justify-center">
                               {saving === student.id ? (
-                                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                                <Loader2 className="w-6 h-6 animate-spin text-brand" />
                               ) : student.has_thursday_attendance || student.has_compensatory_attendance ? (
                                 <div className={`w-[26px] h-[26px] rounded-[5px] flex items-center justify-center ${
-                                  student.has_thursday_attendance ? 'bg-[#00a86b]' : 'bg-blue-500'
+                                  student.has_thursday_attendance ? 'bg-[#00a86b]' : 'bg-brand'
                                 }`}>
                                   <Check className="w-5 h-5 text-white" strokeWidth={3} />
                                 </div>
                               ) : (
-                                <div className="w-[26px] h-[26px] rounded-[5px] border-2 border-[#e0e0e0]" />
+                                <button
+                                  onClick={() => markCompensatoryAttendance(student.id)}
+                                  className="w-[26px] h-[26px] rounded-[5px] border-2 border-[#e0e0e0] hover:border-brand transition-colors"
+                                />
                               )}
                             </div>
 
@@ -1524,30 +1748,85 @@ export default function ActivitiesPage() {
                               <span className="text-sm text-[#666d80] mt-1">{student.student_code || '---'}</span>
                             </div>
 
-                            {/* Compensatory Status & Action */}
-                            <div className="flex-1 flex items-center justify-between pl-3">
+                            {/* Status Text Column */}
+                            <div className="w-[150px]">
+                              <span className={`text-base font-medium ${
+                                student.has_thursday_attendance
+                                  ? 'text-[#00a86b]'
+                                  : student.has_compensatory_attendance
+                                    ? 'text-[#00a86b]'
+                                    : 'text-brand'
+                              }`}>
+                                {student.has_thursday_attendance
+                                  ? 'Đã đi Thứ 5'
+                                  : student.has_compensatory_attendance
+                                    ? 'Đã bổ sung'
+                                    : 'Chưa điểm danh'
+                                }
+                              </span>
+                            </div>
+
+                            {/* Badge Column */}
+                            <div className="w-[120px]">
                               {student.has_thursday_attendance ? (
                                 <div className="h-[34px] px-4 bg-[rgba(0,168,107,0.12)] rounded-full flex items-center gap-2">
                                   <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-[#00a86b] flex items-center justify-center">
                                     <Check className="w-3 h-3 text-[#00a86b]" strokeWidth={3} />
                                   </div>
-                                  <span className="text-sm font-medium text-[#00a86b]">Đã đi Thứ 5</span>
+                                  <span className="text-sm font-medium text-[#00a86b]">Có mặt</span>
                                 </div>
                               ) : student.has_compensatory_attendance ? (
-                                <div className="h-[34px] px-4 bg-blue-100 rounded-full flex items-center gap-2">
-                                  <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-blue-600 flex items-center justify-center">
-                                    <Check className="w-3 h-3 text-blue-600" strokeWidth={3} />
+                                <div className="h-[34px] px-4 bg-[rgba(0,168,107,0.12)] rounded-full flex items-center gap-2">
+                                  <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-[#00a86b] flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-[#00a86b]" strokeWidth={3} />
                                   </div>
-                                  <span className="text-sm font-medium text-blue-600">Đã bổ sung</span>
+                                  <span className="text-sm font-medium text-[#00a86b]">Đã bổ sung</span>
                                 </div>
                               ) : (
                                 <button
                                   onClick={() => markCompensatoryAttendance(student.id)}
                                   disabled={saving === student.id}
-                                  className="h-[34px] px-5 bg-blue-500 rounded-full flex items-center gap-2 hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="h-[34px] px-4 bg-[rgba(250,134,94,0.15)] rounded-full flex items-center gap-2 hover:bg-[rgba(250,134,94,0.25)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  <Plus className="w-4 h-4 text-white" strokeWidth={2.5} />
-                                  <span className="text-sm font-medium text-white">Bổ sung</span>
+                                  <Plus className="w-4 h-4 text-brand" strokeWidth={2.5} />
+                                  <span className="text-sm font-medium text-brand">Bổ sung</span>
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Timestamp & By Column */}
+                            <div className="flex-1 flex flex-col pl-5">
+                              {student.has_compensatory_attendance && student.compensatory_time ? (
+                                <>
+                                  <span className="text-sm font-medium text-black leading-tight">
+                                    {student.compensatory_time} {dayOfWeek} {formatDate(selectedDate)}
+                                  </span>
+                                  <span className="text-sm text-[#666d80] mt-0.5">
+                                    Bổ sung cho: Thứ 5 {formatDate(thursdayOfWeek)}
+                                  </span>
+                                  <span className="text-sm text-[#666d80] mt-0.5">
+                                    Điểm danh bởi: {student.compensatory_by || 'Không rõ'}
+                                  </span>
+                                </>
+                              ) : student.has_thursday_attendance ? (
+                                <span className="text-sm text-[#666d80]">
+                                  Đã điểm danh Thứ 5 {formatDate(thursdayOfWeek)}
+                                </span>
+                              ) : null}
+                            </div>
+
+                            {/* Actions Column */}
+                            <div className="w-[80px] flex items-center justify-end gap-3">
+                              {student.has_compensatory_attendance && (
+                                <button
+                                  onClick={() => clearCompensatoryAttendance(student.id)}
+                                  disabled={saving === student.id}
+                                  className="flex items-center justify-center hover:opacity-70 transition-opacity disabled:opacity-50"
+                                  title="Xóa điểm danh bổ sung"
+                                >
+                                  <svg width="18" height="18" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12.293 0.292896C12.6836 -0.0976321 13.3166 -0.0976321 13.7071 0.292896C14.0976 0.683425 14.0976 1.31645 13.7071 1.70697L8.41408 7L13.7071 12.293C14.0976 12.6836 14.0976 13.3166 13.7071 13.7071C13.3166 14.0976 12.6836 14.0976 12.293 13.7071L7 8.41408L1.70697 13.7071C1.31645 14.0976 0.683425 14.0976 0.292896 13.7071C-0.0976321 13.3166 -0.0976321 12.6836 0.292896 12.293L5.58592 7L0.292896 1.70697C-0.0976321 1.31645 -0.0976321 0.683425 0.292896 0.292896C0.683425 -0.0976321 1.31645 -0.0976321 1.70697 0.292896L7 5.58592L12.293 0.292896Z" fill="#8A8C90"/>
+                                  </svg>
                                 </button>
                               )}
                             </div>
@@ -1568,6 +1847,10 @@ export default function ActivitiesPage() {
                                 <div className={`w-[26px] h-[26px] rounded-[5px] flex items-center justify-center ${
                                   student.attendance_status === 'present' ? 'bg-brand' : 'bg-[#666d80]'
                                 }`}>
+                                  <Check className="w-5 h-5 text-white" strokeWidth={3} />
+                                </div>
+                              ) : student.has_compensatory_attendance ? (
+                                <div className="w-[26px] h-[26px] rounded-[5px] flex items-center justify-center bg-blue-500">
                                   <Check className="w-5 h-5 text-white" strokeWidth={3} />
                                 </div>
                               ) : (
@@ -1607,17 +1890,30 @@ export default function ActivitiesPage() {
                             {/* Status Text Column */}
                             <div className="w-[150px]">
                               <span className={`text-base font-medium ${
-                                student.attendance_status === null
-                                  ? 'text-brand'
-                                  : 'text-[#00a86b]'
+                                student.has_compensatory_attendance && !student.attendance_status
+                                  ? 'text-blue-600'
+                                  : student.attendance_status === null
+                                    ? 'text-brand'
+                                    : 'text-[#00a86b]'
                               }`}>
-                                {student.attendance_status === null ? 'Chưa điểm danh' : 'Đã điểm danh'}
+                                {student.has_compensatory_attendance && !student.attendance_status
+                                  ? 'Đã bổ sung'
+                                  : student.attendance_status === null
+                                    ? 'Chưa điểm danh'
+                                    : 'Đã điểm danh'}
                               </span>
                             </div>
 
                             {/* Attendance Badge Column */}
                             <div className="w-[120px]">
-                              {student.attendance_status === null ? (
+                              {student.has_compensatory_attendance && !student.attendance_status ? (
+                                <div className="h-[34px] px-4 rounded-full flex items-center gap-2 bg-blue-50">
+                                  <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-blue-500 flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-blue-500" strokeWidth={3} />
+                                  </div>
+                                  <span className="text-sm font-medium text-blue-600">Đã bổ sung</span>
+                                </div>
+                              ) : student.attendance_status === null ? (
                                 <button
                                   onClick={() => markAttendance(student.id, 'absent')}
                                   disabled={!dayType || saving === student.id}
@@ -1658,7 +1954,19 @@ export default function ActivitiesPage() {
 
                             {/* Timestamp & By Column */}
                             <div className="flex-1 flex flex-col pl-5">
-                              {student.attendance_status !== null ? (
+                              {student.has_compensatory_attendance && !student.attendance_status ? (
+                                <>
+                                  <span className="text-sm font-medium text-blue-600 leading-tight">
+                                    {student.compensatory_time} (Điểm danh bù)
+                                  </span>
+                                  <span className="text-sm text-[#666d80] mt-0.5">
+                                    Đã bổ sung cho Thứ 5 này
+                                  </span>
+                                  <span className="text-sm text-[#666d80] mt-0.5">
+                                    Điểm danh bởi: {student.compensatory_by || 'Không rõ'}
+                                  </span>
+                                </>
+                              ) : student.attendance_status !== null ? (
                                 <>
                                   <span className="text-sm font-medium text-black leading-tight">
                                     {student.attendance_time} {dayOfWeek} {formatDate(selectedDate)}
