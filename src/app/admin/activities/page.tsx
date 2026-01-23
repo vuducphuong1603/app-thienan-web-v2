@@ -814,13 +814,12 @@ export default function ActivitiesPage() {
           }
         })
 
-        // Count not checked
+        // Count not checked: each student counts as +1 if they have at least one null date
         reportStudentsData.forEach(student => {
-          sortedDates.forEach(date => {
-            if (student.attendance[date] === null) {
-              notChecked++
-            }
-          })
+          const hasNullDate = sortedDates.some(date => student.attendance[date] === null)
+          if (hasNullDate) {
+            notChecked++
+          }
         })
 
         setReportStats({
