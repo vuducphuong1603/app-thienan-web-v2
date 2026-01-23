@@ -273,11 +273,11 @@ export default function ActivitiesPage() {
 
         // Query all Thursday records (both regular and compensatory now share attendance_date = thursdayOfWeek)
         // Filter out compensatory records to identify only regular Thursday attendance
-        const thursdayAttendanceSet = new Set<string>()
+        const thursdayAttendanceMap = new Map<string, { check_in_time?: string; created_by?: string }>()
         if (studentIds.length > 0) {
           const { data: thursdayData } = await supabase
             .from('attendance_records')
-            .select('student_id, is_compensatory')
+            .select('student_id, is_compensatory, check_in_time, created_by')
             .in('student_id', studentIds)
             .eq('attendance_date', thursdayOfWeek)
             .eq('day_type', 'thu5')
@@ -287,7 +287,10 @@ export default function ActivitiesPage() {
             thursdayData.forEach(record => {
               // Only count as regular Thursday attendance if is_compensatory is not true
               if (!record.is_compensatory) {
-                thursdayAttendanceSet.add(record.student_id)
+                thursdayAttendanceMap.set(record.student_id, {
+                  check_in_time: record.check_in_time,
+                  created_by: record.created_by,
+                })
               }
             })
           }
@@ -319,16 +322,17 @@ export default function ActivitiesPage() {
           }
         }
 
-        // Resolve created_by user IDs to names
-        const createdByIds = Array.from(compensatoryMap.values())
-          .map(v => v.created_by)
-          .filter((id): id is string => !!id)
+        // Resolve created_by user IDs to names (both Thursday and compensatory)
+        const allCreatedByIds = [
+          ...Array.from(thursdayAttendanceMap.values()).map(v => v.created_by),
+          ...Array.from(compensatoryMap.values()).map(v => v.created_by),
+        ].filter((id): id is string => !!id)
         const userNameMap = new Map<string, string>()
-        if (createdByIds.length > 0) {
+        if (allCreatedByIds.length > 0) {
           const { data: usersData } = await supabase
             .from('users')
             .select('id, full_name')
-            .in('id', Array.from(new Set(createdByIds)))
+            .in('id', Array.from(new Set(allCreatedByIds)))
 
           if (usersData) {
             usersData.forEach(u => userNameMap.set(u.id, u.full_name))
@@ -336,13 +340,16 @@ export default function ActivitiesPage() {
         }
 
         const studentsWithStatus: StudentWithAttendance[] = (studentsData || []).map(student => {
-          const hasThursday = thursdayAttendanceSet.has(student.id)
+          const thursdayRecord = thursdayAttendanceMap.get(student.id)
+          const hasThursday = !!thursdayRecord
           const compensatory = compensatoryMap.get(student.id)
 
           return {
             ...student,
             class_name: selectedClass?.name,
             attendance_status: (hasThursday || !!compensatory) ? 'present' as const : null,
+            attendance_time: thursdayRecord?.check_in_time?.substring(0, 5),
+            attendance_by: thursdayRecord?.created_by ? userNameMap.get(thursdayRecord.created_by) : undefined,
             has_thursday_attendance: hasThursday,
             has_compensatory_attendance: !!compensatory,
             compensatory_record_id: compensatory?.id,
@@ -417,13 +424,29 @@ export default function ActivitiesPage() {
         }
 
         // Map attendance records to students (exclude compensatory records from regular attendance)
-        const attendanceMap = new Map<string, AttendanceRecord & { created_by_user?: { full_name: string } }>()
+        const attendanceMap = new Map<string, AttendanceRecord>()
         if (attendanceData) {
           attendanceData.forEach(record => {
             // Skip compensatory records - they are handled separately via compensatoryMap
             if ((record as unknown as { is_compensatory?: boolean }).is_compensatory === true) return
             attendanceMap.set(record.student_id, record)
           })
+        }
+
+        // Resolve created_by user IDs to names for regular attendance records
+        const attendanceUserIds = Array.from(attendanceMap.values())
+          .map(r => r.created_by)
+          .filter((id): id is string => !!id)
+        const attendanceUserNameMap = new Map<string, string>()
+        if (attendanceUserIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, full_name')
+            .in('id', Array.from(new Set(attendanceUserIds)))
+
+          if (usersData) {
+            usersData.forEach(u => attendanceUserNameMap.set(u.id, u.full_name))
+          }
         }
 
         // Combine students with attendance data
@@ -435,7 +458,7 @@ export default function ActivitiesPage() {
             class_name: selectedClass?.name,
             attendance_status: attendance?.status || null,
             attendance_time: attendance?.check_in_time?.substring(0, 5) || undefined,
-            attendance_by: attendance?.created_by_user?.full_name || undefined,
+            attendance_by: attendance?.created_by ? attendanceUserNameMap.get(attendance.created_by) : undefined,
             attendance_record_id: attendance?.id || undefined,
             has_compensatory_attendance: !!compensatory,
             compensatory_record_id: compensatory?.id,
@@ -458,6 +481,13 @@ export default function ActivitiesPage() {
     fetchClasses()
     fetchSchoolYear()
   }, [fetchClasses, fetchSchoolYear])
+
+  // Auto-fetch students when date or class changes
+  useEffect(() => {
+    if (selectedClassId) {
+      fetchStudents()
+    }
+  }, [selectedClassId, selectedDate, fetchStudents])
 
   // Group classes by branch
   const classesGroupedByBranch = BRANCHES.reduce((acc, branch) => {
@@ -1450,9 +1480,12 @@ export default function ActivitiesPage() {
                     <div className="absolute top-full right-0 mt-1 z-20">
                       <CustomCalendar
                         value={selectedDate}
-                        onChange={(date) => setSelectedDate(date)}
+                        onChange={(date) => {
+                          setSelectedDate(date)
+                          setIsDatePickerOpen(false)
+                        }}
                         onClose={() => setIsDatePickerOpen(false)}
-                        showConfirmButton={true}
+                        showConfirmButton={false}
                         highlightWeek={true}
                       />
                     </div>
@@ -1510,7 +1543,7 @@ export default function ActivitiesPage() {
                         <rect x="8" y="28" width="6" height="4" rx="1" fill="#666d80"/>
                       </svg>
                       <p className="text-sm text-black">
-                        {selectedClassId ? 'Nhấn "Tải dữ liệu" để xem danh sách' : 'Chọn lớp để bắt đầu điểm danh'}
+                        {selectedClassId ? 'Nhấn "Tải dữ liệu" hoặc chọn ngày trên lịch để xem danh sách' : 'Chọn lớp để bắt đầu điểm danh'}
                       </p>
                     </div>
                   </div>
@@ -1809,9 +1842,14 @@ export default function ActivitiesPage() {
                                   </span>
                                 </>
                               ) : student.has_thursday_attendance ? (
-                                <span className="text-sm text-[#666d80]">
-                                  Đã điểm danh Thứ 5 {formatDate(thursdayOfWeek)}
-                                </span>
+                                <>
+                                  <span className="text-sm font-medium text-black leading-tight">
+                                    {student.attendance_time ? `${student.attendance_time} ` : ''}Thứ 5 {formatDate(thursdayOfWeek)}
+                                  </span>
+                                  <span className="text-sm text-[#666d80] mt-0.5">
+                                    Điểm danh bởi: {student.attendance_by || 'Không rõ'}
+                                  </span>
+                                </>
                               ) : null}
                             </div>
 
