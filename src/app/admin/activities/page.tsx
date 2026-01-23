@@ -2042,74 +2042,70 @@ export default function ActivitiesPage() {
 
                 {/* Data Table */}
                 {reportType === 'attendance' ? (
-                  <div className="overflow-hidden relative">
-                    {/* Table Header */}
-                    <div className="relative h-[38px] bg-[#E5E1DC] rounded-[15px] border border-white/60">
-                      <span className="absolute left-[30px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">STT</span>
-                      <span className="absolute left-[150px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">Tên thánh</span>
-                      <span className="absolute left-[350px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">Họ và tên</span>
-                      {reportDates.map((date, idx) => (
-                        <span
-                          key={date}
-                          className="absolute top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]"
-                          style={{ right: `${(reportDates.length - 1 - idx) * 134 + 40}px` }}
-                        >
-                          {formatShortDate(date)}
-                        </span>
-                      ))}
-                      {reportDates.length === 0 && (
-                        <span className="absolute right-[40px] top-1/2 -translate-y-1/2 text-[16px] text-[#666d80]">Không có dữ liệu</span>
-                      )}
-                    </div>
-
-                    {/* Table Body */}
-                    {reportStudents.length === 0 ? (
-                      <div className="py-12 text-center text-[16px] text-[#666d80]">
-                        Không có học sinh trong lớp này
-                      </div>
-                    ) : (
-                      reportStudents.map((student, index) => {
-                        const nameParts = student.full_name.split(' ')
-                        const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
-                        const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
-
-                        return (
-                          <div key={student.id} className="relative h-[56px]">
-                            <span className="absolute left-[37px] top-1/2 -translate-y-1/2 text-[14px] font-medium text-black">{index + 1}</span>
-                            <div className="absolute left-[90px] top-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-[12px] bg-[#F3F3F3] flex items-center justify-center overflow-hidden">
-                              {student.avatar_url ? (
-                                <img src={student.avatar_url} alt={student.full_name} className="w-full h-full object-cover" />
-                              ) : null}
-                            </div>
-                            <span className="absolute left-[150px] top-1/2 -translate-y-1/2 text-[14px] font-medium text-black">{student.saint_name || '-'}</span>
-                            <span className="absolute left-[350px] top-1/2 -translate-y-1/2 w-[150px] text-[14px] font-semibold text-[#8A8C90]">{familyMiddleName}</span>
-                            <span className="absolute left-[700px] top-1/2 -translate-y-1/2 text-[14px] font-semibold text-black">{givenName}</span>
-
-                            {reportDates.map((date, dateIndex) => {
-                              const rightPosition = (reportDates.length - 1 - dateIndex) * 134
-                              return (
-                                <div key={date} className="absolute top-0 h-[56px]" style={{ right: `${rightPosition}px`, width: '134px' }}>
-                                  <div className="absolute left-0 top-0 w-[1px] h-full bg-[#8A8C90]" />
-                                  <div className={`w-full h-full flex items-center justify-center ${student.attendance[date] === 'present' ? 'bg-[#F5D5D5]' : ''}`}>
-                                    {student.attendance[date] === 'present' ? (
-                                      <span className="text-[#8A8C90] text-[16px]">×</span>
-                                    ) : student.attendance[date] === 'absent' ? (
-                                      <div className="w-[24px] h-[24px] rounded-full bg-[#22C55E] flex items-center justify-center">
-                                        <Check className="w-4 h-4 text-white" />
-                                      </div>
-                                    ) : (
-                                      <span className="text-[#666d80]">-</span>
-                                    )}
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse" style={{ minWidth: `${550 + reportDates.length * 90}px` }}>
+                      <thead>
+                        <tr className="bg-[#E5E1DC] h-[38px]">
+                          <th className="text-left px-4 text-[16px] font-medium text-[#666d80] w-[100px] whitespace-nowrap">STT</th>
+                          <th className="text-left px-4 text-[16px] font-medium text-[#666d80] w-[300px] whitespace-nowrap">Tên thánh</th>
+                          <th className="text-left px-4 text-[16px] font-medium text-[#666d80] whitespace-nowrap" colSpan={2}>Họ và tên</th>
+                          {reportDates.length === 0 ? (
+                            <th className="text-center px-4 text-[16px] text-[#666d80]">Không có dữ liệu</th>
+                          ) : (
+                            reportDates.map((date) => (
+                              <th key={date} className="text-center px-2 text-[14px] font-medium text-[#666d80] whitespace-nowrap min-w-[70px]">
+                                {formatShortDate(date)}
+                              </th>
+                            ))
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportStudents.length === 0 ? (
+                          <tr>
+                            <td colSpan={4 + reportDates.length} className="py-12 text-center text-[16px] text-[#666d80]">
+                              Không có học sinh trong lớp này
+                            </td>
+                          </tr>
+                        ) : (
+                          reportStudents.map((student, index) => {
+                            const nameParts = student.full_name.split(' ')
+                            const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
+                            const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
+                            return (
+                            <tr key={student.id} className="h-[56px] border-b border-[#8A8C90]">
+                              <td className="px-4 text-[14px] font-medium text-black">{index + 1}</td>
+                              <td className="px-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-[36px] h-[36px] rounded-[10px] bg-[#F3F3F3] flex items-center justify-center overflow-hidden flex-shrink-0">
+                                    {student.avatar_url ? (
+                                      <img src={student.avatar_url} alt={student.full_name} className="w-full h-full object-cover" />
+                                    ) : null}
                                   </div>
-                                  <div className="absolute right-0 top-0 w-[1px] h-full bg-[#8A8C90]" />
+                                  <span className="text-[14px] font-medium text-black whitespace-nowrap">{student.saint_name || '-'}</span>
                                 </div>
-                              )
-                            })}
-                            <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[#8A8C90]" />
-                          </div>
-                        )
-                      })
-                    )}
+                              </td>
+                              <td className="px-2 text-[14px] font-semibold text-[#8A8C90] whitespace-nowrap w-[300px]">{familyMiddleName}</td>
+                              <td className="px-2 text-[14px] font-semibold text-black whitespace-nowrap w-[105px]">{givenName}</td>
+                              {reportDates.map((date) => (
+                                <td key={date} className={`text-center border-l border-[#8A8C90] ${student.attendance[date] === 'present' ? 'bg-[#F5D5D5]' : ''}`}>
+                                  {student.attendance[date] === 'present' ? (
+                                    <span className="text-[#8A8C90] text-[16px]">×</span>
+                                  ) : student.attendance[date] === 'absent' ? (
+                                    <div className="w-[24px] h-[24px] rounded-full bg-[#22C55E] flex items-center justify-center mx-auto">
+                                      <Check className="w-4 h-4 text-white" />
+                                    </div>
+                                  ) : (
+                                    <span className="text-[#666d80]">-</span>
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
