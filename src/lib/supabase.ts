@@ -106,4 +106,7 @@ export interface AttendanceRecord {
   created_by?: string
   created_at: string
   updated_at?: string
+  // Compensatory attendance fields
+  is_compensatory?: boolean // TRUE if this is a make-up attendance for missed Thursday
+  compensated_for_date?: string // The Thursday date this attendance compensates for (YYYY-MM-DD)
 }

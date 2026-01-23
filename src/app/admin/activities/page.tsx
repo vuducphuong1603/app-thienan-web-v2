@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Check, X, List, FileText, Loader2, Plus, Calendar } from 'lucide-react'
+import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarPlus } from 'lucide-react'
+import Link from 'next/link'
 import CustomCalendar from '@/components/ui/CustomCalendar'
 import QRAttendanceModal from '@/components/QRAttendanceModal'
 import AttendanceConfirmModal from '@/components/AttendanceConfirmModal'
@@ -955,6 +956,19 @@ export default function ActivitiesPage() {
             Báo cáo
           </span>
         </button>
+
+        {/* Bổ sung điểm danh Link */}
+        <Link
+          href="/admin/activities/compensatory"
+          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] hover:bg-[#eee]"
+        >
+          <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(59,130,246,0.2)]">
+            <CalendarPlus className="w-5 h-5 text-blue-500" />
+          </div>
+          <span className="text-base font-semibold text-black opacity-80">
+            Bổ sung
+          </span>
+        </Link>
       </div>
 
       {/* Main Content */}
@@ -1194,7 +1208,7 @@ export default function ActivitiesPage() {
                       <div className="h-[130px] flex-1 bg-white border border-white/60 rounded-[18px] p-5 flex flex-col justify-between">
                         <div className="flex items-start justify-between">
                           <div className="flex flex-col gap-1">
-                            <span className="text-sm text-black/80">Chưa điểm danh</span>
+                            <span className="text-sm text-black/80">Thiếu nhi chưa điểm danh</span>
                             <span className="text-xs text-[#666d80]">Ngày {formatDate(selectedDate)}</span>
                           </div>
                           {/* Moon icon */}
@@ -1936,7 +1950,7 @@ export default function ActivitiesPage() {
                     {/* Học sinh chưa điểm danh */}
                     <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">Chưa điểm danh</span>
+                        <span className="text-sm text-black/80">Thiếu nhi chưa điểm danh</span>
                         <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
@@ -2077,14 +2091,12 @@ export default function ActivitiesPage() {
                               return (
                                 <div key={date} className="absolute top-0 h-[56px]" style={{ right: `${rightPosition}px`, width: '134px' }}>
                                   <div className="absolute left-0 top-0 w-[1px] h-full bg-[#8A8C90]" />
-                                  <div className="w-full h-full flex items-center justify-center">
+                                  <div className={`w-full h-full flex items-center justify-center ${student.attendance[date] === 'present' ? 'bg-[#F5D5D5]' : ''}`}>
                                     {student.attendance[date] === 'present' ? (
-                                      <div className="w-[24px] h-[24px] rounded-full bg-green-500 flex items-center justify-center">
-                                        <Check className="w-4 h-4 text-white" />
-                                      </div>
+                                      <span className="text-[#8A8C90] text-[16px]">×</span>
                                     ) : student.attendance[date] === 'absent' ? (
-                                      <div className="w-[24px] h-[24px] rounded-full bg-red-500 flex items-center justify-center">
-                                        <X className="w-4 h-4 text-white" />
+                                      <div className="w-[24px] h-[24px] rounded-full bg-[#22C55E] flex items-center justify-center">
+                                        <Check className="w-4 h-4 text-white" />
                                       </div>
                                     ) : (
                                       <span className="text-[#666d80]">-</span>
