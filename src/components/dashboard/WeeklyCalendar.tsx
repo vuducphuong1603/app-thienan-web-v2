@@ -47,16 +47,16 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
   const circumference = 2 * Math.PI * radius
 
   return (
-    <div className="bg-white rounded-2xl p-5 border border-gray-100 h-full flex flex-col">
+    <div className="bg-white dark:bg-white/10 rounded-2xl p-5 border border-gray-100 dark:border-white/10 h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-shrink-0">
-        <h3 className="text-base font-semibold text-black">Kế hoạch tuần này</h3>
+        <h3 className="text-base font-semibold text-black dark:text-white">Kế hoạch tuần này</h3>
         <button
           onClick={() => router.push('/admin/performance')}
-          className="w-[52px] h-[52px] bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
+          className="w-[52px] h-[52px] bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
           title="Xem so sánh hiệu suất"
         >
-          <MoreHorizontal className="w-5 h-5 text-black" />
+          <MoreHorizontal className="w-5 h-5 text-black dark:text-white" />
         </button>
       </div>
 
@@ -71,7 +71,7 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
 
             return (
               <div key={item.day} className="flex flex-col items-center gap-[5px] w-[62px]">
-                <span className="text-xs text-black">{item.day}</span>
+                <span className="text-xs text-black dark:text-white">{item.day}</span>
                 <div className="relative w-[62px] h-[62px]">
                   {/* Progress Ring SVG */}
                   <svg className="w-full h-full transform -rotate-90" viewBox="0 0 62 62">
@@ -101,8 +101,8 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
                   </svg>
                   {/* Inner Circle with Date */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-[50px] h-[50px] rounded-full bg-gray-100 flex items-center justify-center">
-                      <span className="text-lg text-black">{item.date}</span>
+                    <div className="w-[50px] h-[50px] rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center">
+                      <span className="text-lg text-black dark:text-white">{item.date}</span>
                     </div>
                   </div>
                 </div>
@@ -112,8 +112,8 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
             // Day without ring - just text
             return (
               <div key={item.day} className="flex flex-col items-center gap-[23px] w-8">
-                <span className="text-xs text-black text-center w-full">{item.day}</span>
-                <span className="text-lg text-black text-center w-full">{item.date}</span>
+                <span className="text-xs text-black dark:text-white text-center w-full">{item.day}</span>
+                <span className="text-lg text-black dark:text-white text-center w-full">{item.date}</span>
               </div>
             )
           }
@@ -148,13 +148,13 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
             {/* Week Info */}
             <div className="flex items-center gap-2 mb-1.5">
               {/* Apple Icon */}
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 13.333C20 11.667 21.445 8.333 25 8.333" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M17.0833 16.6667C12.9167 16.6667 10 20.8333 10 25C10 29.1667 12.9167 33.3333 16.6667 33.3333C18.3333 33.3333 19.1667 32.5 20 32.5C20.8333 32.5 21.6667 33.3333 23.3333 33.3333C27.0833 33.3333 30 29.1667 30 25C30 20.8333 27.0833 16.6667 22.9167 16.6667C21.6667 16.6667 20.8333 17.0833 20 17.0833C19.1667 17.0833 18.3333 16.6667 17.0833 16.6667Z" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-black dark:text-white">
+                <path d="M20 13.333C20 11.667 21.445 8.333 25 8.333" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M17.0833 16.6667C12.9167 16.6667 10 20.8333 10 25C10 29.1667 12.9167 33.3333 16.6667 33.3333C18.3333 33.3333 19.1667 32.5 20 32.5C20.8333 32.5 21.6667 33.3333 23.3333 33.3333C27.0833 33.3333 30 29.1667 30 25C30 20.8333 27.0833 16.6667 22.9167 16.6667C21.6667 16.6667 20.8333 17.0833 20 17.0833C19.1667 17.0833 18.3333 16.6667 17.0833 16.6667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span className="text-[34px] font-medium text-black">Tuần {currentWeek}</span>
+              <span className="text-[34px] font-medium text-black dark:text-white">Tuần {currentWeek}</span>
             </div>
-            <span className="text-lg text-black/40">{activitiesCount} hoạt động</span>
+            <span className="text-lg text-black/40 dark:text-white/50">{activitiesCount} hoạt động</span>
           </div>
         </div>
 
@@ -164,7 +164,7 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
           <div className="flex items-center gap-4">
             <ProgressBars filled={14} total={14} filledColor="#FA865E" emptyColor="#E5E1DC" />
             <div className="flex flex-col gap-1.5">
-              <span className="text-[22px] font-semibold text-black">100%</span>
+              <span className="text-[22px] font-semibold text-black dark:text-white">100%</span>
               <span className="text-xs text-[#FA865E]">Hoàn thành</span>
             </div>
           </div>
@@ -173,7 +173,7 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
           <div className="flex items-center gap-4">
             <ProgressBars filled={8} total={14} filledColor="#86D4FF" emptyColor="#E5E1DC" />
             <div className="flex flex-col gap-1.5">
-              <span className="text-[22px] font-semibold text-black">50%</span>
+              <span className="text-[22px] font-semibold text-black dark:text-white">50%</span>
               <span className="text-xs text-[#86D4FF]">Đang thực hiện</span>
             </div>
           </div>
@@ -182,7 +182,7 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
           <div className="flex items-center gap-4">
             <ProgressBars filled={8} total={14} filledColor="#E178FF" emptyColor="#E5E1DC" />
             <div className="flex flex-col gap-1.5">
-              <span className="text-[22px] font-semibold text-black">0%</span>
+              <span className="text-[22px] font-semibold text-black dark:text-white">0%</span>
               <span className="text-xs text-[#E178FF]">Chờ thực hiện</span>
             </div>
           </div>

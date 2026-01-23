@@ -114,7 +114,7 @@ export default function QRAttendanceModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-[20px] w-[400px] p-6 shadow-xl">
+      <div className="relative bg-white dark:bg-[#1a1a1a] rounded-[20px] w-[400px] p-6 shadow-xl">
         {/* Close button */}
         <button
           onClick={handleClose}
@@ -188,15 +188,15 @@ export default function QRAttendanceModal({
         {/* Student info */}
         {studentName && (
           <div className="text-center mb-3">
-            <p className="text-base font-semibold text-black">{studentName}</p>
+            <p className="text-base font-semibold text-black dark:text-white">{studentName}</p>
             {studentCode && (
-              <p className="text-sm text-gray-500">{studentCode}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{studentCode}</p>
             )}
           </div>
         )}
 
         {/* Instructions */}
-        <p className="text-center text-sm text-[#666d80] mb-6 leading-relaxed px-2">
+        <p className="text-center text-sm text-[#666d80] dark:text-gray-400 mb-6 leading-relaxed px-2">
           Vui lòng đặt mã QR ngay trước máy ảnh, đảm bảo mã QR nằm chính giữa khung hình.
         </p>
 
@@ -213,7 +213,7 @@ export default function QRAttendanceModal({
           {/* Secondary button - Later */}
           <button
             onClick={handleClose}
-            className="w-full h-[52px] bg-white text-black text-base font-medium rounded-[14px] border border-[#E5E1DC] hover:bg-gray-50 transition-colors"
+            className="w-full h-[52px] bg-white dark:bg-white/10 text-black dark:text-white text-base font-medium rounded-[14px] border border-[#E5E1DC] dark:border-white/20 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
           >
             Để sau
           </button>

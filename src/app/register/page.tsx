@@ -83,12 +83,12 @@ export default function RegisterPage() {
             />
           </svg>
         </div>
-        <span className="text-black text-sm font-medium">Giáo xứ Thiên Ân</span>
+        <span className="text-black dark:text-white text-sm font-medium">Giáo xứ Thiên Ân</span>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-4 relative z-10">
-        <div className="w-full max-w-[420px] p-8 bg-white rounded-[20px] shadow-xl">
+        <div className="w-full max-w-[420px] p-8 bg-white dark:bg-white/10 dark:backdrop-blur-xl dark:border dark:border-white/10 rounded-[20px] shadow-xl">
           {/* User Icon */}
           <div className="flex flex-col items-center">
             <div
@@ -104,8 +104,8 @@ export default function RegisterPage() {
 
             {/* Welcome Text */}
             <div className="text-center mt-4 space-y-1">
-              <h1 className="text-[28px] font-semibold text-black">Tạo tài khoản mới!</h1>
-              <p className="text-sm text-gray-500">Nhập thông tin chi tiết để đăng ký</p>
+              <h1 className="text-[28px] font-semibold text-black dark:text-white">Tạo tài khoản mới!</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-300">Nhập thông tin chi tiết để đăng ký</p>
             </div>
           </div>
 
@@ -121,7 +121,7 @@ export default function RegisterPage() {
             {/* Username Field */}
             <div className="space-y-2">
               <label className="flex items-center gap-1">
-                <span className="text-sm font-medium text-gray-700">Tên đăng nhập</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Tên đăng nhập</span>
                 <span className="text-sm font-medium text-red-500">*</span>
               </label>
               <input
@@ -129,7 +129,7 @@ export default function RegisterPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Nhập tên đăng nhập"
-                className="w-full h-[44px] px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-black placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
+                className="w-full h-[44px] px-4 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-xl text-sm text-black dark:text-white placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
                 disabled={isLoading}
               />
             </div>
@@ -137,7 +137,7 @@ export default function RegisterPage() {
             {/* Email Field */}
             <div className="space-y-2">
               <label className="flex items-center gap-1">
-                <span className="text-sm font-medium text-gray-700">Địa chỉ Email</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Địa chỉ Email</span>
                 <span className="text-sm font-medium text-red-500">*</span>
               </label>
               <input
@@ -145,7 +145,7 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Nhập địa chỉ Email"
-                className="w-full h-[44px] px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-black placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
+                className="w-full h-[44px] px-4 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-xl text-sm text-black dark:text-white placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
                 disabled={isLoading}
               />
             </div>
@@ -153,7 +153,7 @@ export default function RegisterPage() {
             {/* Password Field */}
             <div className="space-y-2">
               <label className="flex items-center gap-1">
-                <span className="text-sm font-medium text-gray-700">Mật khẩu</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Mật khẩu</span>
                 <span className="text-sm font-medium text-red-500">*</span>
               </label>
               <div className="relative">
@@ -162,7 +162,7 @@ export default function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Nhập mật khẩu"
-                  className="w-full h-[44px] px-4 py-2 pr-12 bg-white border border-gray-200 rounded-xl text-sm text-black placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
+                  className="w-full h-[44px] px-4 py-2 pr-12 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-xl text-sm text-black dark:text-white placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
                   disabled={isLoading}
                 />
                 <button
@@ -212,7 +212,7 @@ export default function RegisterPage() {
             </button>
 
             {/* Login Link */}
-            <p className="text-center text-sm text-gray-500">
+            <p className="text-center text-sm text-gray-500 dark:text-gray-300">
               Bạn đã có tài khoản?{' '}
               <Link href="/login" className="font-semibold text-brand hover:text-orange-600 transition-colors">
                 Đăng nhập
@@ -224,25 +224,25 @@ export default function RegisterPage() {
 
       {/* Footer */}
       <footer className="w-full px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10">
-        <p className="text-xs text-gray-600">© 2025 Giáo Xứ Thiên Ân. All right reserved.</p>
+        <p className="text-xs text-gray-600 dark:text-gray-400">© 2025 Giáo Xứ Thiên Ân. All right reserved.</p>
         <div className="flex items-center gap-6">
           <Link
             href="/privacy"
-            className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-brand transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-brand transition-colors"
           >
             <Lock className="w-4 h-4" />
             Riêng tư
           </Link>
           <Link
             href="/terms"
-            className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-brand transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-brand transition-colors"
           >
             <FileText className="w-4 h-4" />
             Điều khoản
           </Link>
           <Link
             href="/help"
-            className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-brand transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-brand transition-colors"
           >
             <HelpCircle className="w-4 h-4" />
             Trợ giúp

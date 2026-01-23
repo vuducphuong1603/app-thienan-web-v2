@@ -29,24 +29,24 @@ export default function MyNotes() {
   const filledBars = 17
 
   return (
-    <div className="bg-white rounded-[15px] p-4 border border-gray-100 h-full flex flex-col">
+    <div className="bg-white dark:bg-white/10 rounded-[15px] p-4 border border-gray-100 dark:border-white/10 h-full flex flex-col">
       {/* Header - Ghi chú của tôi */}
       <div className="flex items-center justify-between h-10 mb-3 flex-shrink-0">
-        <h3 className="text-base font-semibold text-black">Ghi chú của tôi</h3>
-        <button className="w-12 h-12 bg-[#F6F6F6] hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
-          <MoreHorizontal className="w-[22px] h-[22px] text-black/40" />
+        <h3 className="text-base font-semibold text-black dark:text-white">Ghi chú của tôi</h3>
+        <button className="w-12 h-12 bg-[#F6F6F6] dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+          <MoreHorizontal className="w-[22px] h-[22px] text-black/40 dark:text-white/50" />
         </button>
       </div>
 
       {/* Cards Row */}
       <div className="flex gap-2 mb-4 flex-1">
         {/* Add Card */}
-        <div className="w-[100px] h-full bg-[#F6F6F6] rounded-2xl flex items-center justify-center border border-dashed border-black/20 hover:border-brand hover:bg-brand/5 cursor-pointer transition-all flex-shrink-0">
-          <Plus className="w-5 h-5 text-black/40" />
+        <div className="w-[100px] h-full bg-[#F6F6F6] dark:bg-white/5 rounded-2xl flex items-center justify-center border border-dashed border-black/20 dark:border-white/20 hover:border-brand hover:bg-brand/5 cursor-pointer transition-all flex-shrink-0">
+          <Plus className="w-5 h-5 text-black/40 dark:text-white/50" />
         </div>
 
         {/* Class Card - Lớp đang dạy */}
-        <div className="flex-1 h-full bg-[#F6F6F6] rounded-[20px] p-3 flex flex-col justify-between">
+        <div className="flex-1 h-full bg-[#F6F6F6] dark:bg-white/5 rounded-[20px] p-3 flex flex-col justify-between">
           <div className="w-6 h-6">
             <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
               <path d="M13 4.875C10.3 4.875 8.125 7.05 8.125 9.75C8.125 12.45 10.3 14.625 13 14.625C15.7 14.625 17.875 12.45 17.875 9.75C17.875 7.05 15.7 4.875 13 4.875Z" fill="#FA865E" />
@@ -54,45 +54,45 @@ export default function MyNotes() {
             </svg>
           </div>
           <div>
-            <p className="text-sm font-light text-black/40">Lớp đang dạy</p>
-            <p className="text-2xl font-medium text-black leading-[1.2]">
-              8 <span className="text-base font-normal text-black/40">lớp</span>
+            <p className="text-sm font-light text-black/40 dark:text-white/50">Lớp đang dạy</p>
+            <p className="text-2xl font-medium text-black dark:text-white leading-[1.2]">
+              8 <span className="text-base font-normal text-black/40 dark:text-white/50">lớp</span>
             </p>
-            <p className="text-xs text-black">240 thiếu nhi</p>
+            <p className="text-xs text-black dark:text-white">240 thiếu nhi</p>
           </div>
         </div>
 
         {/* Activity Card - Tham gia hoạt động */}
-        <div className="flex-1 h-full bg-[#F6F6F6] rounded-2xl p-3 flex flex-col justify-between">
+        <div className="flex-1 h-full bg-[#F6F6F6] dark:bg-white/5 rounded-2xl p-3 flex flex-col justify-between">
           <div className="w-6 h-6">
             <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
               <path d="M13 22.75L11.3425 21.2475C5.85 16.26 2.16666 12.935 2.16666 8.9375C2.16666 5.6125 4.78749 3.25 8.11249 3.25C9.94583 3.25 11.7 4.095 13 5.4925C14.3 4.095 16.0542 3.25 17.8875 3.25C21.2125 3.25 23.8333 5.6125 23.8333 8.9375C23.8333 12.935 20.15 16.26 14.6575 21.2475L13 22.75Z" fill="#FA865E" />
             </svg>
           </div>
           <div>
-            <p className="text-sm font-light text-black/40">Tham gia hoạt động</p>
-            <p className="text-[22px] font-semibold text-black leading-tight">20/10</p>
+            <p className="text-sm font-light text-black/40 dark:text-white/50">Tham gia hoạt động</p>
+            <p className="text-[22px] font-semibold text-black dark:text-white leading-tight">20/10</p>
             <div className="flex items-center gap-2 text-xs">
               <span className="text-[#DF1C41]">Tại nhà thờ</span>
-              <span className="text-black">14:00</span>
+              <span className="text-black dark:text-white">14:00</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Progress Section */}
-      <div className="bg-[#F6F6F6] rounded-3xl p-4 h-[106px] mb-4 flex-shrink-0 flex flex-col justify-center">
+      <div className="bg-[#F6F6F6] dark:bg-white/5 rounded-3xl p-4 h-[106px] mb-4 flex-shrink-0 flex flex-col justify-center">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-[11px]">
             {/* Fire icon in white circle */}
-            <div className="w-[49px] h-[49px] bg-white rounded-3xl flex items-center justify-center">
+            <div className="w-[49px] h-[49px] bg-white dark:bg-white/10 rounded-3xl flex items-center justify-center">
               <span className="text-[22px]">🔥</span>
             </div>
-            <span className="text-sm font-medium text-black">Hoàn thành</span>
+            <span className="text-sm font-medium text-black dark:text-white">Hoàn thành</span>
           </div>
           <div className="flex items-baseline">
-            <span className="text-[24px] font-medium text-black">65</span>
-            <span className="text-sm text-black/20">%</span>
+            <span className="text-[24px] font-medium text-black dark:text-white">65</span>
+            <span className="text-sm text-black/20 dark:text-white/30">%</span>
           </div>
         </div>
 
@@ -101,7 +101,7 @@ export default function MyNotes() {
           {Array.from({ length: totalBars }).map((_, i) => (
             <div
               key={i}
-              className={`h-4 w-[14px] rounded-[6px] ${i < filledBars ? 'bg-brand' : 'bg-[#E5E1DC]'
+              className={`h-4 w-[14px] rounded-[6px] ${i < filledBars ? 'bg-brand' : 'bg-[#E5E1DC] dark:bg-white/20'
                 }`}
             />
           ))}
@@ -110,7 +110,7 @@ export default function MyNotes() {
 
       {/* Kế hoạch hoạt động hôm nay */}
       <div className="flex items-center justify-between mb-3 flex-shrink-0">
-        <h3 className="text-sm font-medium text-black">Kế hoạch hoạt động hôm nay</h3>
+        <h3 className="text-sm font-medium text-black dark:text-white">Kế hoạch hoạt động hôm nay</h3>
         <div className="flex items-center gap-[15px] w-[60px]">
           {/* Filter/Sort icon */}
           <button className="hover:opacity-70 transition-opacity">
@@ -146,10 +146,10 @@ export default function MyNotes() {
 
             {/* Info */}
             <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-medium text-black mb-[6px]">{activity.title}</h4>
+              <h4 className="text-sm font-medium text-black dark:text-white mb-[6px]">{activity.title}</h4>
 
               {/* Time, Class, Location with separators */}
-              <div className="flex items-center gap-[15px] text-xs text-black/40 mb-[8px]">
+              <div className="flex items-center gap-[15px] text-xs text-black/40 dark:text-white/50 mb-[8px]">
                 <div className="flex items-center gap-[3px]">
                   {/* Clock icon */}
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -157,9 +157,9 @@ export default function MyNotes() {
                   </svg>
                   <span>{activity.time}</span>
                 </div>
-                <div className="w-px h-[19px] bg-black/20" />
+                <div className="w-px h-[19px] bg-black/20 dark:bg-white/20" />
                 <span>{activity.className}</span>
-                <div className="w-px h-[19px] bg-black/20" />
+                <div className="w-px h-[19px] bg-black/20 dark:bg-white/20" />
                 <span>{activity.location}</span>
               </div>
 

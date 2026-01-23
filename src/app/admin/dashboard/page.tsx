@@ -131,18 +131,18 @@ export default function AdminDashboard() {
           {/* Welcome Section */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500 mb-1">Chúc ngày tốt lành</p>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <p className="text-sm text-gray-500 dark:text-gray-300 mb-1">Chúc ngày tốt lành</p>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 Chào mừng, {firstName}. <span className="inline-block animate-wave">👋</span>
               </h1>
             </div>
             <div className="flex items-center gap-3">
               {/* Date Display */}
               <div className="flex items-center gap-2">
-                <span className="text-4xl font-bold text-gray-900">{dayOfMonth}</span>
+                <span className="text-4xl font-bold text-gray-900 dark:text-white">{dayOfMonth}</span>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{formattedDayOfWeek},</p>
-                  <p className="text-sm text-gray-500">{month}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{formattedDayOfWeek},</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-300">{month}</p>
                 </div>
               </div>
               {/* Notification Button */}
@@ -150,8 +150,8 @@ export default function AdminDashboard() {
                 <span className="text-sm font-medium">Xem thông báo</span>
               </button>
               {/* Calendar Button */}
-              <button className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-colors">
-                <Calendar className="w-5 h-5 text-gray-600" />
+              <button className="w-10 h-10 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-xl flex items-center justify-center hover:bg-gray-50 dark:hover:bg-white/20 transition-colors">
+                <Calendar className="w-5 h-5 text-gray-600 dark:text-gray-300" />
               </button>
             </div>
           </div>

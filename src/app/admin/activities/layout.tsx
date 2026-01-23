@@ -11,7 +11,7 @@ interface ActivitiesLayoutProps {
 }
 
 export default function ActivitiesLayout({ children }: ActivitiesLayoutProps) {
-  const { user, loading, isAdmin } = useAuth()
+  const { user, loading, isAdmin, logout } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -44,13 +44,14 @@ export default function ActivitiesLayout({ children }: ActivitiesLayoutProps) {
   const firstName = user.full_name?.split(' ').pop() || user.full_name
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFAFA]">
+    <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-transparent">
       {/* Header */}
       <DashboardHeader
         userName={firstName || 'Admin'}
         userRole={ROLE_LABELS[user.role]}
         activeTab="activities"
         userAvatar={user.avatar_url}
+        onLogout={logout}
       />
 
       {/* Main Content Area */}

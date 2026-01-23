@@ -1334,7 +1334,7 @@ export default function ActivitiesPage() {
           className={`h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors ${
             activeTab === 'attendance'
               ? 'bg-brand'
-              : 'bg-[#f6f6f6] hover:bg-[#eee]'
+              : 'bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10'
           }`}
         >
           <div className={`w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] ${
@@ -1345,7 +1345,7 @@ export default function ActivitiesPage() {
             <List className={`w-5 h-5 ${activeTab === 'attendance' ? 'text-white' : 'text-brand'}`} />
           </div>
           <span className={`text-base font-semibold ${
-            activeTab === 'attendance' ? 'text-white' : 'text-black opacity-80'
+            activeTab === 'attendance' ? 'text-white' : 'text-black dark:text-white opacity-80'
           }`}>
             Điểm danh
           </span>
@@ -1357,7 +1357,7 @@ export default function ActivitiesPage() {
           className={`h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors ${
             activeTab === 'report'
               ? 'bg-brand'
-              : 'bg-[#f6f6f6] hover:bg-[#eee]'
+              : 'bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10'
           }`}
         >
           <div className={`w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] ${
@@ -1368,7 +1368,7 @@ export default function ActivitiesPage() {
             <FileText className={`w-5 h-5 ${activeTab === 'report' ? 'text-white' : 'text-brand'}`} />
           </div>
           <span className={`text-base font-semibold ${
-            activeTab === 'report' ? 'text-white' : 'text-black opacity-80'
+            activeTab === 'report' ? 'text-white' : 'text-black dark:text-white opacity-80'
           }`}>
             Báo cáo
           </span>
@@ -1377,13 +1377,13 @@ export default function ActivitiesPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 min-w-0 bg-[#F6F6F6] border border-white rounded-2xl min-h-[768px]">
+      <div className="flex-1 min-w-0 bg-[#F6F6F6] dark:bg-white/5 border border-white dark:border-white/10 rounded-2xl min-h-[768px]">
         {activeTab === 'attendance' ? (
           <>
             {/* Header Section */}
             <div className="px-6 pt-6 pb-4">
               <div className="flex flex-col gap-1">
-                <h1 className="text-[26px] font-semibold text-black">Điểm danh</h1>
+                <h1 className="text-[26px] font-semibold text-black dark:text-white">Điểm danh</h1>
                 <p className="text-sm font-medium text-[#666d80]">
                   {selectedClassId ? `LỚP ${getClassName(selectedClassId).toUpperCase()}` : 'Chọn lớp để bắt đầu điểm danh'}
                   {!dayType && selectedClassId && !isCompensatoryMode && (
@@ -1406,13 +1406,13 @@ export default function ActivitiesPage() {
                       setIsClassDropdownOpen(!isClassDropdownOpen)
                       setIsDatePickerOpen(false)
                     }}
-                    className="flex items-center justify-between w-full h-[52px] px-6 bg-white rounded-full"
+                    className="flex items-center justify-between w-full h-[52px] px-6 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-base text-black">
+                    <span className="text-base text-black dark:text-white">
                       {selectedClassId ? getClassName(selectedClassId) : 'Chọn lớp'}
                     </span>
                     <svg
-                      className={`w-[9px] h-[18px] text-black transition-transform ${isClassDropdownOpen ? 'rotate-180' : ''}`}
+                      className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isClassDropdownOpen ? 'rotate-180' : ''}`}
                       viewBox="0 0 9 18"
                       fill="none"
                     >
@@ -1425,10 +1425,10 @@ export default function ActivitiesPage() {
                   </button>
 
                   {isClassDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden max-h-[350px] overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden max-h-[350px] overflow-y-auto">
                       {Object.entries(classesGroupedByBranch).map(([branch, branchClasses]) => (
                         <div key={branch}>
-                          <div className="px-5 py-2.5 text-sm font-semibold text-[#666d80] uppercase bg-gray-50">
+                          <div className="px-5 py-2.5 text-sm font-semibold text-[#666d80] uppercase bg-gray-50 dark:bg-white/5">
                             {branch}
                           </div>
                           {branchClasses.map((cls) => (
@@ -1438,8 +1438,8 @@ export default function ActivitiesPage() {
                                 setSelectedClassId(cls.id)
                                 setIsClassDropdownOpen(false)
                               }}
-                              className={`w-full px-5 py-3 text-left text-base hover:bg-gray-50 ${
-                                selectedClassId === cls.id ? 'bg-brand/10 text-brand' : 'text-black'
+                              className={`w-full px-5 py-3 text-left text-base hover:bg-gray-50 dark:hover:bg-white/10 ${
+                                selectedClassId === cls.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'
                               }`}
                             >
                               {cls.name}
@@ -1458,9 +1458,9 @@ export default function ActivitiesPage() {
                       setIsDatePickerOpen(!isDatePickerOpen)
                       setIsClassDropdownOpen(false)
                     }}
-                    className="flex items-center justify-between w-full h-[52px] px-6 bg-white rounded-full"
+                    className="flex items-center justify-between w-full h-[52px] px-6 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-base text-black">{formatDate(selectedDate)}</span>
+                    <span className="text-base text-black dark:text-white">{formatDate(selectedDate)}</span>
                     {/* Calendar Icon from Figma */}
                     <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <rect x="2" y="4" width="20" height="18" rx="3" stroke="#8A8C90" strokeWidth="1.5"/>
@@ -1496,7 +1496,7 @@ export default function ActivitiesPage() {
                 <div className={`h-[52px] px-8 border border-[#F6F6F6] rounded-full flex items-center justify-center flex-1 ${
                   dayType ? 'bg-[#E5E1DC]' : isCompensatoryMode ? 'bg-blue-100' : 'bg-orange-100'
                 }`}>
-                  <span className={`text-base ${dayType ? 'text-black' : isCompensatoryMode ? 'text-blue-700' : 'text-orange-600'}`}>
+                  <span className={`text-base ${dayType ? 'text-black dark:text-white' : isCompensatoryMode ? 'text-blue-700' : 'text-orange-600'}`}>
                     {dayType
                       ? `Buổi: ${dayOfWeek.toLowerCase()}`
                       : isCompensatoryMode
@@ -1523,11 +1523,11 @@ export default function ActivitiesPage() {
 
             {/* Content Area */}
             <div className="px-6 pb-6">
-              <div className="bg-white rounded-3xl min-h-[580px]">
+              <div className="bg-white dark:bg-white/10 rounded-3xl min-h-[580px]">
                 {!selectedClassId || students.length === 0 ? (
                   /* Empty State */
                   <div className="flex flex-col items-center justify-center h-[580px]">
-                    <div className="bg-[#f6f6f6] rounded-2xl px-10 py-6 flex flex-col items-center gap-2">
+                    <div className="bg-[#f6f6f6] dark:bg-white/5 rounded-2xl px-10 py-6 flex flex-col items-center gap-2">
                       {/* Calendar Icon */}
                       <svg className="w-12 h-12" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <rect x="3" y="6" width="30" height="27" rx="3" stroke="#f6f6f6" strokeWidth="2" fill="#f6f6f6"/>
@@ -1542,7 +1542,7 @@ export default function ActivitiesPage() {
                         <rect x="22" y="22" width="6" height="4" rx="1" fill="#666d80"/>
                         <rect x="8" y="28" width="6" height="4" rx="1" fill="#666d80"/>
                       </svg>
-                      <p className="text-sm text-black">
+                      <p className="text-sm text-black dark:text-white">
                         {selectedClassId ? 'Nhấn "Tải dữ liệu" hoặc chọn ngày trên lịch để xem danh sách' : 'Chọn lớp để bắt đầu điểm danh'}
                       </p>
                     </div>
@@ -1598,10 +1598,10 @@ export default function ActivitiesPage() {
                       </div>
 
                       {/* Tổng số Card */}
-                      <div className="h-[130px] flex-1 bg-white border border-white/60 rounded-[18px] p-5 flex flex-col justify-between">
+                      <div className="h-[130px] flex-1 bg-white dark:bg-white/10 border border-white/60 rounded-[18px] p-5 flex flex-col justify-between">
                         <div className="flex items-start justify-between">
                           <div className="flex flex-col gap-1">
-                            <span className="text-sm text-black/80">Tổng số</span>
+                            <span className="text-sm text-black/80 dark:text-white/80">Tổng số</span>
                             <span className="text-xs text-[#666d80]">Năm học {schoolYear?.name || '2025-2026'}</span>
                           </div>
                           {/* Activity icon */}
@@ -1612,7 +1612,7 @@ export default function ActivitiesPage() {
                           </div>
                         </div>
                         <div className="flex items-end justify-between">
-                          <span className="text-[48px] font-bold text-black leading-none">{totalStudents}</span>
+                          <span className="text-[48px] font-bold text-black dark:text-white leading-none">{totalStudents}</span>
                           {/* Mini bar chart */}
                           <div className="flex items-end gap-2 h-[28px] mr-2">
                             <div className="w-[16px] h-[4px] rounded-full bg-[#E5E1DC]"/>
@@ -1628,10 +1628,10 @@ export default function ActivitiesPage() {
                       </div>
 
                       {/* Chưa điểm danh Card */}
-                      <div className="h-[130px] flex-1 bg-white border border-white/60 rounded-[18px] p-5 flex flex-col justify-between">
+                      <div className="h-[130px] flex-1 bg-white dark:bg-white/10 border border-white/60 rounded-[18px] p-5 flex flex-col justify-between">
                         <div className="flex items-start justify-between">
                           <div className="flex flex-col gap-1">
-                            <span className="text-sm text-black/80">{isCompensatoryMode ? 'Chưa bổ sung' : 'Thiếu nhi chưa điểm danh'}</span>
+                            <span className="text-sm text-black/80 dark:text-white/80">{isCompensatoryMode ? 'Chưa bổ sung' : 'Thiếu nhi chưa điểm danh'}</span>
                             <span className="text-xs text-[#666d80]">{isCompensatoryMode ? `Thứ 5 ngày ${formatDate(thursdayOfWeek)}` : `Ngày ${formatDate(selectedDate)}`}</span>
                           </div>
                           {/* Moon icon */}
@@ -1642,7 +1642,7 @@ export default function ActivitiesPage() {
                           </div>
                         </div>
                         <div className="flex items-end justify-between">
-                          <span className="text-[48px] font-bold text-black leading-none">
+                          <span className="text-[48px] font-bold text-black dark:text-white leading-none">
                             {isCompensatoryMode
                               ? students.filter(s => !s.has_thursday_attendance && !s.has_compensatory_attendance).length
                               : notCheckedCount
@@ -1697,16 +1697,16 @@ export default function ActivitiesPage() {
                             <button
                               onClick={markAllPresent}
                               disabled={saving === 'all' || !dayType}
-                              className="h-[60px] w-full bg-white border border-white/60 rounded-[18px] flex items-center gap-4 px-5 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="h-[60px] w-full bg-white dark:bg-white/10 border border-white/60 rounded-[18px] flex items-center gap-4 px-5 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {saving === 'all' ? (
                                 <Loader2 className="w-[20px] h-[20px] animate-spin text-brand" />
                               ) : (
-                                <div className="w-[20px] h-[20px] rounded border border-black flex items-center justify-center">
-                                  <Check className="w-4 h-4 text-black" strokeWidth={2.5} />
+                                <div className="w-[20px] h-[20px] rounded border border-black dark:border-white flex items-center justify-center">
+                                  <Check className="w-4 h-4 text-black dark:text-white" strokeWidth={2.5} />
                                 </div>
                               )}
-                              <span className="text-sm text-black/80">Có mặt tất cả</span>
+                              <span className="text-sm text-black/80 dark:text-white/80">Có mặt tất cả</span>
                             </button>
 
                             {/* Import Excel Button */}
@@ -1715,7 +1715,7 @@ export default function ActivitiesPage() {
                               disabled={!dayType}
                               className="h-[60px] w-full bg-[#E5E1DC] border border-white/60 rounded-[18px] flex items-center gap-4 px-5 hover:bg-[#d9d5d0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <span className="text-sm text-black/80">Import Excel</span>
+                              <span className="text-sm text-black/80 dark:text-white/80">Import Excel</span>
                             </button>
                           </>
                         )}
@@ -1775,7 +1775,7 @@ export default function ActivitiesPage() {
 
                             {/* Name & Code Column */}
                             <div className="w-[220px] flex flex-col pl-3">
-                              <span className="text-base font-medium text-black leading-tight">
+                              <span className="text-base font-medium text-black dark:text-white leading-tight">
                                 {student.saint_name && `${student.saint_name} `}{student.full_name}
                               </span>
                               <span className="text-sm text-[#666d80] mt-1">{student.student_code || '---'}</span>
@@ -1831,7 +1831,7 @@ export default function ActivitiesPage() {
                             <div className="flex-1 flex flex-col pl-5">
                               {student.has_compensatory_attendance && student.compensatory_time ? (
                                 <>
-                                  <span className="text-sm font-medium text-black leading-tight">
+                                  <span className="text-sm font-medium text-black dark:text-white leading-tight">
                                     {student.compensatory_time} {dayOfWeek} {formatDate(selectedDate)}
                                   </span>
                                   <span className="text-sm text-[#666d80] mt-0.5">
@@ -1843,7 +1843,7 @@ export default function ActivitiesPage() {
                                 </>
                               ) : student.has_thursday_attendance ? (
                                 <>
-                                  <span className="text-sm font-medium text-black leading-tight">
+                                  <span className="text-sm font-medium text-black dark:text-white leading-tight">
                                     {student.attendance_time ? `${student.attendance_time} ` : ''}Thứ 5 {formatDate(thursdayOfWeek)}
                                   </span>
                                   <span className="text-sm text-[#666d80] mt-0.5">
@@ -1930,7 +1930,7 @@ export default function ActivitiesPage() {
 
                             {/* Name & Code Column */}
                             <div className="w-[220px] flex flex-col pl-3">
-                              <span className="text-base font-medium text-black leading-tight">
+                              <span className="text-base font-medium text-black dark:text-white leading-tight">
                                 {student.saint_name && `${student.saint_name} `}{student.full_name}
                               </span>
                               <span className="text-sm text-[#666d80] mt-1">{student.student_code || '---'}</span>
@@ -2017,7 +2017,7 @@ export default function ActivitiesPage() {
                                 </>
                               ) : student.attendance_status !== null ? (
                                 <>
-                                  <span className="text-sm font-medium text-black leading-tight">
+                                  <span className="text-sm font-medium text-black dark:text-white leading-tight">
                                     {student.attendance_time} {dayOfWeek} {formatDate(selectedDate)}
                                   </span>
                                   <span className="text-sm text-[#666d80] mt-1">
@@ -2068,14 +2068,14 @@ export default function ActivitiesPage() {
             <div className="flex items-start gap-6 mb-6">
               {/* Title */}
               <div className="w-[300px]">
-                <h1 className="text-[26px] font-semibold text-black">Tạo báo cáo mới</h1>
+                <h1 className="text-[26px] font-semibold text-black dark:text-white">Tạo báo cáo mới</h1>
                 <p className="text-sm font-medium text-[#666d80] mt-1">Tạo và xuất báo cáo</p>
               </div>
 
               {/* Time Filter Mode Selector */}
-              <div className="flex-1 bg-white border border-[#e5e1dc] rounded-2xl overflow-hidden">
+              <div className="flex-1 bg-white dark:bg-white/10 border border-[#e5e1dc] rounded-2xl overflow-hidden">
                 <div className="flex items-center h-12 px-4">
-                  <span className="flex-1 text-base font-semibold text-black">Cách chọn lọc thời gian</span>
+                  <span className="flex-1 text-base font-semibold text-black dark:text-white">Cách chọn lọc thời gian</span>
                   <div className="flex items-center gap-4">
                     {/* Chọn tuần option */}
                     <button
@@ -2083,13 +2083,13 @@ export default function ActivitiesPage() {
                       className="flex items-center gap-2"
                     >
                       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        reportTimeFilterMode === 'week' ? 'border-brand' : 'border-gray-300'
+                        reportTimeFilterMode === 'week' ? 'border-brand' : 'border-gray-300 dark:border-white/30'
                       }`}>
                         {reportTimeFilterMode === 'week' && (
                           <div className="w-2 h-2 rounded-full bg-brand" />
                         )}
                       </div>
-                      <span className="text-sm font-medium text-black">Chọn tuần</span>
+                      <span className="text-sm font-medium text-black dark:text-white">Chọn tuần</span>
                     </button>
 
                     {/* Chọn từ ngày - đến ngày option */}
@@ -2098,13 +2098,13 @@ export default function ActivitiesPage() {
                       className="flex items-center gap-2"
                     >
                       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        reportTimeFilterMode === 'dateRange' ? 'border-brand' : 'border-gray-300'
+                        reportTimeFilterMode === 'dateRange' ? 'border-brand' : 'border-gray-300 dark:border-white/30'
                       }`}>
                         {reportTimeFilterMode === 'dateRange' && (
                           <div className="w-2 h-2 rounded-full bg-brand" />
                         )}
                       </div>
-                      <span className="text-sm font-medium text-black">Chọn từ ngày - đến ngày</span>
+                      <span className="text-sm font-medium text-black dark:text-white">Chọn từ ngày - đến ngày</span>
                     </button>
                   </div>
                 </div>
@@ -2127,9 +2127,9 @@ export default function ActivitiesPage() {
                           closeAllReportDropdowns()
                           setIsReportFromDatePickerOpen(!isReportFromDatePickerOpen)
                         }}
-                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                       >
-                        <span className="text-sm text-black">{formatDisplayDate(reportFromDate)}</span>
+                        <span className="text-sm text-black dark:text-white">{formatDisplayDate(reportFromDate)}</span>
                         <Calendar className="w-5 h-5 text-[#8A8C90]" />
                       </button>
                       {isReportFromDatePickerOpen && (
@@ -2155,9 +2155,9 @@ export default function ActivitiesPage() {
                           closeAllReportDropdowns()
                           setIsReportToDatePickerOpen(!isReportToDatePickerOpen)
                         }}
-                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                       >
-                        <span className="text-sm text-black">{formatDisplayDate(reportToDate)}</span>
+                        <span className="text-sm text-black dark:text-white">{formatDisplayDate(reportToDate)}</span>
                         <Calendar className="w-5 h-5 text-[#8A8C90]" />
                       </button>
                       {isReportToDatePickerOpen && (
@@ -2185,9 +2185,9 @@ export default function ActivitiesPage() {
                         closeAllReportDropdowns()
                         setIsReportWeekPickerOpen(!isReportWeekPickerOpen)
                       }}
-                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                     >
-                      <span className="text-sm text-black">
+                      <span className="text-sm text-black dark:text-white">
                         {reportWeekStart && reportWeekEnd
                           ? `${formatDisplayDate(reportWeekStart)} - ${formatDisplayDate(reportWeekEnd)}`
                           : 'Chọn tuần'}
@@ -2224,23 +2224,23 @@ export default function ActivitiesPage() {
                       closeAllReportDropdowns()
                       setIsReportTypeDropdownOpen(!isReportTypeDropdownOpen)
                     }}
-                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-sm text-black">
+                    <span className="text-sm text-black dark:text-white">
                       {reportType === 'attendance' ? 'Báo cáo điểm danh' : 'Báo cáo điểm số'}
                     </span>
-                    <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                    <svg className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isReportTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
                       <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
                     </svg>
                   </button>
                   {isReportTypeDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden">
                       <button
                         onClick={() => {
                           setReportType('attendance')
                           setIsReportTypeDropdownOpen(false)
                         }}
-                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportType === 'attendance' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${reportType === 'attendance' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                       >
                         Báo cáo điểm danh
                       </button>
@@ -2249,7 +2249,7 @@ export default function ActivitiesPage() {
                           setReportType('score')
                           setIsReportTypeDropdownOpen(false)
                         }}
-                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportType === 'score' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${reportType === 'score' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                       >
                         Báo cáo điểm số
                       </button>
@@ -2270,22 +2270,22 @@ export default function ActivitiesPage() {
                       closeAllReportDropdowns()
                       setIsReportBranchDropdownOpen(!isReportBranchDropdownOpen)
                     }}
-                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-sm text-black">{reportBranch || 'Tất cả ngành'}</span>
-                    <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportBranchDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                    <span className="text-sm text-black dark:text-white">{reportBranch || 'Tất cả ngành'}</span>
+                    <svg className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isReportBranchDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
                       <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
                     </svg>
                   </button>
                   {isReportBranchDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden max-h-[200px] overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden max-h-[200px] overflow-y-auto">
                       <button
                         onClick={() => {
                           setReportBranch('')
                           setReportClassId('')
                           setIsReportBranchDropdownOpen(false)
                         }}
-                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${!reportBranch ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${!reportBranch ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                       >
                         Tất cả ngành
                       </button>
@@ -2297,7 +2297,7 @@ export default function ActivitiesPage() {
                             setReportClassId('')
                             setIsReportBranchDropdownOpen(false)
                           }}
-                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportBranch === branch ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${reportBranch === branch ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                         >
                           {branch}
                         </button>
@@ -2316,15 +2316,15 @@ export default function ActivitiesPage() {
                       closeAllReportDropdowns()
                       setIsReportClassDropdownOpen(!isReportClassDropdownOpen)
                     }}
-                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-sm text-black">{reportClassId ? getReportClassName(reportClassId) : 'Chọn lớp'}</span>
-                    <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportClassDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                    <span className="text-sm text-black dark:text-white">{reportClassId ? getReportClassName(reportClassId) : 'Chọn lớp'}</span>
+                    <svg className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isReportClassDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
                       <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
                     </svg>
                   </button>
                   {isReportClassDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden max-h-[300px] overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden max-h-[300px] overflow-y-auto">
                       {getClassesByBranch(reportBranch).map((cls) => (
                         <button
                           key={cls.id}
@@ -2332,7 +2332,7 @@ export default function ActivitiesPage() {
                             setReportClassId(cls.id)
                             setIsReportClassDropdownOpen(false)
                           }}
-                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportClassId === cls.id ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${reportClassId === cls.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                         >
                           {cls.name}
                         </button>
@@ -2345,9 +2345,9 @@ export default function ActivitiesPage() {
               {/* Năm học */}
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-2">Năm học</label>
-                <div className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full">
-                  <span className="text-sm text-black">{schoolYear?.name || 'Năm học hiện tại'}</span>
-                  <svg className="w-[9px] h-[18px] text-black" viewBox="0 0 9 18" fill="none">
+                <div className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full">
+                  <span className="text-sm text-black dark:text-white">{schoolYear?.name || 'Năm học hiện tại'}</span>
+                  <svg className="w-[9px] h-[18px] text-black dark:text-white" viewBox="0 0 9 18" fill="none">
                     <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
                   </svg>
                 </div>
@@ -2363,17 +2363,17 @@ export default function ActivitiesPage() {
                         closeAllReportDropdowns()
                         setIsReportAttendanceTypeDropdownOpen(!isReportAttendanceTypeDropdownOpen)
                       }}
-                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                     >
-                      <span className="text-sm text-black">
+                      <span className="text-sm text-black dark:text-white">
                         {reportAttendanceType === 'all' ? 'Tất cả' : reportAttendanceType === 'thu5' ? 'Thứ 5' : 'Chủ nhật'}
                       </span>
-                      <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportAttendanceTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                      <svg className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isReportAttendanceTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
                         <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
                       </svg>
                     </button>
                     {isReportAttendanceTypeDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden">
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden">
                         {[
                           { value: 'all', label: 'Tất cả' },
                           { value: 'thu5', label: 'Thứ 5' },
@@ -2385,7 +2385,7 @@ export default function ActivitiesPage() {
                               setReportAttendanceType(option.value as AttendanceTypeFilter)
                               setIsReportAttendanceTypeDropdownOpen(false)
                             }}
-                            className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportAttendanceType === option.value ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                            className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${reportAttendanceType === option.value ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                           >
                             {option.label}
                           </button>
@@ -2411,7 +2411,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, diLeT5: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Đi Lễ T5</span>
+                    <span className="text-sm text-black dark:text-white">Đi Lễ T5</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -2420,7 +2420,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, hocGL: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Học GL</span>
+                    <span className="text-sm text-black dark:text-white">Học GL</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -2429,7 +2429,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, diemTB: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Điểm TB</span>
+                    <span className="text-sm text-black dark:text-white">Điểm TB</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -2438,7 +2438,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, score45HK1: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">45&apos; HKI</span>
+                    <span className="text-sm text-black dark:text-white">45&apos; HKI</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -2447,7 +2447,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, scoreExamHK1: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Thi HKI</span>
+                    <span className="text-sm text-black dark:text-white">Thi HKI</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -2456,7 +2456,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, score45HK2: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">45&apos; HKII</span>
+                    <span className="text-sm text-black dark:text-white">45&apos; HKII</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -2465,7 +2465,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, scoreExamHK2: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Thi HKII</span>
+                    <span className="text-sm text-black dark:text-white">Thi HKII</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -2474,7 +2474,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, diemTong: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Điểm Tổng</span>
+                    <span className="text-sm text-black dark:text-white">Điểm Tổng</span>
                   </label>
                 </div>
               </div>
@@ -2503,7 +2503,7 @@ export default function ActivitiesPage() {
 
             {/* Report Result Section */}
             {isReportGenerated && (
-              <div className="bg-white rounded-[24px] p-6 overflow-hidden">
+              <div className="bg-white dark:bg-white/10 rounded-[24px] p-6 overflow-hidden">
                 {/* Report Preview Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -2512,7 +2512,7 @@ export default function ActivitiesPage() {
                       <path d="M12.0001 12C15.0793 12 18.0179 13.8185 20.1133 17.1592C20.8187 18.2839 20.8187 19.7161 20.1133 20.8408C18.0179 24.1815 15.0793 26 12.0001 26C8.92077 26 5.98224 24.1815 3.88678 20.8408C3.18144 19.7161 3.18144 18.2839 3.88678 17.1592C5.98224 13.8185 8.92077 12 12.0001 12ZM12.0001 14C9.77455 14 7.40822 15.3088 5.58112 18.2217C5.28324 18.6966 5.28324 19.3034 5.58112 19.7783C7.40822 22.6912 9.77455 24 12.0001 24C14.2256 24 16.5919 22.6912 18.419 19.7783C18.7169 19.3034 18.7169 18.6966 18.419 18.2217C16.5919 15.3088 14.2256 14 12.0001 14ZM12.0001 15C14.2092 15 16.0001 16.7909 16.0001 19C16.0001 21.2091 14.2092 23 12.0001 23C9.79092 23 8.00006 21.2091 8.00006 19C8.00006 16.7909 9.79092 15 12.0001 15ZM11.9141 17.0039C11.9687 17.1594 12.0001 17.3259 12.0001 17.5C12.0001 18.3284 11.3285 19 10.5001 19C10.326 19 10.1594 18.9686 10.004 18.9141C10.0028 18.9426 10.0001 18.9712 10.0001 19C10.0001 20.1046 10.8955 21 12.0001 21C13.1046 21 14.0001 20.1045 14.0001 19C14.0001 17.8955 13.1046 17 12.0001 17C11.9713 17 11.9426 17.0027 11.9141 17.0039Z" fill="#8A8C90" transform="translate(0, -7)"/>
                     </svg>
                     <span className="text-sm text-[#666D80]">
-                      Xem trước báo cáo: <span className="font-medium text-black">{reportType === 'attendance' ? 'Báo cáo điểm danh' : 'Báo cáo điểm số'}</span>
+                      Xem trước báo cáo: <span className="font-medium text-black dark:text-white">{reportType === 'attendance' ? 'Báo cáo điểm danh' : 'Báo cáo điểm số'}</span>
                     </span>
                     {reportClassId && (
                       <span className="h-[26px] px-4 bg-[#8A8C90] rounded-[13px] text-xs font-medium text-white uppercase flex items-center">
@@ -2561,47 +2561,47 @@ export default function ActivitiesPage() {
                     </div>
 
                     {/* Có mặt chủ nhật */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">Có mặt chủ nhật</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">Có mặt chủ nhật</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportStats.presentCn}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportStats.presentCn}</span>
                       </div>
                     </div>
 
                     {/* Học sinh chưa điểm danh */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">Thiếu nhi chưa điểm danh</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">Thiếu nhi chưa điểm danh</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportStats.notChecked}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportStats.notChecked}</span>
                       </div>
                     </div>
 
                     {/* Tổng lượt điểm danh */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">Tổng lượt điểm danh</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">Tổng lượt điểm danh</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportStats.totalAttendance}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportStats.totalAttendance}</span>
                       </div>
                     </div>
                   </div>
@@ -2623,47 +2623,47 @@ export default function ActivitiesPage() {
                     </div>
 
                     {/* TB HK2 */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">TB HK2</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">TB HK2</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportScoreStats.averageHK2}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportScoreStats.averageHK2}</span>
                       </div>
                     </div>
 
                     {/* TB cả năm */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">TB cả năm</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">TB cả năm</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportScoreStats.averageYear}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportScoreStats.averageYear}</span>
                       </div>
                     </div>
 
                     {/* Tổng số học sinh */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">Tổng học sinh</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">Tổng học sinh</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportScoreStats.totalStudents}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportScoreStats.totalStudents}</span>
                       </div>
                     </div>
                   </div>
@@ -2703,7 +2703,7 @@ export default function ActivitiesPage() {
                             const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
                             return (
                             <tr key={student.id} className="h-[56px] border-b border-[#8A8C90]">
-                              <td className="px-4 text-[14px] font-medium text-black">{index + 1}</td>
+                              <td className="px-4 text-[14px] font-medium text-black dark:text-white">{index + 1}</td>
                               <td className="px-4">
                                 <div className="flex items-center gap-2">
                                   <div className="w-[36px] h-[36px] rounded-[10px] bg-[#F3F3F3] flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -2711,11 +2711,11 @@ export default function ActivitiesPage() {
                                       <img src={student.avatar_url} alt={student.full_name} className="w-full h-full object-cover" />
                                     ) : null}
                                   </div>
-                                  <span className="text-[14px] font-medium text-black whitespace-nowrap">{student.saint_name || '-'}</span>
+                                  <span className="text-[14px] font-medium text-black dark:text-white whitespace-nowrap">{student.saint_name || '-'}</span>
                                 </div>
                               </td>
                               <td className="px-2 text-[14px] font-semibold text-[#8A8C90] whitespace-nowrap w-[300px]">{familyMiddleName}</td>
-                              <td className="px-2 text-[14px] font-semibold text-black whitespace-nowrap w-[105px]">{givenName}</td>
+                              <td className="px-2 text-[14px] font-semibold text-black dark:text-white whitespace-nowrap w-[105px]">{givenName}</td>
                               {reportDates.map((date) => (
                                 <td key={date} className={`text-center border-l border-[#8A8C90] ${student.attendance[date] === 'present' ? 'bg-[#F5D5D5]' : ''}`}>
                                   {student.attendance[date] === 'present' ? (
@@ -2801,17 +2801,17 @@ export default function ActivitiesPage() {
                                 }
 
                                 return (
-                                  <tr key={student.id} className="border-b border-[#E5E1DC] h-[52px] hover:bg-gray-50">
-                                    <td className="px-4 text-[14px] text-black">{index + 1}</td>
-                                    <td className="px-4 text-[14px] text-black">{student.saint_name || '-'}</td>
-                                    <td className="px-4 text-[14px] font-medium text-black">{student.full_name}</td>
-                                    {showDiLeT5 && <td className="text-center px-2 text-[14px] text-black">{student.score_di_le_t5 !== null ? student.score_di_le_t5 : '-'}</td>}
-                                    {showHocGL && <td className="text-center px-2 text-[14px] text-black">{student.score_hoc_gl !== null ? student.score_hoc_gl : '-'}</td>}
-                                    {show45HK1 && <td className="text-center px-2 text-[14px] text-black">{student.score_45_hk1 !== null ? student.score_45_hk1 : '-'}</td>}
-                                    {showExamHK1 && <td className="text-center px-2 text-[14px] text-black">{student.score_exam_hk1 !== null ? student.score_exam_hk1 : '-'}</td>}
+                                  <tr key={student.id} className="border-b border-[#E5E1DC] h-[52px] hover:bg-gray-50 dark:hover:bg-white/10">
+                                    <td className="px-4 text-[14px] text-black dark:text-white">{index + 1}</td>
+                                    <td className="px-4 text-[14px] text-black dark:text-white">{student.saint_name || '-'}</td>
+                                    <td className="px-4 text-[14px] font-medium text-black dark:text-white">{student.full_name}</td>
+                                    {showDiLeT5 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_di_le_t5 !== null ? student.score_di_le_t5 : '-'}</td>}
+                                    {showHocGL && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_hoc_gl !== null ? student.score_hoc_gl : '-'}</td>}
+                                    {show45HK1 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_45_hk1 !== null ? student.score_45_hk1 : '-'}</td>}
+                                    {showExamHK1 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_exam_hk1 !== null ? student.score_exam_hk1 : '-'}</td>}
                                     {(show45HK1 || showExamHK1) && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.average_hk1 !== null ? student.average_hk1 : '-'}</td>}
-                                    {show45HK2 && <td className="text-center px-2 text-[14px] text-black">{student.score_45_hk2 !== null ? student.score_45_hk2 : '-'}</td>}
-                                    {showExamHK2 && <td className="text-center px-2 text-[14px] text-black">{student.score_exam_hk2 !== null ? student.score_exam_hk2 : '-'}</td>}
+                                    {show45HK2 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_45_hk2 !== null ? student.score_45_hk2 : '-'}</td>}
+                                    {showExamHK2 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_exam_hk2 !== null ? student.score_exam_hk2 : '-'}</td>}
                                     {(show45HK2 || showExamHK2) && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.average_hk2 !== null ? student.average_hk2 : '-'}</td>}
                                     {showDiemTong && <td className="text-center px-2 text-[14px] font-bold text-brand">{student.average_year !== null ? student.average_year : '-'}</td>}
                                     <td className={`text-center px-2 text-[14px] ${classColor}`}>{classification}</td>

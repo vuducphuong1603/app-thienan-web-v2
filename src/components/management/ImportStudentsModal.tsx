@@ -321,19 +321,19 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
       <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="relative bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E1DC]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E1DC] dark:border-white/10">
           <div className="flex items-center gap-3">
             {step === 'preview' && (
               <button
                 onClick={resetModal}
-                className="w-8 h-8 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+                className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
               >
                 <ChevronLeft className="w-5 h-5 text-primary-3" />
               </button>
             )}
-            <h2 className="text-lg font-semibold text-black">
+            <h2 className="text-lg font-semibold text-black dark:text-white">
               {step === 'upload' && 'Import danh sách Thiếu Nhi'}
               {step === 'preview' && 'Xem trước dữ liệu'}
               {step === 'importing' && 'Đang import...'}
@@ -342,7 +342,7 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
           </div>
           <button
             onClick={handleClose}
-            className="w-8 h-8 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+            className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5 text-primary-3" />
           </button>
@@ -355,7 +355,7 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
               {/* Upload Area */}
               <div
                 className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
-                  isDragging ? 'border-brand bg-brand/5' : 'border-[#E5E1DC] hover:border-brand'
+                  isDragging ? 'border-brand bg-brand/5' : 'border-[#E5E1DC] dark:border-white/20 hover:border-brand'
                 }`}
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
                 onDragLeave={() => setIsDragging(false)}
@@ -365,7 +365,7 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-brand/10 flex items-center justify-center">
                   <Upload className="w-8 h-8 text-brand" />
                 </div>
-                <h3 className="text-base font-medium text-black mb-2">
+                <h3 className="text-base font-medium text-black dark:text-white mb-2">
                   Kéo thả file Excel vào đây
                 </h3>
                 <p className="text-sm text-primary-3 mb-4">hoặc click để chọn file</p>
@@ -386,7 +386,7 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
                 <div className="flex items-center gap-3">
                   <FileSpreadsheet className="w-8 h-8 text-brand" />
                   <div>
-                    <h4 className="text-sm font-medium text-black">Tải file mẫu</h4>
+                    <h4 className="text-sm font-medium text-black dark:text-white">Tải file mẫu</h4>
                     <p className="text-xs text-primary-3">Tải xuống file Excel mẫu để import đúng định dạng</p>
                   </div>
                 </div>
@@ -403,8 +403,8 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
               </div>
 
               {/* Notes */}
-              <div className="bg-[#FAFAFA] rounded-xl p-4">
-                <p className="text-sm font-semibold text-black mb-2">Lưu ý:</p>
+              <div className="bg-[#FAFAFA] dark:bg-white/5 rounded-xl p-4">
+                <p className="text-sm font-semibold text-black dark:text-white mb-2">Lưu ý:</p>
                 <ul className="text-xs text-primary-3 space-y-1.5">
                   <li className="flex items-start gap-2">
                     <span className="mt-1.5 w-1 h-1 rounded-full bg-primary-3 flex-shrink-0" />
@@ -471,11 +471,11 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
               </div>
 
               {/* Data Table */}
-              <div className="border border-[#E5E1DC] rounded-xl overflow-hidden">
+              <div className="border border-[#E5E1DC] dark:border-white/10 rounded-xl overflow-hidden">
                 <div className="overflow-x-auto max-h-[400px]">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0">
-                      <tr className="bg-[#FAFAFA] border-b border-[#E5E1DC]">
+                      <tr className="bg-[#FAFAFA] dark:bg-white/5 border-b border-[#E5E1DC] dark:border-white/10">
                         <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">#</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Mã TN</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Tên thánh</th>
@@ -487,9 +487,9 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
                         <th className="px-3 py-2 text-left text-xs font-semibold text-primary-3 uppercase whitespace-nowrap">Trạng thái</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#E5E1DC]">
+                    <tbody className="divide-y divide-[#E5E1DC] dark:divide-white/10">
                       {parsedData.map((student, index) => (
-                        <tr key={index} className={student.isValid ? 'bg-white hover:bg-gray-50' : 'bg-[#FFF5F5]'}>
+                        <tr key={index} className={student.isValid ? 'bg-white dark:bg-transparent hover:bg-gray-50 dark:hover:bg-white/5' : 'bg-[#FFF5F5]'}>
                           <td className="px-3 py-2 text-primary-3">{index + 1}</td>
                           <td className="px-3 py-2 font-medium">{student.student_code}</td>
                           <td className="px-3 py-2">{student.saint_name || '-'}</td>
@@ -602,11 +602,11 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E5E1DC]">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E5E1DC] dark:border-white/10">
           {step === 'upload' && (
             <button
               onClick={handleClose}
-              className="px-6 py-2.5 border border-[#E5E1DC] rounded-xl text-sm font-medium text-primary-3 hover:bg-gray-50 transition-colors"
+              className="px-6 py-2.5 border border-[#E5E1DC] dark:border-white/20 rounded-xl text-sm font-medium text-primary-3 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
             >
               Huỷ
             </button>
@@ -616,7 +616,7 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
             <>
               <button
                 onClick={resetModal}
-                className="px-6 py-2.5 border border-[#E5E1DC] rounded-xl text-sm font-medium text-primary-3 hover:bg-gray-50 transition-colors"
+                className="px-6 py-2.5 border border-[#E5E1DC] dark:border-white/20 rounded-xl text-sm font-medium text-primary-3 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
               >
                 Chọn file khác
               </button>

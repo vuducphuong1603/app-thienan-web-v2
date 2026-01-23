@@ -174,7 +174,7 @@ export default function CustomCalendar({
 
   return (
     <div
-      className="bg-white rounded-[15px] border border-[#E5E1DC] shadow-[1px_3px_4px_rgba(0,0,0,0.25)]"
+      className="bg-white dark:bg-[#1a1a1a] rounded-[15px] border border-[#E5E1DC] dark:border-white/10 shadow-[1px_3px_4px_rgba(0,0,0,0.25)]"
       style={{ width: '297px' }}
     >
       {/* Header */}
@@ -182,19 +182,19 @@ export default function CustomCalendar({
         <button
           type="button"
           onClick={handlePrevMonth}
-          className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+          className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
         >
           <ChevronLeft className="w-5 h-5 text-gray-400" />
         </button>
-        <span className="text-sm font-bold text-gray-900 font-['Inter_Tight']">
+        <span className="text-sm font-bold text-gray-900 dark:text-white font-['Inter_Tight']">
           {MONTHS_VI[viewDate.month]} {viewDate.year}
         </span>
         <button
           type="button"
           onClick={handleNextMonth}
-          className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+          className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
         >
-          <ChevronRight className="w-5 h-5 text-gray-900" />
+          <ChevronRight className="w-5 h-5 text-gray-900 dark:text-white" />
         </button>
       </div>
 
@@ -204,7 +204,7 @@ export default function CustomCalendar({
           {DAYS_EN.map((day) => (
             <div
               key={day}
-              className="w-10 py-2 text-center text-[10px] text-gray-500 font-['Inter_Tight']"
+              className="w-10 py-2 text-center text-[10px] text-gray-500 dark:text-gray-400 font-['Inter_Tight']"
             >
               {day}
             </div>
@@ -240,12 +240,12 @@ export default function CustomCalendar({
                       ${selected
                         ? 'bg-[#FA865E] text-white font-medium text-sm'
                         : today
-                          ? 'bg-gray-100 text-gray-900 font-medium text-sm'
+                          ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-medium text-sm'
                           : inSelectedWeek && dayInfo.isCurrentMonth
                             ? 'text-[#8A8C90] font-medium text-sm hover:bg-[#FA865E]/10'
                             : dayInfo.isCurrentMonth
-                              ? 'text-[#8A8C90] text-xs hover:bg-gray-100'
-                              : 'text-[#D1D5DB] text-xs hover:bg-gray-50'
+                              ? 'text-[#8A8C90] text-xs hover:bg-gray-100 dark:hover:bg-white/10'
+                              : 'text-[#D1D5DB] text-xs hover:bg-gray-50 dark:hover:bg-white/5'
                       }
                       ${isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
                     `}

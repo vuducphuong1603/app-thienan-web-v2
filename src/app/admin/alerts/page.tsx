@@ -61,11 +61,11 @@ function AlertStatsCard({
       case 'total':
         return <Flame className="w-4 h-4 text-white" />
       case 'unread':
-        return <Inbox className="w-4 h-4 text-gray-600" />
+        return <Inbox className="w-4 h-4 text-gray-600 dark:text-gray-300" />
       case 'high':
-        return <AlertCircle className="w-4 h-4 text-gray-600" />
+        return <AlertCircle className="w-4 h-4 text-gray-600 dark:text-gray-300" />
       case 'resolved':
-        return <CheckCircle className="w-4 h-4 text-gray-600" />
+        return <CheckCircle className="w-4 h-4 text-gray-600 dark:text-gray-300" />
     }
   }
 
@@ -77,13 +77,13 @@ function AlertStatsCard({
       className={`relative rounded-[15px] p-4 h-[147px] overflow-hidden ${
         variant === 'primary'
           ? 'bg-brand text-white'
-          : 'bg-white border border-white/60'
+          : 'bg-white dark:bg-white/10 border border-white/60 dark:border-white/10'
       }`}
     >
       {/* Title */}
       <p
         className={`text-[22px] font-semibold ${
-          variant === 'primary' ? 'text-white' : 'text-black opacity-80'
+          variant === 'primary' ? 'text-white' : 'text-black dark:text-white opacity-80'
         }`}
       >
         {title}
@@ -94,7 +94,7 @@ function AlertStatsCard({
         className={`absolute top-4 right-4 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-sm ${
           variant === 'primary'
             ? 'bg-white/10 border border-white/20'
-            : 'bg-black/[0.03]'
+            : 'bg-black/[0.03] dark:bg-white/10'
         }`}
       >
         {getIcon()}
@@ -103,7 +103,7 @@ function AlertStatsCard({
       {/* Value */}
       <p
         className={`text-[40px] font-bold absolute bottom-4 left-4 ${
-          variant === 'primary' ? 'text-white' : 'text-black'
+          variant === 'primary' ? 'text-white' : 'text-black dark:text-white'
         }`}
       >
         {value}
@@ -284,7 +284,7 @@ function SidebarTab({
       className={`w-full flex items-center gap-5 pl-[7px] pr-4 py-2 rounded-full transition-all ${
         active
           ? 'bg-brand text-white shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)]'
-          : 'bg-[#f6f6f6] text-black shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] hover:bg-gray-100'
+          : 'bg-[#f6f6f6] dark:bg-white/10 text-black dark:text-white shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] hover:bg-gray-100 dark:hover:bg-white/20'
       }`}
     >
       <div
@@ -298,7 +298,7 @@ function SidebarTab({
       {count !== undefined && (
         <div
           className={`ml-auto w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm ${
-            active ? 'bg-white/20' : 'bg-black/10'
+            active ? 'bg-white/20' : 'bg-black/10 dark:bg-white/20'
           }`}
         >
           <span className="text-xs">{count}</span>
@@ -319,10 +319,10 @@ function FilterButton({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 h-[38px] px-4 bg-white border border-white/60 rounded-full hover:shadow-sm transition-all"
+      className="flex items-center gap-2 h-[38px] px-4 bg-white dark:bg-white/10 border border-white/60 dark:border-white/10 rounded-full hover:shadow-sm transition-all"
     >
-      <span className="text-sm font-medium text-black">{label}</span>
-      <ChevronDown className="w-4 h-4 text-black" />
+      <span className="text-sm font-medium text-black dark:text-white">{label}</span>
+      <ChevronDown className="w-4 h-4 text-black dark:text-white" />
     </button>
   )
 }
@@ -364,9 +364,9 @@ function AlertItem({
   }
 
   return (
-    <div className="bg-white rounded-[25px] p-3.5 flex items-center gap-4">
+    <div className="bg-white dark:bg-white/10 rounded-[25px] p-3.5 flex items-center gap-4">
       {/* Thumbnail */}
-      <div className="w-[178px] h-[90px] bg-[#e5e1dc] rounded-[20px] flex-shrink-0" />
+      <div className="w-[178px] h-[90px] bg-[#e5e1dc] dark:bg-white/10 rounded-[20px] flex-shrink-0" />
 
       {/* Content */}
       <div className="flex-1 min-w-0">
@@ -374,27 +374,27 @@ function AlertItem({
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xs text-[#6e62e5]">{getStatusLabel(alert.status)}</span>
           <div className="flex items-center gap-1">
-            <AlertTriangle className="w-3.5 h-3.5 text-black" />
-            <span className="text-xs text-black">{getPriorityLabel(alert.priority)}</span>
+            <AlertTriangle className="w-3.5 h-3.5 text-black dark:text-white" />
+            <span className="text-xs text-black dark:text-white">{getPriorityLabel(alert.priority)}</span>
           </div>
         </div>
 
         {/* Title */}
-        <h4 className="text-sm font-medium text-black mb-0.5">{alert.title}</h4>
+        <h4 className="text-sm font-medium text-black dark:text-white mb-0.5">{alert.title}</h4>
 
         {/* Description */}
-        <p className="text-sm text-black/40 font-light mb-2">{alert.description}</p>
+        <p className="text-sm text-black/40 dark:text-white/40 font-light mb-2">{alert.description}</p>
 
         {/* Meta Info */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5 text-black/40" />
-            <span className="text-xs text-black/40">Thời gian: {alert.time}</span>
+            <Clock className="w-3.5 h-3.5 text-black/40 dark:text-white/40" />
+            <span className="text-xs text-black/40 dark:text-white/40">Thời gian: {alert.time}</span>
           </div>
-          <div className="w-px h-4 bg-black" />
+          <div className="w-px h-4 bg-black dark:bg-white/40" />
           <div className="flex items-center gap-1">
-            <Monitor className="w-3.5 h-3.5 text-black/40" />
-            <span className="text-xs text-black/40">Nguồn: {alert.source}</span>
+            <Monitor className="w-3.5 h-3.5 text-black/40 dark:text-white/40" />
+            <span className="text-xs text-black/40 dark:text-white/40">Nguồn: {alert.source}</span>
           </div>
         </div>
       </div>
@@ -407,7 +407,7 @@ function AlertItem({
             <div
               key={i}
               className={`w-2 h-5 rounded ${
-                i < alert.progress / 10 ? 'bg-brand' : 'bg-[#e5e1dc]'
+                i < alert.progress / 10 ? 'bg-brand' : 'bg-[#e5e1dc] dark:bg-white/20'
               }`}
             />
           ))}
@@ -424,7 +424,7 @@ function AlertItem({
             </button>
             <button
               onClick={() => onCancel(alert.id)}
-              className="px-3 py-1.5 bg-[#e5e1dc] text-black text-xs rounded-full hover:bg-gray-300 transition-colors"
+              className="px-3 py-1.5 bg-[#e5e1dc] dark:bg-white/20 text-black dark:text-white text-xs rounded-full hover:bg-gray-300 dark:hover:bg-white/30 transition-colors"
             >
               Hủy
             </button>
@@ -513,7 +513,7 @@ export default function AlertsPage() {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          <p className="text-gray-500 text-sm">Đang tải...</p>
+          <p className="text-gray-500 dark:text-gray-300 text-sm">Đang tải...</p>
         </div>
       </div>
     )
@@ -554,12 +554,12 @@ export default function AlertsPage() {
         <div className="mb-6">
           <Link
             href="/admin/dashboard"
-            className="inline-flex items-center gap-1.5 text-xs text-[#666d80] hover:text-black transition-colors mb-1"
+            className="inline-flex items-center gap-1.5 text-xs text-[#666d80] dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors mb-1"
           >
             <ArrowLeft className="w-6 h-6" />
             <span>Quay trở lại</span>
           </Link>
-          <h1 className="text-[40px] font-bold text-black">Hệ thống cảnh báo</h1>
+          <h1 className="text-[40px] font-bold text-black dark:text-white">Hệ thống cảnh báo</h1>
         </div>
 
         {/* Stats Cards */}
@@ -603,13 +603,13 @@ export default function AlertsPage() {
           {/* Main Content Area */}
           <div className="flex-1">
             {/* Divider */}
-            <div className="w-px h-full bg-[#e5e1dc] absolute left-[232px] top-[388px]" />
+            <div className="w-px h-full bg-[#e5e1dc] dark:bg-white/10 absolute left-[232px] top-[388px]" />
 
             {/* Filters */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-4">
-                <span className="text-lg text-black">{capitalizedDate}</span>
-                <button className="h-[38px] px-4 bg-white border border-white/60 rounded-full text-lg text-black hover:shadow-sm transition-all">
+                <span className="text-lg text-black dark:text-white">{capitalizedDate}</span>
+                <button className="h-[38px] px-4 bg-white dark:bg-white/10 border border-white/60 dark:border-white/10 rounded-full text-lg text-black dark:text-white hover:shadow-sm transition-all">
                   Hôm nay
                 </button>
               </div>

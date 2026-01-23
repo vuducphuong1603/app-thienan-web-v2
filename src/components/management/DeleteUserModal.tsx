@@ -29,7 +29,7 @@ export default function DeleteUserModal({ isOpen, onClose, onConfirm }: DeleteUs
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl w-[400px] overflow-hidden shadow-xl">
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl w-[400px] overflow-hidden shadow-xl">
         {/* Body */}
         <div className="p-6 flex flex-col items-center">
           {/* Icon */}
@@ -38,7 +38,7 @@ export default function DeleteUserModal({ isOpen, onClose, onConfirm }: DeleteUs
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-black mb-2">Xóa tài khoản?</h2>
+          <h2 className="text-xl font-bold text-black dark:text-white mb-2">Xóa tài khoản?</h2>
 
           {/* Description */}
           <p className="text-sm text-primary-3 text-center mb-6">
@@ -50,7 +50,7 @@ export default function DeleteUserModal({ isOpen, onClose, onConfirm }: DeleteUs
             <button
               onClick={onClose}
               disabled={isDeleting}
-              className="flex-1 h-[44px] bg-white border border-[#E5E1DC] rounded-xl text-sm font-medium text-black hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="flex-1 h-[44px] bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/20 rounded-xl text-sm font-medium text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
             >
               Hủy
             </button>

@@ -363,13 +363,13 @@ export default function CompensatoryAttendancePage() {
       <div className="flex items-center gap-4">
         <Link
           href="/admin/activities"
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
         >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+          <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
         </Link>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Bo sung diem danh Thu 5</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Bo sung diem danh Thu 5</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Diem danh bu cho thieu nhi khong the di vao Thu 5
           </p>
         </div>
@@ -401,25 +401,25 @@ export default function CompensatoryAttendancePage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
+      <div className="bg-white dark:bg-white/10 rounded-xl shadow-sm p-4">
         <div className="flex flex-wrap gap-4 items-center">
           {/* Class selector */}
           <div className="relative">
             <button
               onClick={() => setIsClassDropdownOpen(!isClassDropdownOpen)}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 min-w-[180px]"
+              className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-white/10 hover:bg-gray-50 dark:hover:bg-white/10 min-w-[180px]"
             >
-              <span className="text-sm text-gray-700">{selectedClassId ? getClassName(selectedClassId) : 'Chon lop'}</span>
+              <span className="text-sm text-gray-700 dark:text-gray-200">{selectedClassId ? getClassName(selectedClassId) : 'Chon lop'}</span>
               <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {isClassDropdownOpen && (
-              <div className="absolute z-50 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
+              <div className="absolute z-50 mt-2 w-64 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-lg shadow-lg max-h-80 overflow-y-auto">
                 {Object.entries(classesGroupedByBranch).map(([branch, branchClasses]) => (
                   <div key={branch}>
-                    <div className="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
+                    <div className="px-3 py-2 bg-gray-50 dark:bg-white/5 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
                       {branch}
                     </div>
                     {branchClasses.map((cls) => (
@@ -429,8 +429,8 @@ export default function CompensatoryAttendancePage() {
                           setSelectedClassId(cls.id)
                           setIsClassDropdownOpen(false)
                         }}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
-                          selectedClassId === cls.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${
+                          selectedClassId === cls.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700 dark:text-gray-200'
                         }`}
                       >
                         {cls.name}
@@ -446,12 +446,12 @@ export default function CompensatoryAttendancePage() {
           <div className="relative">
             <button
               onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-              className={`flex items-center gap-2 px-4 py-2 border rounded-lg bg-white hover:bg-gray-50 min-w-[200px] ${
-                !isValidDay ? 'border-red-300 bg-red-50' : 'border-gray-200'
+              className={`flex items-center gap-2 px-4 py-2 border rounded-lg bg-white dark:bg-white/10 hover:bg-gray-50 dark:hover:bg-white/10 min-w-[200px] ${
+                !isValidDay ? 'border-red-300 bg-red-50' : 'border-gray-200 dark:border-white/10'
               }`}
             >
               <Calendar className={`w-4 h-4 ${!isValidDay ? 'text-red-500' : 'text-gray-400'}`} />
-              <span className={`text-sm ${!isValidDay ? 'text-red-700' : 'text-gray-700'}`}>
+              <span className={`text-sm ${!isValidDay ? 'text-red-700' : 'text-gray-700 dark:text-gray-200'}`}>
                 {dayOfWeek}, {new Date(selectedDate).toLocaleDateString('vi-VN')}
               </span>
             </button>
@@ -478,7 +478,7 @@ export default function CompensatoryAttendancePage() {
               placeholder="Tim kiem thieu nhi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-white/10 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -495,11 +495,11 @@ export default function CompensatoryAttendancePage() {
 
         {/* Week info */}
         {isValidDay && selectedClassId && (
-          <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-            <p className="text-sm text-gray-700">
+          <div className="mt-3 p-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg">
+            <p className="text-sm text-gray-700 dark:text-gray-200">
               <span className="font-medium">Tuan:</span> {formatDate(weekStart)} - {formatDate(weekEnd)}
             </p>
-            <p className="text-sm text-gray-700 mt-1">
+            <p className="text-sm text-gray-700 dark:text-gray-200 mt-1">
               <span className="font-medium">Bo sung cho:</span> {formatDate(thursdayOfWeek)}
             </p>
           </div>
@@ -509,23 +509,23 @@ export default function CompensatoryAttendancePage() {
       {/* Stats */}
       {selectedClassId && isValidDay && (
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <p className="text-2xl font-bold text-gray-900">{totalStudents}</p>
-            <p className="text-sm text-gray-500">Tong so thieu nhi</p>
+          <div className="bg-white dark:bg-white/10 rounded-xl shadow-sm p-4">
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalStudents}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Tong so thieu nhi</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="bg-white dark:bg-white/10 rounded-xl shadow-sm p-4">
             <p className="text-2xl font-bold text-green-600">{alreadyAttendedCount}</p>
-            <p className="text-sm text-gray-500">Da diem danh/bu</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Da diem danh/bu</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="bg-white dark:bg-white/10 rounded-xl shadow-sm p-4">
             <p className="text-2xl font-bold text-blue-600">{canCompensateCount}</p>
-            <p className="text-sm text-gray-500">Chua diem danh</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Chua diem danh</p>
           </div>
         </div>
       )}
 
       {/* Students list */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-white/10 rounded-xl shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="flex flex-col items-center gap-4">
@@ -533,32 +533,32 @@ export default function CompensatoryAttendancePage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <p className="text-gray-500 text-sm">Dang tai...</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">Dang tai...</p>
             </div>
           </div>
         ) : !selectedClassId ? (
           <div className="text-center py-12">
-            <p className="text-gray-500">Vui long chon lop de xem danh sach thieu nhi</p>
+            <p className="text-gray-500 dark:text-gray-400">Vui long chon lop de xem danh sach thieu nhi</p>
           </div>
         ) : !isValidDay ? (
           <div className="text-center py-12">
-            <p className="text-gray-500">Vui long chon ngay hop le (Thu 2, 3, 4, 6, 7)</p>
+            <p className="text-gray-500 dark:text-gray-400">Vui long chon ngay hop le (Thu 2, 3, 4, 6, 7)</p>
           </div>
         ) : filteredStudents.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500">Khong co thieu nhi nao</p>
+            <p className="text-gray-500 dark:text-gray-400">Khong co thieu nhi nao</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 dark:divide-white/10">
             {filteredStudents.map((student) => (
-              <div key={student.id} className="p-4 flex items-center justify-between hover:bg-gray-50 gap-3">
+              <div key={student.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-white/5 gap-3">
                 <div className="flex items-center gap-3">
                   {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-white/20 flex items-center justify-center overflow-hidden">
                     {student.avatar_url ? (
                       <img src={student.avatar_url} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-gray-500 text-sm font-medium">
+                      <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">
                         {student.full_name.charAt(0)}
                       </span>
                     )}
@@ -566,11 +566,11 @@ export default function CompensatoryAttendancePage() {
 
                   {/* Info */}
                   <div>
-                    <p className="font-medium text-gray-900">
-                      {student.saint_name && <span className="text-gray-500">{student.saint_name} </span>}
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {student.saint_name && <span className="text-gray-500 dark:text-gray-400">{student.saint_name} </span>}
                       {student.full_name}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                       {student.student_code && <span className="mr-2">MS: {student.student_code}</span>}
                       {student.class_name}
                     </p>

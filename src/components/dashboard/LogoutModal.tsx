@@ -44,7 +44,7 @@ export default function LogoutModal({ isOpen, onClose, onConfirm }: LogoutModalP
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div
         ref={modalRef}
-        className="bg-white rounded-[16px] p-8 w-[320px] flex flex-col gap-4 items-center"
+        className="bg-white dark:bg-[#1a1a1a] rounded-[16px] p-8 w-[320px] flex flex-col gap-4 items-center"
       >
         {/* Icon */}
         <div className="flex items-start p-4 rounded-full bg-gradient-to-b from-[rgba(250,134,94,0.16)] to-transparent border border-[#fff0f3]">
@@ -55,8 +55,8 @@ export default function LogoutModal({ isOpen, onClose, onConfirm }: LogoutModalP
 
         {/* Content */}
         <div className="flex flex-col gap-2 text-center w-full">
-          <h2 className="text-[22px] font-semibold text-black">Đăng xuất</h2>
-          <p className="text-xs text-black/40">
+          <h2 className="text-[22px] font-semibold text-black dark:text-white">Đăng xuất</h2>
+          <p className="text-xs text-black/40 dark:text-white/60">
             Bạn chắc chắn muốn đăng xuất Giáo xứ Thiên Ân?
           </p>
         </div>
@@ -65,7 +65,7 @@ export default function LogoutModal({ isOpen, onClose, onConfirm }: LogoutModalP
         <div className="flex gap-4 w-full">
           <button
             onClick={onClose}
-            className="flex-1 h-[38px] px-4 py-2 bg-[#f6f6f6] rounded-full text-base font-semibold text-black hover:bg-[#e5e1dc] transition-colors"
+            className="flex-1 h-[38px] px-4 py-2 bg-[#f6f6f6] dark:bg-white/10 rounded-full text-base font-semibold text-black dark:text-white hover:bg-[#e5e1dc] dark:hover:bg-white/20 transition-colors"
           >
             Hủy
           </button>

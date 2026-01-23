@@ -67,7 +67,7 @@ export default function AttendanceConfirmModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-[16px] w-[450px] px-8 pt-8 pb-8 shadow-xl">
+      <div className="relative bg-white dark:bg-[#1a1a1a] rounded-[16px] w-[450px] px-8 pt-8 pb-8 shadow-xl">
         {/* Avatar */}
         <div className="flex justify-center mb-4">
           <div className="w-[66px] h-[66px] rounded-[12px] bg-[#E5E1DC] flex items-center justify-center overflow-hidden">
@@ -86,7 +86,7 @@ export default function AttendanceConfirmModal({
         </div>
 
         {/* Student Name */}
-        <h2 className={`text-center text-lg font-bold text-black ${studentCode ? 'mb-1' : 'mb-6'}`}>
+        <h2 className={`text-center text-lg font-bold text-black dark:text-white ${studentCode ? 'mb-1' : 'mb-6'}`}>
           {studentName}
         </h2>
 
@@ -98,10 +98,10 @@ export default function AttendanceConfirmModal({
         )}
 
         {/* Attendance Info Card */}
-        <div className="border border-[#E5E1DC] rounded-[16px] overflow-hidden mb-8">
+        <div className="border border-[#E5E1DC] dark:border-white/10 rounded-[16px] overflow-hidden mb-8">
           {/* Card Header */}
-          <div className="px-5 py-4 border-b border-[#E5E1DC]">
-            <p className="text-sm font-medium text-black">
+          <div className="px-5 py-4 border-b border-[#E5E1DC] dark:border-white/10">
+            <p className="text-sm font-medium text-black dark:text-white">
               Điểm danh {getDayName(dayType)} ({formatDisplayDate(attendanceDate)})
             </p>
           </div>
@@ -120,7 +120,7 @@ export default function AttendanceConfirmModal({
                     strokeLinejoin="round"
                   />
                 </svg>
-                <span className="text-sm text-black">{age} tuổi</span>
+                <span className="text-sm text-black dark:text-white">{age} tuổi</span>
               </div>
             )}
 
@@ -135,7 +135,7 @@ export default function AttendanceConfirmModal({
                   strokeLinejoin="round"
                 />
               </svg>
-              <span className="text-sm text-black">Buổi: {getSessionLabel(dayType)}</span>
+              <span className="text-sm text-black dark:text-white">Buổi: {getSessionLabel(dayType)}</span>
             </div>
           </div>
         </div>
@@ -146,7 +146,7 @@ export default function AttendanceConfirmModal({
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="flex-1 h-[56px] bg-[#F6F6F6] text-black text-base font-medium rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50"
+            className="flex-1 h-[56px] bg-[#F6F6F6] dark:bg-white/10 text-black dark:text-white text-base font-medium rounded-full hover:bg-gray-200 dark:hover:bg-white/20 transition-colors disabled:opacity-50"
           >
             Hủy
           </button>

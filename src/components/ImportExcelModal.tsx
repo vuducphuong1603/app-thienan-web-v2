@@ -54,7 +54,7 @@ export default function ImportExcelModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-[20px] w-[420px] px-8 pt-8 pb-8 shadow-xl">
+      <div className="relative bg-white dark:bg-[#1a1a1a] rounded-[20px] w-[420px] px-8 pt-8 pb-8 shadow-xl">
         {/* Icon */}
         <div className="flex justify-center mb-5">
           <div className="w-[56px] h-[56px] rounded-full bg-[rgba(250,134,94,0.15)] flex items-center justify-center">
@@ -67,12 +67,12 @@ export default function ImportExcelModal({
         </div>
 
         {/* Title */}
-        <h2 className="text-center text-xl font-bold text-black mb-1">
+        <h2 className="text-center text-xl font-bold text-black dark:text-white mb-1">
           Import điểm danh từ Excel
         </h2>
 
         {/* Subtitle */}
-        <p className="text-center text-sm text-[#666d80] mb-1">
+        <p className="text-center text-sm text-[#666d80] dark:text-gray-400 mb-1">
           Chọn file Excel
         </p>
 
@@ -82,10 +82,10 @@ export default function ImportExcelModal({
         </p>
 
         {/* Current Settings Card */}
-        <div className="border border-[#E5E1DC] rounded-[16px] overflow-hidden mb-5">
+        <div className="border border-[#E5E1DC] dark:border-white/10 rounded-[16px] overflow-hidden mb-5">
           {/* Card Header */}
-          <div className="px-5 py-3 border-b border-[#E5E1DC] bg-[#FAFAFA]">
-            <p className="text-sm font-medium text-black">
+          <div className="px-5 py-3 border-b border-[#E5E1DC] dark:border-white/10 bg-[#FAFAFA] dark:bg-white/5">
+            <p className="text-sm font-medium text-black dark:text-white">
               Thiết lập hiện tại
             </p>
           </div>
@@ -105,7 +105,7 @@ export default function ImportExcelModal({
                   />
                 </svg>
               </div>
-              <span className="text-sm text-black">Ngày: {formatDisplayDate(selectedDate)}</span>
+              <span className="text-sm text-black dark:text-white">Ngày: {formatDisplayDate(selectedDate)}</span>
             </div>
 
             {/* Day Type */}
@@ -121,15 +121,15 @@ export default function ImportExcelModal({
                   />
                 </svg>
               </div>
-              <span className="text-sm text-black">Buổi: {getDayName(dayType)}</span>
+              <span className="text-sm text-black dark:text-white">Buổi: {getDayName(dayType)}</span>
             </div>
           </div>
         </div>
 
         {/* Instructions */}
         <div className="mb-6">
-          <p className="text-sm font-medium text-black mb-2">Hướng dẫn</p>
-          <ul className="space-y-1.5 text-sm text-[#666d80]">
+          <p className="text-sm font-medium text-black dark:text-white mb-2">Hướng dẫn</p>
+          <ul className="space-y-1.5 text-sm text-[#666d80] dark:text-gray-400">
             <li className="flex items-start gap-2">
               <span className="text-[#666d80] mt-0.5">•</span>
               <span>File Excel chỉ cần 1 cột chứa mã thiếu nhi</span>
@@ -160,7 +160,7 @@ export default function ImportExcelModal({
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="flex-1 h-[52px] bg-[#F6F6F6] text-black text-base font-medium rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50"
+            className="flex-1 h-[52px] bg-[#F6F6F6] dark:bg-white/10 text-black dark:text-white text-base font-medium rounded-full hover:bg-gray-200 dark:hover:bg-white/20 transition-colors disabled:opacity-50"
           >
             Hủy
           </button>
