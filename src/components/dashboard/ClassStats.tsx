@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 interface BranchData {
@@ -60,9 +61,12 @@ function ArrowIcon({ className }: { className?: string }) {
   )
 }
 
-function BranchCard({ branch }: { branch: BranchData }) {
+function BranchCard({ branch, onClick }: { branch: BranchData; onClick?: () => void }) {
   return (
-    <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/20 dark:border-white/10 rounded-[14px] px-[18px] py-[7px]">
+    <div
+      className="bg-[#F6F6F6] dark:bg-white/5 border border-white/20 dark:border-white/10 rounded-[14px] px-[18px] py-[7px] cursor-pointer hover:border-brand/50 transition-colors"
+      onClick={onClick}
+    >
       {/* Branch Name */}
       <p className="text-xs text-black dark:text-white mb-4">{branch.name}</p>
 
@@ -259,6 +263,7 @@ function LineChart({ branchesData }: { branchesData: BranchData[] }) {
 }
 
 export default function ClassStats() {
+  const router = useRouter()
   const [branchesData, setBranchesData] = useState<BranchData[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -386,7 +391,11 @@ export default function ClassStats() {
           </div>
         ) : (
           branchesData.map((branch, index) => (
-            <BranchCard key={index} branch={branch} />
+            <BranchCard
+              key={index}
+              branch={branch}
+              onClick={() => router.push(`/admin/management/classes?branch=${encodeURIComponent(branch.name)}`)}
+            />
           ))
         )}
       </div>

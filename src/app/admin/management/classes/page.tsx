@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase, Class, BRANCHES, Branch } from '@/lib/supabase'
 import { Search, ChevronDown, Plus, Edit2, Eye, Trash2 } from 'lucide-react'
 import AddClassForm from '@/components/management/AddClassForm'
@@ -14,10 +15,17 @@ interface ClassWithDetails extends Class {
 type FilterBranch = 'all' | Branch
 
 export default function ClassesPage() {
+  const searchParams = useSearchParams()
+  const branchParam = searchParams.get('branch')
+  const matchedBranch = branchParam
+    ? BRANCHES.find(b => b.toLowerCase() === branchParam.toLowerCase())
+    : undefined
+  const initialBranch: FilterBranch = matchedBranch || 'all'
+
   const [classes, setClasses] = useState<ClassWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterBranch, setFilterBranch] = useState<FilterBranch>('all')
+  const [filterBranch, setFilterBranch] = useState<FilterBranch>(initialBranch)
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false)
   const [showAddClassForm, setShowAddClassForm] = useState(false)
   const [showEditClassForm, setShowEditClassForm] = useState(false)
@@ -112,6 +120,13 @@ export default function ClassesPage() {
   useEffect(() => {
     fetchClasses()
   }, [fetchClasses])
+
+  // Sync filterBranch with URL parameter
+  useEffect(() => {
+    if (matchedBranch) {
+      setFilterBranch(matchedBranch)
+    }
+  }, [matchedBranch])
 
   // Filter classes based on search and branch filter
   const filteredClasses = classes.filter((cls) => {
