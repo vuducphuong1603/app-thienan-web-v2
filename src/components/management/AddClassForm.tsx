@@ -69,20 +69,20 @@ export default function AddClassForm({ onBack, onSuccess }: AddClassFormProps) {
   }
 
   return (
-    <div className="bg-[#F6F6F6] border border-white/60 rounded-2xl p-6">
+    <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 rounded-2xl p-6">
       {/* Header Section */}
       <div className="flex flex-col gap-1.5 py-0.5">
         {/* Back Button */}
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-primary-3 hover:text-black transition-colors w-fit"
+          className="flex items-center gap-1.5 text-primary-3 hover:text-black dark:hover:text-white transition-colors w-fit"
         >
           <ArrowLeft className="w-6 h-6" />
           <span className="text-xs">Quay trở lại</span>
         </button>
 
         {/* Title */}
-        <h1 className="text-[40px] font-bold text-black leading-none">Thêm lớp mới</h1>
+        <h1 className="text-[40px] font-bold text-black dark:text-white leading-none">Thêm lớp mới</h1>
 
         {/* Subtitle */}
         <p className="text-sm text-primary-1">
@@ -93,15 +93,15 @@ export default function AddClassForm({ onBack, onSuccess }: AddClassFormProps) {
       {/* Main Content */}
       <div className="flex flex-col gap-4 mt-2">
         {/* Divider */}
-        <div className="h-px bg-[#E5E1DC] w-full" />
+        <div className="h-px bg-[#E5E1DC] dark:bg-white/10 w-full" />
 
         {/* Form Fields Row */}
         <div className="flex gap-3">
           {/* Class Name Input */}
           <div className="flex flex-col gap-1.5 w-[511px]">
-            <label className="text-sm font-medium text-black">Tên lớp</label>
+            <label className="text-sm font-medium text-black dark:text-white">Tên lớp</label>
             <div
-              className={`h-[43px] px-4 bg-white rounded-full flex items-center ${
+              className={`h-[43px] px-4 bg-white dark:bg-white/10 rounded-full flex items-center ${
                 errors.name ? 'ring-2 ring-red-500' : ''
               }`}
             >
@@ -110,7 +110,7 @@ export default function AddClassForm({ onBack, onSuccess }: AddClassFormProps) {
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 placeholder="VD: Chiên 1"
-                className="flex-1 text-xs text-black placeholder:text-black bg-transparent border-none focus:outline-none"
+                className="flex-1 text-xs text-black dark:text-white placeholder:text-black dark:placeholder:text-gray-500 bg-transparent border-none focus:outline-none"
               />
             </div>
             {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
@@ -118,23 +118,23 @@ export default function AddClassForm({ onBack, onSuccess }: AddClassFormProps) {
 
           {/* Branch Dropdown */}
           <div className="flex flex-col gap-1.5 flex-1">
-            <label className="text-sm font-medium text-black">Ngành</label>
+            <label className="text-sm font-medium text-black dark:text-white">Ngành</label>
             <div className="relative">
               <button
                 onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-                className={`w-full h-[43px] px-4 bg-white rounded-[25px] text-xs flex items-center justify-between ${
+                className={`w-full h-[43px] px-4 bg-white dark:bg-white/10 rounded-[25px] text-xs flex items-center justify-between ${
                   errors.branch ? 'ring-2 ring-red-500' : ''
-                } ${formData.branch ? 'text-black' : 'text-black'}`}
+                } ${formData.branch ? 'text-black dark:text-white' : 'text-black dark:text-white'}`}
               >
                 <span>{formData.branch || 'Chọn ngành'}</span>
                 <ChevronDown
-                  className={`w-[18px] h-[9px] transition-transform text-black ${
+                  className={`w-[18px] h-[9px] transition-transform text-black dark:text-white ${
                     isBranchDropdownOpen ? 'rotate-180' : ''
                   }`}
                 />
               </button>
               {isBranchDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden">
+                <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden">
                   {BRANCHES.map((branch) => (
                     <button
                       key={branch}
@@ -142,8 +142,8 @@ export default function AddClassForm({ onBack, onSuccess }: AddClassFormProps) {
                         handleInputChange('branch', branch)
                         setIsBranchDropdownOpen(false)
                       }}
-                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${
-                        formData.branch === branch ? 'bg-brand/10 text-brand' : 'text-black'
+                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${
+                        formData.branch === branch ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'
                       }`}
                     >
                       {branch}
@@ -162,7 +162,7 @@ export default function AddClassForm({ onBack, onSuccess }: AddClassFormProps) {
         <button
           onClick={onBack}
           disabled={isSubmitting}
-          className="h-[49px] w-[131px] bg-[#E5E1DC] rounded-full text-base font-semibold text-black hover:bg-[#D5D1CC] transition-colors disabled:opacity-50"
+          className="h-[49px] w-[131px] bg-[#E5E1DC] dark:bg-white/10 rounded-full text-base font-semibold text-black dark:text-white hover:bg-[#D5D1CC] dark:hover:bg-white/20 transition-colors disabled:opacity-50"
         >
           Hủy
         </button>

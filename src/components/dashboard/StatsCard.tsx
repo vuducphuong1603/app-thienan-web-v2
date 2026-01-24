@@ -182,7 +182,7 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
     if (icon === 'branch') {
       // Graph/chart icon for "Tổng số ngành"
       return (
-        <div className={`w-11 h-11 rounded-full flex items-center justify-center ${isPrimary ? 'bg-white/10' : 'bg-gray-50'}`}>
+        <div className={`w-11 h-11 rounded-full flex items-center justify-center ${isPrimary ? 'bg-white/10' : 'bg-gray-50 dark:bg-white/10'}`}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path
               d="M16 10L13.5 14L11.5 12L8 16M8 10V16M16 16V14"
@@ -198,7 +198,7 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
     if (icon === 'class') {
       // Heartbeat/pulse icon for "Tổng số lớp"
       return (
-        <div className="w-11 h-11 rounded-full bg-black/5 flex items-center justify-center">
+        <div className="w-11 h-11 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path
               d="M3 12H7L10 6L14 18L17 12H21"
@@ -214,7 +214,7 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
     if (icon === 'student') {
       // Moon/night icon for "Tổng thiếu nhi"
       return (
-        <div className="w-11 h-11 rounded-full bg-black/5 flex items-center justify-center">
+        <div className="w-11 h-11 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path
               d="M12 3C10.22 3 8.47 3.53 6.97 4.51C5.47 5.5 4.28 6.9 3.54 8.55C2.8 10.2 2.55 12.01 2.83 13.78C3.1 15.54 3.88 17.18 5.05 18.49C6.23 19.81 7.75 20.74 9.44 21.18C11.13 21.62 12.91 21.55 14.56 20.98C16.21 20.41 17.66 19.37 18.72 18C19.78 16.62 20.41 14.97 20.53 13.24"
@@ -236,7 +236,7 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
     if (icon === 'teacher') {
       // Water drop icon for "Giáo lý viên"
       return (
-        <div className="w-11 h-11 rounded-full bg-black/5 flex items-center justify-center">
+        <div className="w-11 h-11 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center">
           <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
             <path
               d="M10.94 6.05C10.17 5.16 9.3 4.36 8.35 3.66C8.27 3.6 8.17 3.57 8.07 3.57C7.96 3.57 7.86 3.6 7.78 3.66C6.83 4.36 5.97 5.16 5.19 6.05C3.48 8.03 2.57 10.11 2.57 12.07C2.57 13.53 3.15 14.93 4.18 15.96C5.21 16.99 6.61 17.57 8.07 17.57C9.53 17.57 10.93 16.99 11.96 15.96C12.99 14.93 13.57 13.53 13.57 12.07C13.57 10.11 12.66 8.03 10.94 6.05Z"
@@ -263,12 +263,12 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
       className={`rounded-[15px] p-4 h-[120px] flex flex-col justify-between ${
         isPrimary
           ? 'bg-brand text-white'
-          : 'bg-white border border-gray-100'
+          : 'bg-white dark:bg-white/10 border border-gray-100 dark:border-white/10'
       } ${href ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
     >
       {/* Top row: Title and Icon */}
       <div className="flex items-start justify-between">
-        <span className={`text-sm font-medium ${isPrimary ? 'text-white/80' : 'text-gray-500'}`}>
+        <span className={`text-sm font-medium ${isPrimary ? 'text-white/80' : 'text-gray-500 dark:text-gray-300'}`}>
           {title}
         </span>
         {renderIcon()}
@@ -276,7 +276,7 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
 
       {/* Bottom row: Value and Chart */}
       <div className="flex items-end justify-between">
-        <span className={`text-4xl font-bold ${isPrimary ? 'text-white' : 'text-gray-900'}`}>
+        <span className={`text-4xl font-bold ${isPrimary ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
           {value}
         </span>
         {renderChart()}

@@ -203,28 +203,28 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
 
       {/* Modal */}
       <div className="relative min-h-screen flex items-start justify-center py-8 px-4">
-        <div className="relative bg-[#F6F6F6] w-full max-w-[1000px] rounded-2xl border border-white/60 overflow-hidden">
+        <div className="relative bg-[#F6F6F6] dark:bg-white/5 w-full max-w-[1000px] rounded-2xl border border-white/60 overflow-hidden">
           {/* Header */}
-          <div className="px-6 py-4 bg-[#F6F6F6]">
+          <div className="px-6 py-4 bg-[#F6F6F6] dark:bg-transparent">
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-1.5">
                 {/* Back Button */}
                 <button
                   onClick={onClose}
-                  className="flex items-center gap-1.5 text-[#666d80] hover:text-black transition-colors"
+                  className="flex items-center gap-1.5 text-[#666d80] hover:text-black dark:hover:text-white transition-colors"
                 >
                   <ChevronLeft className="w-5 h-5" />
                   <span className="text-xs">Quay trở lại</span>
                 </button>
                 {/* Title */}
-                <h1 className="text-[40px] font-bold text-black leading-tight">Thêm thiếu nhi</h1>
+                <h1 className="text-[40px] font-bold text-black dark:text-white leading-tight">Thêm thiếu nhi</h1>
               </div>
 
               {/* Action Buttons */}
               <div className="flex items-center gap-3">
                 <button
                   onClick={onClose}
-                  className="h-10 px-6 bg-white rounded-full text-sm font-bold text-black hover:bg-gray-50 transition-colors"
+                  className="h-10 px-6 bg-white dark:bg-white/10 rounded-full text-sm font-bold text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/20 transition-colors"
                 >
                   Hủy
                 </button>
@@ -240,12 +240,12 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
           </div>
 
           {/* Content */}
-          <div className="bg-white mx-6 mb-6 rounded-3xl p-6 overflow-y-auto max-h-[calc(100vh-200px)]">
+          <div className="bg-white dark:bg-[#1a1a1a] mx-6 mb-6 rounded-3xl p-6 overflow-y-auto max-h-[calc(100vh-200px)]">
             {/* Personal Information Section */}
-            <div className="flex gap-6 pb-6 border-b border-[#E5E1DC]">
+            <div className="flex gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
               {/* Left side - Section title */}
               <div className="w-[280px] flex-shrink-0">
-                <h2 className="text-lg font-bold text-black">Thông tin cá nhân</h2>
+                <h2 className="text-lg font-bold text-black dark:text-white">Thông tin cá nhân</h2>
                 <p className="text-xs text-[#666d80] mt-1">
                   Xem và cập nhật chi tiết tài khoản, thông tin và nhiều hơn thế nữa
                 </p>
@@ -305,7 +305,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                       value={formData.student_code}
                       onChange={(e) => handleChange('student_code', e.target.value)}
                       placeholder="VD: HA172336"
-                      className={`w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand ${errors.student_code ? 'ring-1 ring-red-500' : ''}`}
+                      className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand ${errors.student_code ? 'ring-1 ring-red-500' : ''}`}
                     />
                     {errors.student_code && <p className="text-xs text-red-500 mt-1">{errors.student_code}</p>}
                   </div>
@@ -320,16 +320,16 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                       onClick={() => setIsClassDropdownOpen(!isClassDropdownOpen)}
                       className={`w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-left flex items-center justify-between ${errors.class_id ? 'ring-1 ring-red-500' : ''}`}
                     >
-                      <span className={formData.class_id ? 'text-black' : 'text-[#8B8685]'}>
+                      <span className={formData.class_id ? 'text-black dark:text-white' : 'text-[#8B8685]'}>
                         {formData.class_id ? getClassName(formData.class_id) : 'Chọn lớp'}
                       </span>
                       <ChevronLeft className={`w-4 h-4 text-[#8B8685] transition-transform ${isClassDropdownOpen ? 'rotate-90' : '-rotate-90'}`} />
                     </button>
                     {isClassDropdownOpen && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 max-h-[200px] overflow-y-auto">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 max-h-[200px] overflow-y-auto">
                         {Object.entries(classesGroupedByBranch).map(([branch, branchClasses]) => (
                           <div key={branch}>
-                            <div className="px-4 py-2 text-xs font-semibold text-[#666d80] uppercase bg-gray-50">
+                            <div className="px-4 py-2 text-xs font-semibold text-[#666d80] uppercase bg-gray-50 dark:bg-white/5">
                               {branch}
                             </div>
                             {branchClasses.map((cls) => (
@@ -340,7 +340,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                                   handleChange('class_id', cls.id)
                                   setIsClassDropdownOpen(false)
                                 }}
-                                className={`w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 ${formData.class_id === cls.id ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                                className={`w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-white/10 ${formData.class_id === cls.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                               >
                                 {cls.name}
                               </button>
@@ -364,7 +364,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                       value={formData.saint_name}
                       onChange={(e) => handleChange('saint_name', e.target.value)}
                       placeholder="VD: Têrêsa Avila"
-                      className={`w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand ${errors.saint_name ? 'ring-1 ring-red-500' : ''}`}
+                      className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand ${errors.saint_name ? 'ring-1 ring-red-500' : ''}`}
                     />
                     {errors.saint_name && <p className="text-xs text-red-500 mt-1">{errors.saint_name}</p>}
                   </div>
@@ -377,7 +377,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                       value={formData.full_name}
                       onChange={(e) => handleChange('full_name', e.target.value)}
                       placeholder="VD: Hoàng Nguyễn Khả Ái"
-                      className={`w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand ${errors.full_name ? 'ring-1 ring-red-500' : ''}`}
+                      className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand ${errors.full_name ? 'ring-1 ring-red-500' : ''}`}
                     />
                     {errors.full_name && <p className="text-xs text-red-500 mt-1">{errors.full_name}</p>}
                   </div>
@@ -406,7 +406,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                       value={formData.phone}
                       onChange={(e) => handleChange('phone', e.target.value)}
                       placeholder="VD: 0987654321"
-                      className="w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand"
+                      className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand"
                     />
                   </div>
                 </div>
@@ -422,7 +422,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                       value={formData.parent_phone}
                       onChange={(e) => handleChange('parent_phone', e.target.value)}
                       placeholder="VD: 0123456789"
-                      className={`w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand ${errors.parent_phone ? 'ring-1 ring-red-500' : ''}`}
+                      className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand ${errors.parent_phone ? 'ring-1 ring-red-500' : ''}`}
                     />
                     {errors.parent_phone && <p className="text-xs text-red-500 mt-1">{errors.parent_phone}</p>}
                   </div>
@@ -435,7 +435,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                       value={formData.parent_phone_2}
                       onChange={(e) => handleChange('parent_phone_2', e.target.value)}
                       placeholder="VD: 0987654321"
-                      className="w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand"
+                      className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand"
                     />
                   </div>
                 </div>
@@ -450,16 +450,16 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                     onChange={(e) => handleChange('address', e.target.value)}
                     placeholder="Nhập địa chỉ..."
                     rows={2}
-                    className="w-full px-4 py-3 bg-white border border-[#E5E1DC] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand resize-none"
+                    className="w-full px-4 py-3 bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/20 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand resize-none"
                   />
                 </div>
               </div>
             </div>
 
             {/* Notes Section */}
-            <div className="flex gap-6 py-6 border-b border-[#E5E1DC]">
+            <div className="flex gap-6 py-6 border-b border-[#E5E1DC] dark:border-white/10">
               <div className="w-[280px] flex-shrink-0">
-                <h2 className="text-lg font-bold text-black">Ghi chú</h2>
+                <h2 className="text-lg font-bold text-black dark:text-white">Ghi chú</h2>
                 <p className="text-xs text-[#666d80] mt-1">Ghi chú về thiếu nhi</p>
               </div>
               <div className="flex-1">
@@ -468,7 +468,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                   onChange={(e) => handleChange('notes', e.target.value)}
                   placeholder="Nhập ghi chú..."
                   rows={4}
-                  className="w-full px-4 py-3 bg-white border border-[#E5E1DC] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand resize-none"
+                  className="w-full px-4 py-3 bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/20 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand resize-none"
                 />
               </div>
             </div>
@@ -476,7 +476,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
             {/* Scores Section */}
             <div className="flex gap-6 pt-6">
               <div className="w-[280px] flex-shrink-0">
-                <h2 className="text-lg font-bold text-black">Điểm số giáo lý</h2>
+                <h2 className="text-lg font-bold text-black dark:text-white">Điểm số giáo lý</h2>
                 <div className="text-xs text-[#666d80] mt-1">
                   <p>Lưu ý: Điểm điểm danh và điểm tổng sẽ được tính tự động dựa trên:</p>
                   <ul className="list-disc ml-4 mt-1 space-y-0.5">
@@ -488,9 +488,9 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
 
               <div className="flex-1 space-y-4">
                 {/* Học kỳ 1 Card */}
-                <div className="border border-[#E5E1DC] rounded-2xl overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC]">
-                    <h3 className="text-base font-semibold text-black">Học kỳ 1</h3>
+                <div className="border border-[#E5E1DC] dark:border-white/10 rounded-2xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC] dark:border-white/10">
+                    <h3 className="text-base font-semibold text-black dark:text-white">Học kỳ 1</h3>
                   </div>
                   <div className="p-4">
                     <div className="flex gap-3">
@@ -506,7 +506,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                           value={formData.score_45_hk1}
                           onChange={(e) => handleChange('score_45_hk1', e.target.value)}
                           placeholder="0"
-                          className="w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand"
+                          className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand"
                         />
                       </div>
                       <div className="flex-1">
@@ -521,7 +521,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                           value={formData.score_exam_hk1}
                           onChange={(e) => handleChange('score_exam_hk1', e.target.value)}
                           placeholder="0"
-                          className="w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand"
+                          className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand"
                         />
                       </div>
                     </div>
@@ -529,9 +529,9 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                 </div>
 
                 {/* Học kỳ 2 Card */}
-                <div className="border border-[#E5E1DC] rounded-2xl overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC]">
-                    <h3 className="text-base font-semibold text-black">Học kỳ 2</h3>
+                <div className="border border-[#E5E1DC] dark:border-white/10 rounded-2xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC] dark:border-white/10">
+                    <h3 className="text-base font-semibold text-black dark:text-white">Học kỳ 2</h3>
                   </div>
                   <div className="p-4">
                     <div className="flex gap-3">
@@ -547,7 +547,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                           value={formData.score_45_hk2}
                           onChange={(e) => handleChange('score_45_hk2', e.target.value)}
                           placeholder="0"
-                          className="w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand"
+                          className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand"
                         />
                       </div>
                       <div className="flex-1">
@@ -562,7 +562,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                           value={formData.score_exam_hk2}
                           onChange={(e) => handleChange('score_exam_hk2', e.target.value)}
                           placeholder="0"
-                          className="w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand"
+                          className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand"
                         />
                       </div>
                     </div>
@@ -570,12 +570,12 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                 </div>
 
                 {/* Điểm trung bình năm học Card */}
-                <div className="border border-[#E5E1DC] rounded-2xl overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC]">
-                    <h3 className="text-base font-semibold text-black">Điểm trung bình năm học</h3>
+                <div className="border border-[#E5E1DC] dark:border-white/10 rounded-2xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC] dark:border-white/10">
+                    <h3 className="text-base font-semibold text-black dark:text-white">Điểm trung bình năm học</h3>
                   </div>
                   <div className="p-4">
-                    <p className="text-lg font-bold text-black">{calculateYearAverage()}</p>
+                    <p className="text-lg font-bold text-black dark:text-white">{calculateYearAverage()}</p>
                     <p className="text-sm text-[#666d80] mt-1">
                       Công thức: (45&apos; HK1 + 45&apos; HK2 + Thi HK1x2 + Thi HK2x2) / 6
                     </p>

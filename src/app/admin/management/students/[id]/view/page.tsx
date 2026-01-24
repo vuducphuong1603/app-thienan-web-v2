@@ -140,7 +140,7 @@ export default function ViewStudentPage() {
 
   if (isLoading) {
     return (
-      <div className="bg-[#F6F6F6] border border-white/60 rounded-2xl min-h-[calc(100vh-140px)] flex items-center justify-center">
+      <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 dark:border-white/10 rounded-2xl min-h-[calc(100vh-140px)] flex items-center justify-center">
         <div className="flex items-center gap-3">
           <svg
             className="animate-spin h-8 w-8 text-brand"
@@ -170,7 +170,7 @@ export default function ViewStudentPage() {
   const { avgCatechism, avgAttendance, totalAvg } = calculateAverages()
 
   return (
-    <div className="bg-[#F6F6F6] border border-white/60 rounded-2xl min-h-[calc(100vh-140px)]">
+    <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 dark:border-white/10 rounded-2xl min-h-[calc(100vh-140px)]">
       {/* Header */}
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
@@ -178,20 +178,20 @@ export default function ViewStudentPage() {
             {/* Back Button */}
             <button
               onClick={() => router.push('/admin/management/students')}
-              className="flex items-center gap-1.5 text-[#666d80] hover:text-black transition-colors"
+              className="flex items-center gap-1.5 text-[#666d80] hover:text-black dark:hover:text-white transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
               <span className="text-xs">Quay trở lại</span>
             </button>
             {/* Title */}
-            <h1 className="text-[40px] font-bold text-black leading-tight">Thông tin thiếu nhi</h1>
+            <h1 className="text-[40px] font-bold text-black dark:text-white leading-tight">Thông tin thiếu nhi</h1>
           </div>
 
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/admin/management/students')}
-              className="h-10 px-6 bg-white rounded-full text-sm font-bold text-black hover:bg-gray-50 transition-colors"
+              className="h-10 px-6 bg-white dark:bg-white/10 rounded-full text-sm font-bold text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
             >
               Đóng
             </button>
@@ -200,12 +200,12 @@ export default function ViewStudentPage() {
       </div>
 
       {/* Content */}
-      <div className="bg-white mx-6 mb-6 rounded-3xl p-6">
+      <div className="bg-white dark:bg-white/10 mx-6 mb-6 rounded-3xl p-6">
         {/* Personal Information Section */}
-        <div className="flex gap-6 pb-6 border-b border-[#E5E1DC]">
+        <div className="flex gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
           {/* Left side - Section title */}
           <div className="w-[280px] flex-shrink-0">
-            <h2 className="text-lg font-bold text-black">Thông tin cá nhân</h2>
+            <h2 className="text-lg font-bold text-black dark:text-white">Thông tin cá nhân</h2>
             <p className="text-xs text-[#666d80] mt-1">
               Thông tin chi tiết về thiếu nhi
             </p>
@@ -223,7 +223,7 @@ export default function ViewStudentPage() {
                 )}
               </div>
               <div className="flex flex-col gap-2">
-                <span className="text-xl font-semibold text-black">
+                <span className="text-xl font-semibold text-black dark:text-white">
                   {student.saint_name && `${student.saint_name} `}{student.full_name}
                 </span>
                 <div className="flex items-center gap-2">
@@ -234,7 +234,7 @@ export default function ViewStudentPage() {
                     </span>
                   )}
                   {age && (
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F6F6F6] text-[#8B8685]">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F6F6F6] dark:bg-white/10 text-[#8B8685]">
                       {age} tuổi
                     </span>
                   )}
@@ -249,13 +249,13 @@ export default function ViewStudentPage() {
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">Mã thiếu nhi</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {student.student_code || '-'}
                 </div>
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">Lớp</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {classInfo.name !== 'Chưa phân lớp' ? `${classInfo.name} (${classInfo.branch})` : 'Chưa phân lớp'}
                 </div>
               </div>
@@ -265,13 +265,13 @@ export default function ViewStudentPage() {
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">Tên thánh</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {student.saint_name || '-'}
                 </div>
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">Họ và tên</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {student.full_name}
                 </div>
               </div>
@@ -281,13 +281,13 @@ export default function ViewStudentPage() {
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">Ngày sinh</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {formatDate(student.date_of_birth)}
                 </div>
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">Giới tính</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {student.gender === 'male' ? 'Nam' : student.gender === 'female' ? 'Nữ' : '-'}
                 </div>
               </div>
@@ -297,13 +297,13 @@ export default function ViewStudentPage() {
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">Ngày rửa tội</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {formatDate(student.baptism_date)}
                 </div>
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">Ngày thêm sức</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {formatDate(student.confirmation_date)}
                 </div>
               </div>
@@ -313,7 +313,7 @@ export default function ViewStudentPage() {
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">SĐT thiếu nhi</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {student.phone || '-'}
                 </div>
               </div>
@@ -323,7 +323,7 @@ export default function ViewStudentPage() {
             {/* Row 6: Địa chỉ */}
             <div>
               <label className="block text-sm font-medium text-[#666d80] mb-1.5">Địa chỉ</label>
-              <div className="min-h-[60px] px-4 py-3 bg-[#F6F6F6] rounded-xl text-xs text-black">
+              <div className="min-h-[60px] px-4 py-3 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white">
                 {student.address || '-'}
               </div>
             </div>
@@ -331,22 +331,22 @@ export default function ViewStudentPage() {
         </div>
 
         {/* Contact Section */}
-        <div className="flex gap-6 py-6 border-b border-[#E5E1DC]">
+        <div className="flex gap-6 py-6 border-b border-[#E5E1DC] dark:border-white/10">
           <div className="w-[280px] flex-shrink-0">
-            <h2 className="text-lg font-bold text-black">Thông tin liên hệ</h2>
+            <h2 className="text-lg font-bold text-black dark:text-white">Thông tin liên hệ</h2>
             <p className="text-xs text-[#666d80] mt-1">Thông tin phụ huynh</p>
           </div>
           <div className="flex-1 space-y-4">
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">Tên phụ huynh</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {student.parent_name || '-'}
                 </div>
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">SĐT phụ huynh 1</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {student.parent_phone || '-'}
                 </div>
               </div>
@@ -354,7 +354,7 @@ export default function ViewStudentPage() {
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">SĐT phụ huynh 2</label>
-                <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-xs text-black flex items-center">
+                <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white flex items-center">
                   {student.parent_phone_2 || '-'}
                 </div>
               </div>
@@ -364,13 +364,13 @@ export default function ViewStudentPage() {
         </div>
 
         {/* Notes Section */}
-        <div className="flex gap-6 py-6 border-b border-[#E5E1DC]">
+        <div className="flex gap-6 py-6 border-b border-[#E5E1DC] dark:border-white/10">
           <div className="w-[280px] flex-shrink-0">
-            <h2 className="text-lg font-bold text-black">Ghi chú</h2>
+            <h2 className="text-lg font-bold text-black dark:text-white">Ghi chú</h2>
             <p className="text-xs text-[#666d80] mt-1">Ghi chú về thiếu nhi</p>
           </div>
           <div className="flex-1">
-            <div className="min-h-[80px] px-4 py-3 bg-[#F6F6F6] rounded-xl text-xs text-black">
+            <div className="min-h-[80px] px-4 py-3 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white">
               {student.notes || '-'}
             </div>
           </div>
@@ -379,7 +379,7 @@ export default function ViewStudentPage() {
         {/* Scores Section */}
         <div className="flex gap-6 pt-6">
           <div className="w-[280px] flex-shrink-0">
-            <h2 className="text-lg font-bold text-black">Điểm số giáo lý</h2>
+            <h2 className="text-lg font-bold text-black dark:text-white">Điểm số giáo lý</h2>
             <div className="text-xs text-[#666d80] mt-1">
               <p>Điểm học tập và điểm danh</p>
             </div>
@@ -387,21 +387,21 @@ export default function ViewStudentPage() {
 
           <div className="flex-1 space-y-4">
             {/* Học kỳ 1 Card */}
-            <div className="border border-[#E5E1DC] rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC]">
-                <h3 className="text-base font-semibold text-black">Học kỳ 1</h3>
+            <div className="border border-[#E5E1DC] dark:border-white/10 rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC] dark:border-white/10">
+                <h3 className="text-base font-semibold text-black dark:text-white">Học kỳ 1</h3>
               </div>
               <div className="p-4">
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Điểm 45 phút</label>
-                    <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black flex items-center justify-center font-medium">
+                    <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
                       {(student.score_45_hk1 || 0).toFixed(1)}
                     </div>
                   </div>
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Điểm học kỳ (x2)</label>
-                    <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black flex items-center justify-center font-medium">
+                    <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
                       {(student.score_exam_hk1 || 0).toFixed(1)}
                     </div>
                   </div>
@@ -410,21 +410,21 @@ export default function ViewStudentPage() {
             </div>
 
             {/* Học kỳ 2 Card */}
-            <div className="border border-[#E5E1DC] rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC]">
-                <h3 className="text-base font-semibold text-black">Học kỳ 2</h3>
+            <div className="border border-[#E5E1DC] dark:border-white/10 rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC] dark:border-white/10">
+                <h3 className="text-base font-semibold text-black dark:text-white">Học kỳ 2</h3>
               </div>
               <div className="p-4">
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Điểm 45 phút</label>
-                    <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black flex items-center justify-center font-medium">
+                    <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
                       {(student.score_45_hk2 || 0).toFixed(1)}
                     </div>
                   </div>
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Điểm học kỳ (x2)</label>
-                    <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black flex items-center justify-center font-medium">
+                    <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
                       {(student.score_exam_hk2 || 0).toFixed(1)}
                     </div>
                   </div>
@@ -433,21 +433,21 @@ export default function ViewStudentPage() {
             </div>
 
             {/* Điểm danh Card */}
-            <div className="border border-[#E5E1DC] rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC]">
-                <h3 className="text-base font-semibold text-black">Điểm danh</h3>
+            <div className="border border-[#E5E1DC] dark:border-white/10 rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC] dark:border-white/10">
+                <h3 className="text-base font-semibold text-black dark:text-white">Điểm danh</h3>
               </div>
               <div className="p-4">
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Số buổi thứ 5</label>
-                    <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black flex items-center justify-center font-medium">
+                    <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
                       {student.attendance_thu5 || 0}
                     </div>
                   </div>
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Số buổi Chúa nhật</label>
-                    <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black flex items-center justify-center font-medium">
+                    <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
                       {student.attendance_cn || 0}
                     </div>
                   </div>
@@ -456,9 +456,9 @@ export default function ViewStudentPage() {
             </div>
 
             {/* Điểm trung bình Card */}
-            <div className="border border-[#E5E1DC] rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC]">
-                <h3 className="text-base font-semibold text-black">Điểm trung bình</h3>
+            <div className="border border-[#E5E1DC] dark:border-white/10 rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-4 border-b border-[#E5E1DC] dark:border-white/10">
+                <h3 className="text-base font-semibold text-black dark:text-white">Điểm trung bình</h3>
               </div>
               <div className="p-4">
                 <div className="flex gap-3">

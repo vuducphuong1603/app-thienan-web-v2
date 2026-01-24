@@ -113,7 +113,7 @@ export default function StudentAttendancePage() {
 
   if (loading) {
     return (
-      <div className="bg-[#F6F6F6] border border-white/60 rounded-2xl p-8">
+      <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 dark:border-white/10 rounded-2xl p-8">
         <div className="flex items-center justify-center py-16">
           <svg className="animate-spin h-8 w-8 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -126,7 +126,7 @@ export default function StudentAttendancePage() {
 
   if (!student) {
     return (
-      <div className="bg-[#F6F6F6] border border-white/60 rounded-2xl p-8">
+      <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 dark:border-white/10 rounded-2xl p-8">
         <div className="text-center py-16 text-primary-3">
           Không tìm thấy thiếu nhi
         </div>
@@ -218,10 +218,10 @@ export default function StudentAttendancePage() {
       className={`flex flex-col items-center justify-center h-[68px] rounded-[10px] ${
         attended
           ? 'bg-[rgba(250,134,94,0.2)] border-[0.5px] border-[#fa865e]'
-          : 'bg-[#f6f6f6]'
+          : 'bg-[#f6f6f6] dark:bg-white/5'
       }`}
     >
-      <span className={`text-xs ${attended ? 'text-black' : 'text-[#666d80]'}`}>Tuần {week}</span>
+      <span className={`text-xs ${attended ? 'text-black dark:text-white' : 'text-[#666d80]'}`}>Tuần {week}</span>
       {attended ? (
         <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-[#fa865e] flex items-center justify-center mt-1">
           <Check className="w-2.5 h-2.5 text-[#fa865e]" strokeWidth={3} />
@@ -234,7 +234,7 @@ export default function StudentAttendancePage() {
 
   // Calendar icon component
   const CalendarIcon = () => (
-    <svg className="w-[23px] h-[23px] text-black" viewBox="0 0 24 24" fill="currentColor">
+    <svg className="w-[23px] h-[23px] text-black dark:text-white" viewBox="0 0 24 24" fill="currentColor">
       <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zM9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm-8 4H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
     </svg>
   )
@@ -248,20 +248,20 @@ export default function StudentAttendancePage() {
   )
 
   return (
-    <div className="bg-[#F6F6F6] border border-white/60 rounded-2xl">
+    <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 dark:border-white/10 rounded-2xl">
       {/* Header */}
       <div className="px-6 py-5">
         {/* Back Button */}
         <button
           onClick={() => router.push('/admin/management/students')}
-          className="flex items-center gap-2 text-sm text-[#8B8685] hover:text-black transition-colors mb-2"
+          className="flex items-center gap-2 text-sm text-[#8B8685] hover:text-black dark:hover:text-white transition-colors mb-2"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Quay trở lại</span>
         </button>
 
         {/* Title */}
-        <h1 className="text-2xl font-bold text-black">
+        <h1 className="text-2xl font-bold text-black dark:text-white">
           Điểm danh thiếu nhi
         </h1>
       </div>
@@ -269,7 +269,7 @@ export default function StudentAttendancePage() {
       {/* Content */}
       <div className="p-6">
         {/* Student Info */}
-        <div className="bg-white rounded-[25px] p-6 mb-6">
+        <div className="bg-white dark:bg-white/10 rounded-[25px] p-6 mb-6">
           <div className="flex items-center gap-4">
             {/* Avatar */}
             <div className="w-[81px] h-[81px] rounded-full bg-[#f5eaf6] flex items-center justify-center overflow-hidden flex-shrink-0 shadow-[0px_0px_26px_0px_rgba(110,98,229,0.04)]">
@@ -289,7 +289,7 @@ export default function StudentAttendancePage() {
             {/* Info */}
             <div className="flex flex-col gap-0.5">
               <p className="text-base leading-relaxed">
-                <span className="text-black font-medium">Thiếu nhi:</span>
+                <span className="text-black dark:text-white font-medium">Thiếu nhi:</span>
                 <span className="text-[#fa865e]">&nbsp;</span>
                 <span className="text-[#fa865e] font-bold">
                   {student.saint_name && `${student.saint_name} `}{student.full_name}
@@ -298,7 +298,7 @@ export default function StudentAttendancePage() {
                   <span className="text-[#fa865e]"> ({student.student_code})</span>
                 )}
               </p>
-              <p className="text-xs text-black/40">
+              <p className="text-xs text-black/40 dark:text-white/40">
                 Lớp: {student.class_name || 'Chưa phân lớp'} | Năm học: {schoolYear?.name || '2025-2026'}
               </p>
             </div>
@@ -306,12 +306,12 @@ export default function StudentAttendancePage() {
         </div>
 
         {/* Tiến độ điểm danh - Container chung */}
-        <div className="bg-white rounded-[25px] p-6 mb-6">
+        <div className="bg-white dark:bg-white/10 rounded-[25px] p-6 mb-6">
           {/* Thứ năm */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex flex-col gap-1">
-                <h3 className="text-lg font-bold text-black">Tiến độ điểm danh</h3>
+                <h3 className="text-lg font-bold text-black dark:text-white">Tiến độ điểm danh</h3>
                 <p className="text-sm font-medium text-[#666d80]">Hiển thị theo tuần của năm học {schoolYear?.name || '2025-2026'}</p>
               </div>
 
@@ -320,7 +320,7 @@ export default function StudentAttendancePage() {
                 <button className="h-[52px] w-[143px] rounded-[50px] text-lg bg-brand text-white border border-white/60 flex items-center justify-center">
                   Thứ năm
                 </button>
-                <div className="h-[52px] w-[144px] rounded-[50px] text-lg bg-[#e5e1dc] text-black border border-white/60 flex items-center justify-center">
+                <div className="h-[52px] w-[144px] rounded-[50px] text-lg bg-[#e5e1dc] dark:bg-white/20 text-black dark:text-white border border-white/60 dark:border-white/10 flex items-center justify-center">
                   {attendanceThu5}/{totalWeeks} buổi
                 </div>
               </div>
@@ -338,7 +338,7 @@ export default function StudentAttendancePage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex flex-col gap-1">
-                <h3 className="text-lg font-bold text-black">Tiến độ điểm danh</h3>
+                <h3 className="text-lg font-bold text-black dark:text-white">Tiến độ điểm danh</h3>
                 <p className="text-sm font-medium text-[#666d80]">Hiển thị theo tuần của năm học {schoolYear?.name || '2025-2026'}</p>
               </div>
 
@@ -347,7 +347,7 @@ export default function StudentAttendancePage() {
                 <button className="h-[52px] w-[143px] rounded-[50px] text-lg bg-brand text-white border border-white/60 flex items-center justify-center">
                   Chủ nhật
                 </button>
-                <div className="h-[52px] w-[144px] rounded-[50px] text-lg bg-[#e5e1dc] text-black border border-white/60 flex items-center justify-center">
+                <div className="h-[52px] w-[144px] rounded-[50px] text-lg bg-[#e5e1dc] dark:bg-white/20 text-black dark:text-white border border-white/60 dark:border-white/10 flex items-center justify-center">
                   {attendanceCn}/{totalWeeks} buổi
                 </div>
               </div>
@@ -376,10 +376,10 @@ export default function StudentAttendancePage() {
           {thu5Records.length > 0 ? (
             <div className="grid grid-cols-3 gap-4">
               {thu5Records.map((record) => (
-                <div key={record.id} className="bg-white rounded-[14px] p-4 h-[104px]">
+                <div key={record.id} className="bg-white dark:bg-white/10 rounded-[14px] p-4 h-[104px]">
                   <div className="flex items-center gap-2 mb-1">
                     <CalendarIcon />
-                    <span className="text-sm font-medium text-black">{formatDate(record.attendance_date)}</span>
+                    <span className="text-sm font-medium text-black dark:text-white">{formatDate(record.attendance_date)}</span>
                   </div>
                   <div className="flex items-center gap-2 mb-2">
                     <ClockIcon />
@@ -412,10 +412,10 @@ export default function StudentAttendancePage() {
           {cnRecords.length > 0 ? (
             <div className="grid grid-cols-3 gap-4">
               {cnRecords.map((record) => (
-                <div key={record.id} className="bg-white rounded-[14px] p-4 h-[104px]">
+                <div key={record.id} className="bg-white dark:bg-white/10 rounded-[14px] p-4 h-[104px]">
                   <div className="flex items-center gap-2 mb-1">
                     <CalendarIcon />
-                    <span className="text-sm font-medium text-black">{formatDate(record.attendance_date)}</span>
+                    <span className="text-sm font-medium text-black dark:text-white">{formatDate(record.attendance_date)}</span>
                   </div>
                   <div className="flex items-center gap-2 mb-2">
                     <ClockIcon />

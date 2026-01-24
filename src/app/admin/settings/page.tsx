@@ -5,6 +5,7 @@ import { ROLE_LABELS, supabase, SchoolYear } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
 import { DashboardHeader } from '@/components/dashboard'
+import { useTheme } from '@/lib/theme-context'
 import Image from 'next/image'
 import { Eye, EyeOff, Check, X } from 'lucide-react'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
@@ -69,7 +70,8 @@ interface SchoolYearFormData {
 }
 
 export default function SettingsPage() {
-  const { user, loading, isAdmin, updateProfile, changePassword, uploadAvatar, deleteAvatar } = useAuth()
+  const { user, loading, isAdmin, logout, updateProfile, changePassword, uploadAvatar, deleteAvatar } = useAuth()
+  const { isDarkMode, toggleDarkMode } = useTheme()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<SettingsTab>('personal')
   const [formData, setFormData] = useState<FormData>({
@@ -100,7 +102,7 @@ export default function SettingsPage() {
     systemReports: true,
   })
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
-    darkMode: false,
+    darkMode: true,
   })
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
     safeMode: true,
@@ -152,15 +154,13 @@ export default function SettingsPage() {
     }
   }, [user])
 
+  // Sync dark mode state with theme context
+  useEffect(() => {
+    setSystemSettings(prev => ({ ...prev, darkMode: isDarkMode }))
+  }, [isDarkMode])
+
   // Load saved settings from localStorage
   useEffect(() => {
-    // Dark mode
-    const savedDarkMode = localStorage.getItem('darkMode')
-    if (savedDarkMode === 'true') {
-      setSystemSettings(prev => ({ ...prev, darkMode: true }))
-      document.documentElement.classList.add('dark')
-    }
-
     // Security settings
     const savedSecuritySettings = localStorage.getItem('securitySettings')
     if (savedSecuritySettings) {
@@ -259,20 +259,12 @@ export default function SettingsPage() {
   }
 
   const handleSystemToggle = (field: keyof SystemSettings) => {
-    setSystemSettings(prev => {
-      const newSettings = { ...prev, [field]: !prev[field] }
-      // Apply dark mode to document
-      if (field === 'darkMode') {
-        if (newSettings.darkMode) {
-          document.documentElement.classList.add('dark')
-          localStorage.setItem('darkMode', 'true')
-        } else {
-          document.documentElement.classList.remove('dark')
-          localStorage.setItem('darkMode', 'false')
-        }
-      }
-      return newSettings
-    })
+    if (field === 'darkMode') {
+      toggleDarkMode()
+      setSystemSettings(prev => ({ ...prev, darkMode: !prev.darkMode }))
+    } else {
+      setSystemSettings(prev => ({ ...prev, [field]: !prev[field] }))
+    }
   }
 
   const handleSecurityToggle = (field: keyof SecuritySettings) => {
@@ -602,10 +594,10 @@ export default function SettingsPage() {
   const renderPersonalInfoContent = () => (
     <>
       {/* Personal Information Section */}
-      <div className="border-b border-primary-4 p-6 flex gap-6">
+      <div className="border-b border-primary-4 dark:border-white/10 p-6 flex gap-6">
         {/* Section Header */}
         <div className="w-[300px] flex-shrink-0">
-          <h2 className="text-lg font-bold text-black mb-2">Thông tin cá nhân</h2>
+          <h2 className="text-lg font-bold text-white mb-2">Thông tin cá nhân</h2>
           <p className="text-xs text-primary-3 leading-relaxed">
             Xem và cập nhật chi tiết tài khoản, thông tin và nhiều hơn thế nữa
           </p>
@@ -664,7 +656,7 @@ export default function SettingsPage() {
                   Xóa
                 </button>
               </div>
-              <p className="text-xs text-black/40">
+              <p className="text-xs text-black/40 dark:text-white/50">
                 Hỗ trợ JPG, PNG, GIF, WEBP. Dung lượng tối đa 5MB.
               </p>
             </div>
@@ -681,7 +673,7 @@ export default function SettingsPage() {
                 type="text"
                 value={formData.saintName}
                 onChange={(e) => handleInputChange('saintName', e.target.value)}
-                className="h-[38px] px-4 bg-[#f6f6f6] rounded-xl text-xs text-black border-none focus:ring-2 focus:ring-brand/30"
+                className="h-[38px] px-4 bg-[#f6f6f6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white border-none focus:ring-2 focus:ring-brand/30"
                 placeholder="Nhập tên thánh"
               />
             </div>
@@ -694,7 +686,7 @@ export default function SettingsPage() {
                 type="text"
                 value={formData.fullName}
                 onChange={(e) => handleInputChange('fullName', e.target.value)}
-                className="h-[38px] px-3 bg-[#f6f6f6] rounded-xl text-xs text-black border-none focus:ring-2 focus:ring-brand/30"
+                className="h-[38px] px-3 bg-[#f6f6f6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white border-none focus:ring-2 focus:ring-brand/30"
                 placeholder="Nhập họ và tên"
               />
             </div>
@@ -711,7 +703,7 @@ export default function SettingsPage() {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                className="h-[38px] px-4 bg-[#f6f6f6] rounded-xl text-xs text-black border-none focus:ring-2 focus:ring-brand/30"
+                className="h-[38px] px-4 bg-[#f6f6f6] dark:bg-white/10 rounded-xl text-xs text-black dark:text-white border-none focus:ring-2 focus:ring-brand/30"
                 placeholder="Nhập số điện thoại"
               />
             </div>
@@ -750,7 +742,7 @@ export default function SettingsPage() {
       <div className="p-6 flex gap-6">
         {/* Section Header */}
         <div className="w-[300px] flex-shrink-0">
-          <h2 className="text-lg font-bold text-black">Quyền riêng tư</h2>
+          <h2 className="text-lg font-bold text-black dark:text-white">Quyền riêng tư</h2>
         </div>
 
         {/* Privacy Controls */}
@@ -759,7 +751,7 @@ export default function SettingsPage() {
           <div className="flex items-start justify-between">
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium text-black">Địa chỉ</p>
-              <p className="text-xs text-black/40">Hiển thị địa chỉ công khai</p>
+              <p className="text-xs text-black/40 dark:text-white/50">Hiển thị địa chỉ công khai</p>
             </div>
             <button
               onClick={() => handleToggle('showAddress')}
@@ -779,7 +771,7 @@ export default function SettingsPage() {
           <div className="flex items-start justify-between">
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium text-black">Trạng thái trực tuyến</p>
-              <p className="text-xs text-black/40">
+              <p className="text-xs text-black/40 dark:text-white/50">
                 Hiển thị trạng thái đang hoạt động khi đăng nhập vào hệ thống
               </p>
             </div>
@@ -1053,7 +1045,7 @@ export default function SettingsPage() {
                           <div className="w-4 h-4 rounded-full bg-brand/20 flex items-center justify-center">
                             <Check className="w-3 h-3 text-brand" />
                           </div>
-                          <span className="text-xs text-black">
+                          <span className="text-xs text-black dark:text-white">
                             Thời gian: {formatDate(schoolYearForm.startDate)} - {formatDate(schoolYearForm.endDate)}
                           </span>
                         </div>
@@ -1061,7 +1053,7 @@ export default function SettingsPage() {
                           <div className="w-4 h-4 rounded-full bg-brand/20 flex items-center justify-center">
                             <Check className="w-3 h-3 text-brand" />
                           </div>
-                          <span className="text-xs text-black">
+                          <span className="text-xs text-black dark:text-white">
                             Tổng tuần: {totalWeeks} tuần
                           </span>
                         </div>
@@ -1072,7 +1064,7 @@ export default function SettingsPage() {
                   /* Display Mode */
                   <>
                     <div className="flex flex-col gap-1">
-                      <p className="text-lg font-bold text-black">{currentSchoolYear.name}</p>
+                      <p className="text-lg font-bold text-black dark:text-white">{currentSchoolYear.name}</p>
                       <p className="text-sm font-medium text-primary-3">{currentSchoolYear.parish_name}</p>
                     </div>
 
@@ -1085,7 +1077,7 @@ export default function SettingsPage() {
                         <div className="w-4 h-4 rounded-full bg-brand/20 flex items-center justify-center">
                           <Check className="w-3 h-3 text-brand" />
                         </div>
-                        <span className="text-xs text-black">
+                        <span className="text-xs text-black dark:text-white">
                           Thời gian: {formatDate(currentSchoolYear.start_date)} - {formatDate(currentSchoolYear.end_date)}
                         </span>
                       </div>
@@ -1093,7 +1085,7 @@ export default function SettingsPage() {
                         <div className="w-4 h-4 rounded-full bg-brand/20 flex items-center justify-center">
                           <Check className="w-3 h-3 text-brand" />
                         </div>
-                        <span className="text-xs text-black">
+                        <span className="text-xs text-black dark:text-white">
                           Tổng tuần: {currentSchoolYear.total_weeks} tuần
                         </span>
                       </div>
@@ -1234,7 +1226,7 @@ export default function SettingsPage() {
           <div className="bg-white rounded-2xl w-[480px] max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="p-6 border-b border-primary-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-black">Cài đặt bảo mật</h3>
+              <h3 className="text-lg font-bold text-black dark:text-white">Cài đặt bảo mật</h3>
               <button
                 onClick={() => setIsSecurityModalOpen(false)}
                 className="w-8 h-8 rounded-full bg-[#f6f6f6] flex items-center justify-center hover:bg-gray-200 transition-colors"
@@ -1478,6 +1470,7 @@ export default function SettingsPage() {
         userRole={ROLE_LABELS[user.role]}
         activeTab="system"
         userAvatar={user.avatar_url}
+        onLogout={logout}
       />
 
       {/* Main Content */}

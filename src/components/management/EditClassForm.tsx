@@ -186,7 +186,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
   return (
     <div className="flex flex-col gap-4">
       {/* Class Info Card */}
-      <div className="bg-[#F6F6F6] border border-white/60 rounded-2xl p-6">
+      <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 rounded-2xl p-6">
         {/* Header Section */}
         <div className="flex flex-col gap-1.5 py-0.5">
           {/* Back Button */}
@@ -199,7 +199,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
           </button>
 
           {/* Title */}
-          <h1 className="text-[40px] font-bold text-black leading-none">Chỉnh sửa lớp học</h1>
+          <h1 className="text-[40px] font-bold text-black dark:text-white leading-none">Chỉnh sửa lớp học</h1>
 
           {/* Subtitle */}
           <p className="text-sm text-primary-1">
@@ -211,9 +211,9 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
         <div className="flex gap-3 mt-4">
           {/* Class Name Input */}
           <div className="flex flex-col gap-1.5 w-[400px]">
-            <label className="text-sm font-medium text-black">Tên lớp</label>
+            <label className="text-sm font-medium text-black dark:text-white">Tên lớp</label>
             <div
-              className={`h-[43px] px-4 bg-white rounded-full flex items-center ${
+              className={`h-[43px] px-4 bg-white dark:bg-white/10 rounded-full flex items-center ${
                 errors.name ? 'ring-2 ring-red-500' : ''
               }`}
             >
@@ -222,7 +222,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 placeholder="VD: Ấu 2A"
-                className="flex-1 text-xs text-black placeholder:text-black bg-transparent border-none focus:outline-none"
+                className="flex-1 text-xs text-black dark:text-white placeholder:text-black dark:placeholder:text-gray-500 bg-transparent border-none focus:outline-none"
               />
             </div>
             {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
@@ -230,23 +230,23 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
 
           {/* Branch Dropdown */}
           <div className="flex flex-col gap-1.5 flex-1">
-            <label className="text-sm font-medium text-black">Ngành</label>
+            <label className="text-sm font-medium text-black dark:text-white">Ngành</label>
             <div className="relative">
               <button
                 onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-                className={`w-full h-[43px] px-4 bg-white rounded-[25px] text-xs flex items-center justify-between ${
+                className={`w-full h-[43px] px-4 bg-white dark:bg-white/10 rounded-[25px] text-xs flex items-center justify-between ${
                   errors.branch ? 'ring-2 ring-red-500' : ''
-                } text-black`}
+                } text-black dark:text-white`}
               >
                 <span>{formData.branch || 'Chọn ngành'}</span>
                 <ChevronDown
-                  className={`w-[18px] h-[9px] transition-transform text-black ${
+                  className={`w-[18px] h-[9px] transition-transform text-black dark:text-white ${
                     isBranchDropdownOpen ? 'rotate-180' : ''
                   }`}
                 />
               </button>
               {isBranchDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden">
+                <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden">
                   {BRANCHES.map((branch) => (
                     <button
                       key={branch}
@@ -254,8 +254,8 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
                         handleInputChange('branch', branch)
                         setIsBranchDropdownOpen(false)
                       }}
-                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${
-                        formData.branch === branch ? 'bg-brand/10 text-brand' : 'text-black'
+                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${
+                        formData.branch === branch ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'
                       }`}
                     >
                       {branch}
@@ -273,7 +273,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
           <button
             onClick={onBack}
             disabled={isSubmitting}
-            className="h-[49px] w-[131px] bg-[#E5E1DC] rounded-full text-base font-semibold text-black hover:bg-[#D5D1CC] transition-colors disabled:opacity-50"
+            className="h-[49px] w-[131px] bg-[#E5E1DC] dark:bg-white/10 rounded-full text-base font-semibold text-black dark:text-white hover:bg-[#D5D1CC] dark:hover:bg-white/20 transition-colors disabled:opacity-50"
           >
             Hủy
           </button>
@@ -310,22 +310,22 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
       </div>
 
       {/* Teacher Assignment Card */}
-      <div className="bg-white border border-[#E5E1DC] rounded-2xl p-6">
+      <div className="bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-2xl p-6">
         {/* Header */}
         <div className="mb-4">
-          <h2 className="text-xl font-bold text-black">Phân công giáo lý viên</h2>
+          <h2 className="text-xl font-bold text-black dark:text-white">Phân công giáo lý viên</h2>
           <p className="text-sm text-primary-3">Tìm kiếm và phân công giáo lý viên cho lớp này</p>
         </div>
 
         {/* Search Input */}
-        <div className="flex items-center gap-2 h-[43px] px-4 bg-[#F6F6F6] rounded-full mb-6">
+        <div className="flex items-center gap-2 h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-full mb-6">
           <Search className="w-5 h-5 text-primary-3" />
           <input
             type="text"
             placeholder="Tìm kiếm giáo lý viên..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 h-full bg-transparent text-sm text-black placeholder:text-primary-3 border-none focus:outline-none"
+            className="flex-1 h-full bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"
           />
         </div>
 
@@ -333,7 +333,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
         <div className="flex gap-6">
           {/* Assigned Teachers Column */}
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-black mb-3">
+            <h3 className="text-sm font-semibold text-black dark:text-white mb-3">
               Giáo lý viên đã phân công ({assignedTeachers.length})
             </h3>
             <div className="flex flex-col gap-2">
@@ -350,7 +350,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
                 assignedTeachers.map((teacher) => (
                   <div
                     key={teacher.id}
-                    className="flex items-center justify-between p-3 bg-[#F6F6F6] rounded-xl"
+                    className="flex items-center justify-between p-3 bg-[#F6F6F6] dark:bg-white/5 rounded-xl"
                   >
                     <div className="flex items-center gap-3">
                       {/* Avatar Placeholder */}
@@ -360,7 +360,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
                         </span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-black">
+                        <p className="text-sm font-medium text-black dark:text-white">
                           {teacher.saint_name} {teacher.full_name}
                         </p>
                         <p className="text-xs text-primary-3">admin</p>
@@ -380,7 +380,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
 
           {/* Available Teachers Column */}
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-black mb-3">Giáo lý viên khả dụng</h3>
+            <h3 className="text-sm font-semibold text-black dark:text-white mb-3">Giáo lý viên khả dụng</h3>
             <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto">
               {loadingTeachers ? (
                 <div className="flex items-center justify-center py-8">
@@ -397,7 +397,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
                 filteredAvailableTeachers.map((teacher) => (
                   <div
                     key={teacher.id}
-                    className="flex items-center justify-between p-3 bg-[#F6F6F6] rounded-xl"
+                    className="flex items-center justify-between p-3 bg-[#F6F6F6] dark:bg-white/5 rounded-xl"
                   >
                     <div className="flex items-center gap-3">
                       {/* Avatar Placeholder */}
@@ -407,7 +407,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
                         </span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-black">
+                        <p className="text-sm font-medium text-black dark:text-white">
                           {teacher.saint_name} {teacher.full_name}
                         </p>
                         <p className="text-xs text-primary-3">Đang dạy: Nghĩa 1D</p>
@@ -416,7 +416,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleAssignTeacher(teacher, 'assistant')}
-                        className="h-8 px-4 bg-white border border-[#E5E1DC] rounded-full text-xs font-medium text-black hover:bg-gray-50 transition-colors"
+                        className="h-8 px-4 bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/20 rounded-full text-xs font-medium text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
                       >
                         Phụ
                       </button>

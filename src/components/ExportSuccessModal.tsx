@@ -22,7 +22,7 @@ export default function ExportSuccessModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-[20px] w-[320px] px-8 py-10 shadow-xl flex flex-col items-center">
+      <div className="relative bg-white dark:bg-[#1a1a1a] rounded-[20px] w-[320px] px-8 py-10 shadow-xl flex flex-col items-center">
         {/* Icon */}
         <div className="w-[56px] h-[56px] rounded-full bg-[rgba(250,134,94,0.15)] flex items-center justify-center mb-5">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -33,7 +33,7 @@ export default function ExportSuccessModal({
         </div>
 
         {/* Title */}
-        <h2 className="text-center text-xl font-bold text-black">
+        <h2 className="text-center text-xl font-bold text-black dark:text-white">
           {message}
         </h2>
       </div>

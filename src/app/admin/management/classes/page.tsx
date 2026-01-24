@@ -199,14 +199,14 @@ export default function ClassesPage() {
       {/* Search and Actions Bar */}
       <div className="flex items-center justify-between">
         {/* Search Input */}
-        <div className="flex items-center gap-2 h-[42px] px-3 bg-white border border-[#E5E1DC] rounded-xl w-[320px]">
+        <div className="flex items-center gap-2 h-[42px] px-3 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl w-[320px]">
           <Search className="w-5 h-5 text-primary-3" />
           <input
             type="text"
             placeholder="Tìm kiếm lớp..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 h-full bg-transparent text-sm text-black placeholder:text-primary-3 border-none focus:outline-none"
+            className="flex-1 h-full bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"
           />
         </div>
 
@@ -216,19 +216,19 @@ export default function ClassesPage() {
           <div className="relative">
             <button
               onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-              className="flex items-center justify-between gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl min-w-[160px] text-sm text-primary-3 hover:bg-gray-50 transition-colors"
+              className="flex items-center justify-between gap-2 h-[42px] px-4 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl min-w-[160px] text-sm text-primary-3 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
             >
               <span>{filterBranch === 'all' ? 'Tất cả ngành' : filterBranch}</span>
               <ChevronDown className={`w-4 h-4 transition-transform ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
             {isBranchDropdownOpen && (
-              <div className="absolute top-full right-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden">
+              <div className="absolute top-full right-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden">
                 <button
                   onClick={() => {
                     setFilterBranch('all')
                     setIsBranchDropdownOpen(false)
                   }}
-                  className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterBranch === 'all' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                  className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterBranch === 'all' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                 >
                   Tất cả ngành
                 </button>
@@ -239,7 +239,7 @@ export default function ClassesPage() {
                       setFilterBranch(branch)
                       setIsBranchDropdownOpen(false)
                     }}
-                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterBranch === branch ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterBranch === branch ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                   >
                     {branch}
                   </button>
@@ -261,15 +261,15 @@ export default function ClassesPage() {
 
       {/* Stats Bar */}
       <div className="flex items-center gap-8">
-        <div className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E5E1DC] rounded-xl">
+        <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl">
           <span className="text-sm font-semibold text-brand">{totalClasses}</span>
           <span className="text-sm text-primary-3">lớp</span>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E5E1DC] rounded-xl">
+        <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl">
           <span className="text-sm font-semibold text-brand">{totalBranches}</span>
           <span className="text-sm text-primary-3">ngành</span>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E5E1DC] rounded-xl">
+        <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl">
           <span className="text-sm font-semibold text-brand">{totalStudents}</span>
           <span className="text-sm text-primary-3">thiếu nhi</span>
         </div>
@@ -293,7 +293,7 @@ export default function ClassesPage() {
       ) : (
         <div className="flex flex-col gap-6">
           {Object.entries(groupedClasses).map(([branch, branchClasses]) => (
-            <div key={branch} className="bg-white border border-[#E5E1DC] rounded-2xl overflow-hidden">
+            <div key={branch} className="bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-2xl overflow-hidden">
               {/* Branch Header */}
               <div className="flex items-center gap-3 px-4 py-3 bg-[#FFF8F5] border-b border-[#E5E1DC]">
                 <h3 className="text-base font-bold text-brand uppercase">Ngành {branch}</h3>
@@ -303,7 +303,7 @@ export default function ClassesPage() {
               </div>
 
               {/* Table Header */}
-              <div className="grid grid-cols-[1fr_1.5fr_100px_120px] gap-4 px-4 py-3 bg-[#FAFAFA] border-b border-[#E5E1DC]">
+              <div className="grid grid-cols-[1fr_1.5fr_100px_120px] gap-4 px-4 py-3 bg-[#FAFAFA] dark:bg-white/5 border-b border-[#E5E1DC]">
                 <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Tên lớp</div>
                 <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Giáo lý viên</div>
                 <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider text-center">Thiếu nhi</div>
@@ -315,10 +315,10 @@ export default function ClassesPage() {
                 {branchClasses.map((cls) => (
                   <div
                     key={cls.id}
-                    className="grid grid-cols-[1fr_1.5fr_100px_120px] gap-4 px-4 py-3 items-center hover:bg-[#FAFAFA] transition-colors"
+                    className="grid grid-cols-[1fr_1.5fr_100px_120px] gap-4 px-4 py-3 items-center hover:bg-[#FAFAFA] dark:hover:bg-white/5 transition-colors"
                   >
                     {/* Class Name */}
-                    <div className="text-sm font-medium text-black">{cls.name}</div>
+                    <div className="text-sm font-medium text-black dark:text-white">{cls.name}</div>
 
                     {/* Teachers */}
                     <div className="flex flex-col text-sm text-primary-3">
@@ -345,13 +345,13 @@ export default function ClassesPage() {
                     <div className="flex items-center justify-center gap-2">
                       <button
                         onClick={() => handleOpenEditForm(cls)}
-                        className="w-8 h-8 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+                        className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
                         title="Chỉnh sửa"
                       >
                         <Edit2 className="w-4 h-4 text-primary-3" />
                       </button>
                       <button
-                        className="w-8 h-8 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+                        className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
                         title="Xem chi tiết"
                       >
                         <Eye className="w-4 h-4 text-primary-3" />
@@ -375,14 +375,14 @@ export default function ClassesPage() {
       {/* Delete Class Modal */}
       {isDeleteModalOpen && classToDelete && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-[400px] mx-4 flex flex-col items-center">
+          <div className="bg-white dark:bg-white/10 rounded-3xl p-8 w-full max-w-[400px] mx-4 flex flex-col items-center">
             {/* Trash Icon */}
             <div className="w-16 h-16 rounded-full bg-brand/10 flex items-center justify-center mb-4">
               <Trash2 className="w-7 h-7 text-brand" />
             </div>
 
             {/* Title */}
-            <h3 className="text-xl font-bold text-black mb-2">Xóa lớp?</h3>
+            <h3 className="text-xl font-bold text-black dark:text-white mb-2">Xóa lớp?</h3>
 
             {/* Subtitle */}
             <p className="text-sm text-primary-3 text-center mb-8">
@@ -396,7 +396,7 @@ export default function ClassesPage() {
                   setIsDeleteModalOpen(false)
                   setClassToDelete(null)
                 }}
-                className="flex-1 h-[49px] bg-[#E5E1DC] rounded-full text-base font-semibold text-black hover:bg-[#D5D1CC] transition-colors"
+                className="flex-1 h-[49px] bg-[#E5E1DC] rounded-full text-base font-semibold text-black dark:text-white hover:bg-[#D5D1CC] transition-colors"
               >
                 Hủy
               </button>

@@ -40,7 +40,7 @@ export default function DashboardHeader({
     <header className="bg-transparent px-6 py-3">
       <div className="flex items-center justify-between">
         {/* Left: Logo + Navigation */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-20">
           {/* Logo */}
           <Link href="/admin/dashboard" className="w-[52px] h-[52px] rounded-full overflow-hidden flex-shrink-0">
             <Image
@@ -61,7 +61,7 @@ export default function DashboardHeader({
                 className={`px-[22px] py-[12px] rounded-full text-sm font-medium transition-all h-[45px] flex items-center justify-center ${
                   activeTab === tab.id
                     ? 'bg-brand text-white'
-                    : 'bg-white border border-white/20 text-black hover:shadow-[1px_2px_4px_0px_rgba(0,0,0,0.25)]'
+                    : 'bg-white dark:bg-white/10 border border-white/20 dark:border-white/10 text-black dark:text-white hover:shadow-[1px_2px_4px_0px_rgba(0,0,0,0.25)]'
                 }`}
               >
                 {tab.label}
@@ -73,20 +73,20 @@ export default function DashboardHeader({
         {/* Right: Search + Actions + User */}
         <div className="flex items-center gap-2">
           {/* Search */}
-          <div className="flex items-center gap-4 h-[45px] px-1 bg-white border border-white/20 rounded-full w-[324px] hover:shadow-[1px_2px_4px_0px_rgba(0,0,0,0.25)] transition-shadow">
-            <div className="w-[41px] h-[41px] bg-[#f6f6f6] rounded-full flex items-center justify-center flex-shrink-0">
-              <Search className="w-5 h-5 text-black" />
+          <div className="flex items-center gap-4 h-[45px] px-1 bg-white dark:bg-white/10 border border-white/20 dark:border-white/10 rounded-full w-[324px] hover:shadow-[1px_2px_4px_0px_rgba(0,0,0,0.25)] transition-shadow">
+            <div className="w-[41px] h-[41px] bg-[#f6f6f6] dark:bg-white/10 rounded-full flex items-center justify-center flex-shrink-0">
+              <Search className="w-5 h-5 text-black dark:text-white" />
             </div>
             <input
               type="text"
               placeholder="Tìm kiếm"
-              className="flex-1 h-full pr-4 bg-transparent text-xs text-black placeholder:text-black border-none focus:outline-none"
+              className="flex-1 h-full pr-4 bg-transparent text-xs text-black dark:text-white placeholder:text-black dark:placeholder:text-gray-400 border-none focus:outline-none"
             />
           </div>
 
           {/* Add Button */}
-          <button className="w-[45px] h-[45px] bg-white border border-white/20 rounded-full flex items-center justify-center hover:bg-[#e5e1dc] transition-colors flex-shrink-0">
-            <Plus className="w-5 h-5 text-black" />
+          <button className="w-[45px] h-[45px] bg-white dark:bg-white/10 border border-white/20 dark:border-white/10 rounded-full flex items-center justify-center hover:bg-[#e5e1dc] dark:hover:bg-white/20 transition-colors flex-shrink-0">
+            <Plus className="w-5 h-5 text-black dark:text-white" />
           </button>
 
           {/* User Profile */}
@@ -94,7 +94,7 @@ export default function DashboardHeader({
             {/* User Info Container - Clickable */}
             <button
               onClick={handleAvatarClick}
-              className="flex items-center gap-4 rounded-[25px] hover:bg-[#e5e1dc] transition-colors cursor-pointer pr-2"
+              className="flex items-center gap-4 rounded-[25px] hover:bg-[#e5e1dc] dark:hover:bg-white/10 transition-colors cursor-pointer pr-2"
             >
               {/* Avatar */}
               <div className="w-[45px] h-[45px] rounded-full overflow-hidden flex items-center justify-center bg-orange-100 flex-shrink-0">
@@ -108,8 +108,8 @@ export default function DashboardHeader({
               </div>
               {/* Name and Role */}
               <div className="flex flex-col gap-1 text-left w-[103px]">
-                <p className="text-sm font-medium text-black">{userName}</p>
-                <p className="text-xs text-black/40">{userRole}</p>
+                <p className="text-sm font-medium text-black dark:text-white">{userName}</p>
+                <p className="text-xs text-black/40 dark:text-white/60">{userRole}</p>
               </div>
             </button>
 

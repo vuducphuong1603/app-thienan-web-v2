@@ -65,12 +65,12 @@ export default function ForgotPasswordPage() {
             />
           </svg>
         </div>
-        <span className="text-black text-sm font-medium">Giáo xứ Thiên Ân</span>
+        <span className="text-black dark:text-white text-sm font-medium">Giáo xứ Thiên Ân</span>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-4 relative z-10">
-        <div className="w-full max-w-[420px] p-8 bg-white rounded-[20px] shadow-xl">
+        <div className="w-full max-w-[420px] p-8 bg-white dark:bg-white/10 dark:backdrop-blur-xl dark:border dark:border-white/10 rounded-[20px] shadow-xl">
           {!success ? (
             <>
               {/* Lock Icon */}
@@ -88,8 +88,8 @@ export default function ForgotPasswordPage() {
 
                 {/* Title */}
                 <div className="text-center mt-4 space-y-2">
-                  <h1 className="text-[28px] font-semibold text-black">Quên mật khẩu</h1>
-                  <p className="text-sm text-gray-500 max-w-[280px] mx-auto">
+                  <h1 className="text-[28px] font-semibold text-black dark:text-white">Quên mật khẩu</h1>
+                  <p className="text-sm text-gray-500 dark:text-gray-300 max-w-[280px] mx-auto">
                     Nhập địa chỉ Email và chúng tôi sẽ gửi cho bạn hướng dẫn đặt lại mật khẩu
                   </p>
                 </div>
@@ -107,14 +107,14 @@ export default function ForgotPasswordPage() {
                 {/* Email Field */}
                 <div className="space-y-2">
                   <label className="flex items-center gap-1">
-                    <span className="text-sm font-medium text-gray-700">Địa chỉ Email</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Địa chỉ Email</span>
                   </label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="demo@gmail.com"
-                    className="w-full h-[44px] px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-black placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
+                    className="w-full h-[44px] px-4 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-xl text-sm text-black dark:text-white placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
                     disabled={isLoading}
                   />
                 </div>
@@ -155,7 +155,7 @@ export default function ForgotPasswordPage() {
                 </button>
 
                 {/* Alternative Link */}
-                <p className="text-center text-sm text-gray-500">
+                <p className="text-center text-sm text-gray-500 dark:text-gray-300">
                   Không còn quyền truy cập nữa?{' '}
                   <Link href="/contact-support" className="font-semibold text-brand hover:text-orange-600 transition-colors">
                     Hãy thử phương pháp khác
@@ -190,8 +190,8 @@ export default function ForgotPasswordPage() {
               </div>
 
               <div className="text-center mt-4 space-y-2">
-                <h1 className="text-[28px] font-semibold text-black">Đã gửi email!</h1>
-                <p className="text-sm text-gray-500 max-w-[300px] mx-auto">
+                <h1 className="text-[28px] font-semibold text-black dark:text-white">Đã gửi email!</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-300 max-w-[300px] mx-auto">
                   Chúng tôi đã gửi hướng dẫn đặt lại mật khẩu đến địa chỉ email <span className="font-medium text-gray-700">{email}</span>. Vui lòng kiểm tra hộp thư của bạn.
                 </p>
               </div>
@@ -210,7 +210,7 @@ export default function ForgotPasswordPage() {
                     setSuccess(false)
                     setEmail('')
                   }}
-                  className="w-full h-[44px] px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-gray-700 text-sm font-semibold flex items-center justify-center transition-colors"
+                  className="w-full h-[44px] px-4 py-2 bg-white dark:bg-white/10 hover:bg-gray-50 dark:hover:bg-white/20 border border-gray-200 dark:border-white/20 rounded-xl text-gray-700 dark:text-gray-200 text-sm font-semibold flex items-center justify-center transition-colors"
                 >
                   Gửi lại email
                 </button>
@@ -229,25 +229,25 @@ export default function ForgotPasswordPage() {
 
       {/* Footer */}
       <footer className="w-full px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10">
-        <p className="text-xs text-gray-600">© 2025 Giáo Xứ Thiên Ân. All right reserved.</p>
+        <p className="text-xs text-gray-600 dark:text-gray-400">© 2025 Giáo Xứ Thiên Ân. All right reserved.</p>
         <div className="flex items-center gap-6">
           <Link
             href="/privacy"
-            className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-brand transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-brand transition-colors"
           >
             <Lock className="w-4 h-4" />
             Riêng tư
           </Link>
           <Link
             href="/terms"
-            className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-brand transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-brand transition-colors"
           >
             <FileText className="w-4 h-4" />
             Điều khoản
           </Link>
           <Link
             href="/help"
-            className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-brand transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-brand transition-colors"
           >
             <HelpCircle className="w-4 h-4" />
             Trợ giúp

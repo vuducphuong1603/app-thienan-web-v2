@@ -38,7 +38,7 @@ export default function DeleteStudentModal({ isOpen, onClose, onConfirm, student
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl w-[400px] overflow-hidden shadow-xl">
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl w-[400px] overflow-hidden shadow-xl">
         {/* Body */}
         <div className="p-6 flex flex-col items-center">
           {/* Icon - Door/Exit icon matching Figma */}
@@ -51,11 +51,11 @@ export default function DeleteStudentModal({ isOpen, onClose, onConfirm, student
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-black mb-2">Xóa thiếu nhi?</h2>
+          <h2 className="text-xl font-bold text-black dark:text-white mb-2">Xóa thiếu nhi?</h2>
 
           {/* Description */}
           <p className="text-sm text-primary-3 text-center mb-4">
-            Bạn chắc chắn muốn xóa thiếu nhi <span className="font-medium text-black">{studentName}</span>?
+            Bạn chắc chắn muốn xóa thiếu nhi <span className="font-medium text-black dark:text-white">{studentName}</span>?
           </p>
 
           {/* Error message */}
@@ -70,7 +70,7 @@ export default function DeleteStudentModal({ isOpen, onClose, onConfirm, student
             <button
               onClick={onClose}
               disabled={isDeleting}
-              className="flex-1 h-[44px] bg-white border border-[#E5E1DC] rounded-xl text-sm font-medium text-black hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="flex-1 h-[44px] bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/20 rounded-xl text-sm font-medium text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
             >
               Hủy
             </button>

@@ -189,18 +189,18 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
         <div className="flex flex-col gap-2">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-primary-3 hover:text-black transition-colors"
+            className="flex items-center gap-2 text-primary-3 hover:text-black dark:hover:text-white transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
             <span className="text-sm">Quay trở lại</span>
           </button>
-          <h1 className="text-4xl font-bold text-black">Thêm người dùng</h1>
+          <h1 className="text-4xl font-bold text-black dark:text-white">Thêm người dùng</h1>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
             disabled={isSubmitting}
-            className="h-[40px] px-6 bg-white border border-[#E5E1DC] rounded-full text-sm font-bold text-black hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="h-[40px] px-6 bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/20 rounded-full text-sm font-bold text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
           >
             Hủy
           </button>
@@ -221,12 +221,12 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
       </div>
 
       {/* Form Container */}
-      <div className="bg-white rounded-3xl p-6">
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-3xl p-6">
         {/* Account Info Section */}
-        <div className="flex gap-6 pb-6 border-b border-[#E5E1DC]">
+        <div className="flex gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
           {/* Left Label */}
           <div className="w-[300px] flex-shrink-0">
-            <h2 className="text-lg font-bold text-black">Thông tin tài khoản</h2>
+            <h2 className="text-lg font-bold text-black dark:text-white">Thông tin tài khoản</h2>
             <p className="text-sm text-primary-3">Tạo người dùng mới cho hệ thống</p>
           </div>
 
@@ -276,7 +276,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                   value={formData.username}
                   onChange={(e) => handleInputChange('username', e.target.value)}
                   placeholder="VD: HA172336"
-                  className={`h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black placeholder:text-black/40 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.username ? 'ring-2 ring-red-500' : ''}`}
+                  className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.username ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.username && <p className="text-xs text-red-500">{errors.username}</p>}
               </div>
@@ -287,13 +287,13 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                 <div className="relative">
                   <button
                     onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                    className="w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black flex items-center justify-between"
+                    className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white flex items-center justify-between"
                   >
                     <span>{ROLE_LABELS[formData.role]}</span>
                     <ChevronDown className={`w-4 h-4 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {isRoleDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden">
                       {Object.entries(ROLE_LABELS).map(([key, label]) => (
                         <button
                           key={key}
@@ -301,7 +301,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                             handleInputChange('role', key)
                             setIsRoleDropdownOpen(false)
                           }}
-                          className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${formData.role === key ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                          className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${formData.role === key ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                         >
                           {label}
                         </button>
@@ -323,7 +323,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
                   placeholder="Nhập mật khẩu"
-                  className={`h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black placeholder:text-black/40 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.password ? 'ring-2 ring-red-500' : ''}`}
+                  className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.password ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
               </div>
@@ -336,14 +336,14 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                   value={formData.confirmPassword}
                   onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                   placeholder="Nhập lại mật khẩu"
-                  className={`h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black placeholder:text-black/40 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.confirmPassword ? 'ring-2 ring-red-500' : ''}`}
+                  className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.confirmPassword ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword}</p>}
               </div>
             </div>
 
             {/* Divider */}
-            <div className="h-px bg-[#E5E1DC] my-2" />
+            <div className="h-px bg-[#E5E1DC] dark:bg-white/10 my-2" />
 
             {/* Saint Name & Full Name */}
             <div className="flex gap-3">
@@ -356,7 +356,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                   value={formData.saint_name}
                   onChange={(e) => handleInputChange('saint_name', e.target.value)}
                   placeholder="VD: Teresa"
-                  className={`h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black placeholder:text-black/40 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.saint_name ? 'ring-2 ring-red-500' : ''}`}
+                  className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.saint_name ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.saint_name && <p className="text-xs text-red-500">{errors.saint_name}</p>}
               </div>
@@ -369,7 +369,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                   value={formData.full_name}
                   onChange={(e) => handleInputChange('full_name', e.target.value)}
                   placeholder="VD: Nguyen Van A"
-                  className={`h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black placeholder:text-black/40 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.full_name ? 'ring-2 ring-red-500' : ''}`}
+                  className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.full_name ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.full_name && <p className="text-xs text-red-500">{errors.full_name}</p>}
               </div>
@@ -396,7 +396,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   placeholder="VD: 0987654321"
-                  className={`h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black placeholder:text-black/40 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.phone ? 'ring-2 ring-red-500' : ''}`}
+                  className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.phone ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
               </div>
@@ -422,7 +422,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
         <div className="flex gap-6 pt-6">
           {/* Left Label */}
           <div className="w-[300px] flex-shrink-0">
-            <h2 className="text-lg font-bold text-black">Phan cong & phu trach</h2>
+            <h2 className="text-lg font-bold text-black dark:text-white">Phan cong & phu trach</h2>
             <p className="text-sm text-primary-3">Vai tro</p>
           </div>
 
@@ -441,13 +441,13 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                       setIsBranchDropdownOpen(!isBranchDropdownOpen)
                       setIsClassDropdownOpen(false)
                     }}
-                    className="w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm text-black flex items-center justify-between"
+                    className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white flex items-center justify-between"
                   >
                     <span>{formData.branch || 'Chọn ngành'}</span>
                     <ChevronDown className={`w-4 h-4 transition-transform ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {isBranchDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden">
                       {BRANCHES.map((branch) => (
                         <button
                           key={branch}
@@ -457,7 +457,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                             handleInputChange('class_name', '')
                             setIsBranchDropdownOpen(false)
                           }}
-                          className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${formData.branch === branch ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                          className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${formData.branch === branch ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                         >
                           {branch}
                         </button>
@@ -481,7 +481,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                       }
                     }}
                     disabled={!formData.branch || classes.length === 0}
-                    className={`w-full h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-sm flex items-center justify-between ${!formData.branch || classes.length === 0 ? 'text-black/40 cursor-not-allowed' : 'text-black'}`}
+                    className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm flex items-center justify-between ${!formData.branch || classes.length === 0 ? 'text-black/40 cursor-not-allowed' : 'text-black dark:text-white'}`}
                   >
                     <span>
                       {isLoadingClasses
@@ -495,7 +495,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                     <ChevronDown className={`w-4 h-4 transition-transform ${isClassDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {isClassDropdownOpen && formData.branch && classes.length > 0 && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden max-h-[200px] overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden max-h-[200px] overflow-y-auto">
                       {classes.map((cls) => (
                         <button
                           key={cls.id}
@@ -504,7 +504,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                             handleInputChange('class_name', cls.name)
                             setIsClassDropdownOpen(false)
                           }}
-                          className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${formData.class_id === cls.id ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                          className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${formData.class_id === cls.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                         >
                           {cls.name}
                         </button>

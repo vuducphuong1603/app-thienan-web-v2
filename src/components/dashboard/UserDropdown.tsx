@@ -91,11 +91,11 @@ export default function UserDropdown({
   return (
     <div
       ref={dropdownRef}
-      className="absolute top-full right-0 mt-2 w-[310px] bg-white border border-[#e5e1dc] rounded-[15px] shadow-[2px_3px_4px_0px_rgba(0,0,0,0.25)] z-50"
+      className="absolute top-full right-0 mt-2 w-[310px] bg-white dark:bg-[#1a1a1a] dark:border-white/10 border border-[#e5e1dc] rounded-[15px] shadow-[2px_3px_4px_0px_rgba(0,0,0,0.25)] z-50"
     >
       <div className="p-4">
         {/* Header */}
-        <p className="text-xs text-black mb-4">Đang đăng nhập</p>
+        <p className="text-xs text-black dark:text-white mb-4">Đang đăng nhập</p>
 
         {/* User Info */}
         <div className="flex items-center justify-between mb-4">
@@ -121,18 +121,18 @@ export default function UserDropdown({
 
             {/* User Details */}
             <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium text-black">{userName}</p>
-              <p className="text-xs text-black/40">{userRole}</p>
-              <p className="text-xs text-black/40">{userEmail}</p>
+              <p className="text-sm font-medium text-black dark:text-white">{userName}</p>
+              <p className="text-xs text-black/40 dark:text-white/60">{userRole}</p>
+              <p className="text-xs text-black/40 dark:text-white/60">{userEmail}</p>
             </div>
           </div>
 
           {/* Checkmark */}
-          <CheckCircle className="w-7 h-7 text-black/60" />
+          <CheckCircle className="w-7 h-7 text-black/60 dark:text-white/60" />
         </div>
 
         {/* Divider */}
-        <div className="w-full h-px bg-[#666d80] mb-4" />
+        <div className="w-full h-px bg-[#666d80] dark:bg-white/20 mb-4" />
 
         {/* Menu Items */}
         <div className="flex flex-col gap-3">
@@ -140,10 +140,10 @@ export default function UserDropdown({
             <button
               key={index}
               onClick={item.onClick}
-              className="flex items-center gap-3 w-full px-1 py-2 hover:bg-gray-50 rounded-lg transition-colors text-left"
+              className="flex items-center gap-3 w-full px-1 py-2 hover:bg-gray-50 dark:hover:bg-white/10 rounded-lg transition-colors text-left"
             >
-              <item.icon className="w-[18px] h-[18px] text-black" />
-              <span className="text-xs text-black">{item.label}</span>
+              <item.icon className="w-[18px] h-[18px] text-black dark:text-white" />
+              <span className="text-xs text-black dark:text-white">{item.label}</span>
             </button>
           ))}
         </div>

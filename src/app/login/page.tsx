@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { Eye, EyeOff, Lock, FileText, HelpCircle, User } from 'lucide-react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
@@ -53,30 +54,15 @@ function LoginForm() {
     <div className="min-h-screen w-full relative overflow-hidden flex flex-col">
       {/* Header */}
       <header className="w-full px-8 py-6 flex items-center gap-3 relative z-10">
-        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-brand to-orange-400">
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M12 2L4 7V12C4 16.42 7.42 20.74 12 22C16.58 20.74 20 16.42 20 12V7L12 2Z"
-              fill="white"
-            />
-            <path
-              d="M12 6C13.1 6 14 6.9 14 8C14 9.1 13.1 10 12 10C10.9 10 10 9.1 10 8C10 6.9 10.9 6 12 6ZM12 16C14.7 16 17.8 17.29 18 18H6C6.23 17.28 9.31 16 12 16Z"
-              fill="#FA865E"
-            />
-          </svg>
+        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center">
+          <Image src="/logo.png" alt="Logo Giáo xứ Thiên Ân" width={40} height={40} />
         </div>
-        <span className="text-black text-sm font-medium">Giáo xứ Thiên Ân</span>
+        <span className="text-black dark:text-white text-sm font-medium">Giáo xứ Thiên Ân</span>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-4 relative z-10">
-        <div className="w-full max-w-[420px] p-8 bg-white rounded-[20px] shadow-xl">
+        <div className="w-full max-w-[420px] p-8 bg-white dark:bg-white/10 dark:backdrop-blur-xl dark:border dark:border-white/10 rounded-[20px] shadow-xl">
           {/* User Icon */}
           <div className="flex flex-col items-center">
             <div
@@ -92,8 +78,8 @@ function LoginForm() {
 
             {/* Welcome Text */}
             <div className="text-center mt-4 space-y-1">
-              <h1 className="text-[28px] font-semibold text-black">Chào mừng!</h1>
-              <p className="text-sm text-gray-500">Đăng nhập vào tài khoản của bạn</p>
+              <h1 className="text-[28px] font-semibold text-black dark:text-white">Chào mừng!</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-300">Đăng nhập vào tài khoản của bạn</p>
             </div>
           </div>
 
@@ -116,7 +102,7 @@ function LoginForm() {
             {/* Username Field */}
             <div className="space-y-2">
               <label className="flex items-center gap-1">
-                <span className="text-sm font-medium text-gray-700">Tên đăng nhập</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Tên đăng nhập</span>
                 <span className="text-sm font-medium text-red-500">*</span>
               </label>
               <input
@@ -124,7 +110,7 @@ function LoginForm() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Nhập tên đăng nhập"
-                className="w-full h-[44px] px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-black placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
+                className="w-full h-[44px] px-4 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-xl text-sm text-black dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
                 disabled={isLoading}
               />
             </div>
@@ -132,7 +118,7 @@ function LoginForm() {
             {/* Password Field */}
             <div className="space-y-2">
               <label className="flex items-center gap-1">
-                <span className="text-sm font-medium text-gray-700">Mật khẩu</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Mật khẩu</span>
                 <span className="text-sm font-medium text-red-500">*</span>
               </label>
               <div className="relative">
@@ -141,7 +127,7 @@ function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Nhập mật khẩu"
-                  className="w-full h-[44px] px-4 py-2 pr-12 bg-white border border-gray-200 rounded-xl text-sm text-black placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
+                  className="w-full h-[44px] px-4 py-2 pr-12 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-xl text-sm text-black dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
                   disabled={isLoading}
                 />
                 <button
@@ -164,7 +150,7 @@ function LoginForm() {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                 />
-                <span className="text-sm text-gray-600">Ghi nhớ đăng nhập</span>
+                <span className="text-sm text-gray-600 dark:text-gray-300">Ghi nhớ đăng nhập</span>
               </label>
               <Link
                 href="/forgot-password"
@@ -210,7 +196,7 @@ function LoginForm() {
             </button>
 
             {/* Register Link */}
-            <p className="text-center text-sm text-gray-500">
+            <p className="text-center text-sm text-gray-500 dark:text-gray-300">
               Bạn chưa có tài khoản?{' '}
               <Link href="/register" className="font-semibold text-brand hover:text-orange-600 transition-colors">
                 Đăng ký
@@ -222,25 +208,25 @@ function LoginForm() {
 
       {/* Footer */}
       <footer className="w-full px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10">
-        <p className="text-xs text-gray-600">© 2025 Giáo Xứ Thiên Ân. All right reserved.</p>
+        <p className="text-xs text-gray-600 dark:text-gray-400">© 2025 Giáo Xứ Thiên Ân. All right reserved.</p>
         <div className="flex items-center gap-6">
           <Link
             href="/privacy"
-            className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-brand transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-brand transition-colors"
           >
             <Lock className="w-4 h-4" />
             Riêng tư
           </Link>
           <Link
             href="/terms"
-            className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-brand transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-brand transition-colors"
           >
             <FileText className="w-4 h-4" />
             Điều khoản
           </Link>
           <Link
             href="/help"
-            className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-brand transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-brand transition-colors"
           >
             <HelpCircle className="w-4 h-4" />
             Trợ giúp

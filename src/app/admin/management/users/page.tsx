@@ -218,14 +218,14 @@ export default function UsersPage() {
       {/* Search and Actions Bar */}
       <div className="flex items-center justify-between">
         {/* Search Input */}
-        <div className="flex items-center gap-2 h-[42px] px-3 bg-white border border-[#E5E1DC] rounded-xl w-[320px]">
+        <div className="flex items-center gap-2 h-[42px] px-3 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl w-[320px]">
           <Search className="w-5 h-5 text-primary-3" />
           <input
             type="text"
             placeholder="Tìm kiếm theo tên, username,..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 h-full bg-transparent text-sm text-black placeholder:text-primary-3 border-none focus:outline-none"
+            className="flex-1 h-full bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"
           />
         </div>
 
@@ -233,7 +233,7 @@ export default function UsersPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl text-sm font-medium text-primary-3 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 h-[42px] px-4 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl text-sm font-medium text-primary-3 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
           >
             <FileSpreadsheet className="w-4 h-4" />
             Import Excel
@@ -258,19 +258,19 @@ export default function UsersPage() {
               setIsBranchDropdownOpen(false)
               setIsClassDropdownOpen(false)
             }}
-            className="flex items-center justify-between gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl min-w-[160px] text-sm text-primary-3 hover:bg-gray-50 transition-colors"
+            className="flex items-center justify-between gap-2 h-[42px] px-4 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl min-w-[160px] text-sm text-primary-3 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
           >
             <span>{filterRole === 'all' ? 'Tất cả vai trò' : ROLE_LABELS[filterRole]}</span>
             <ChevronDown className={`w-4 h-4 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {isRoleDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden">
+            <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden">
               <button
                 onClick={() => {
                   setFilterRole('all')
                   setIsRoleDropdownOpen(false)
                 }}
-                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterRole === 'all' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterRole === 'all' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
               >
                 Tất cả vai trò
               </button>
@@ -281,7 +281,7 @@ export default function UsersPage() {
                     setFilterRole(key as UserRole)
                     setIsRoleDropdownOpen(false)
                   }}
-                  className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterRole === key ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                  className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterRole === key ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                 >
                   {label}
                 </button>
@@ -298,19 +298,19 @@ export default function UsersPage() {
               setIsRoleDropdownOpen(false)
               setIsClassDropdownOpen(false)
             }}
-            className="flex items-center justify-between gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl min-w-[160px] text-sm text-primary-3 hover:bg-gray-50 transition-colors"
+            className="flex items-center justify-between gap-2 h-[42px] px-4 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl min-w-[160px] text-sm text-primary-3 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
           >
             <span>{filterBranch === 'all' ? 'Tất cả ngành' : filterBranch}</span>
             <ChevronDown className={`w-4 h-4 transition-transform ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {isBranchDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden">
+            <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden">
               <button
                 onClick={() => {
                   setFilterBranch('all')
                   setIsBranchDropdownOpen(false)
                 }}
-                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterBranch === 'all' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterBranch === 'all' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
               >
                 Tất cả ngành
               </button>
@@ -322,7 +322,7 @@ export default function UsersPage() {
                     setFilterClass('all')
                     setIsBranchDropdownOpen(false)
                   }}
-                  className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterBranch === branch ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                  className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterBranch === branch ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                 >
                   {branch}
                 </button>
@@ -342,8 +342,8 @@ export default function UsersPage() {
               }
             }}
             disabled={filterBranch === 'all'}
-            className={`flex items-center justify-between gap-2 h-[42px] px-4 bg-white border border-[#E5E1DC] rounded-xl min-w-[180px] text-sm text-primary-3 transition-colors ${
-              filterBranch === 'all' ? 'cursor-not-allowed opacity-60' : 'hover:bg-gray-50'
+            className={`flex items-center justify-between gap-2 h-[42px] px-4 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl min-w-[180px] text-sm text-primary-3 transition-colors ${
+              filterBranch === 'all' ? 'cursor-not-allowed opacity-60' : 'hover:bg-gray-50 dark:hover:bg-white/10'
             }`}
           >
             <span>
@@ -356,13 +356,13 @@ export default function UsersPage() {
             <ChevronDown className={`w-4 h-4 transition-transform ${isClassDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {isClassDropdownOpen && filterBranch !== 'all' && (
-            <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-10 overflow-hidden max-h-[200px] overflow-y-auto">
+            <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden max-h-[200px] overflow-y-auto">
               <button
                 onClick={() => {
                   setFilterClass('all')
                   setIsClassDropdownOpen(false)
                 }}
-                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterClass === 'all' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterClass === 'all' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
               >
                 Tất cả lớp
               </button>
@@ -374,7 +374,7 @@ export default function UsersPage() {
                       setFilterClass(cls.id)
                       setIsClassDropdownOpen(false)
                     }}
-                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterClass === cls.id ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterClass === cls.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                   >
                     {cls.name}
                   </button>
@@ -395,7 +395,7 @@ export default function UsersPage() {
           className={`flex items-center gap-2 h-[42px] px-4 rounded-xl text-sm font-medium transition-colors ${
             hasActiveFilters
               ? 'bg-brand text-white hover:bg-orange-500'
-              : 'bg-[#F6F6F6] text-primary-3 cursor-not-allowed'
+              : 'bg-[#F6F6F6] dark:bg-white/5 text-primary-3 cursor-not-allowed'
           }`}
         >
           <X className="w-4 h-4" />
@@ -404,9 +404,9 @@ export default function UsersPage() {
       </div>
 
       {/* Users Table */}
-      <div className="bg-white border border-[#E5E1DC] rounded-2xl overflow-hidden">
+      <div className="bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-2xl overflow-hidden">
         {/* Table Header */}
-        <div className="grid grid-cols-[1fr_140px_140px_140px_100px_120px] gap-4 px-4 py-3 bg-[#FAFAFA] border-b border-[#E5E1DC]">
+        <div className="grid grid-cols-[1fr_140px_140px_140px_100px_120px] gap-4 px-4 py-3 bg-[#FAFAFA] dark:bg-white/5 border-b border-[#E5E1DC]">
           <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Người dùng</div>
           <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Vai trò</div>
           <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Ngành/ Lớp</div>
@@ -435,7 +435,7 @@ export default function UsersPage() {
             {filteredUsers.map((user) => (
               <div
                 key={user.id}
-                className="grid grid-cols-[1fr_140px_140px_140px_100px_120px] gap-4 px-4 py-3 items-center hover:bg-[#FAFAFA] transition-colors"
+                className="grid grid-cols-[1fr_140px_140px_140px_100px_120px] gap-4 px-4 py-3 items-center hover:bg-[#FAFAFA] dark:hover:bg-white/5 transition-colors"
               >
                 {/* User Info */}
                 <div
@@ -458,7 +458,7 @@ export default function UsersPage() {
                     )}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-black hover:text-brand transition-colors">{user.saint_name} {user.full_name}</span>
+                    <span className="text-sm font-medium text-black dark:text-white hover:text-brand transition-colors">{user.saint_name} {user.full_name}</span>
                     <span className="text-xs text-primary-3">{user.username || user.email}</span>
                   </div>
                 </div>
@@ -477,7 +477,7 @@ export default function UsersPage() {
                 </div>
 
                 {/* Contact */}
-                <div className="text-sm text-black">{user.phone || '-'}</div>
+                <div className="text-sm text-black dark:text-white">{user.phone || '-'}</div>
 
                 {/* Status */}
                 <div>
@@ -490,13 +490,13 @@ export default function UsersPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleOpenEditForm(user)}
-                    className="w-8 h-8 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+                    className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
                   >
                     <Edit2 className="w-4 h-4 text-primary-3" />
                   </button>
                   <button
                     onClick={() => handleOpenResetPasswordModal(user)}
-                    className="w-8 h-8 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+                    className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
                   >
                     <KeyRound className="w-4 h-4 text-primary-3" />
                   </button>

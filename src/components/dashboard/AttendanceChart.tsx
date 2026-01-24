@@ -24,15 +24,15 @@ export default function AttendanceChart() {
   }
 
   return (
-    <div className="bg-white rounded-2xl p-3 border border-gray-100 w-full h-full flex flex-col">
+    <div className="bg-white dark:bg-white/10 rounded-2xl p-3 border border-gray-100 dark:border-white/10 w-full h-full flex flex-col">
       {/* Header */}
       <div className="flex items-start justify-between mb-3 flex-shrink-0">
         <div>
-          <h3 className="text-xl font-medium text-gray-900 leading-tight">Điểm danh</h3>
-          <p className="text-xl font-medium text-gray-900 leading-tight">7 ngày qua</p>
+          <h3 className="text-xl font-medium text-gray-900 dark:text-white leading-tight">Điểm danh</h3>
+          <p className="text-xl font-medium text-gray-900 dark:text-white leading-tight">7 ngày qua</p>
         </div>
-        <button className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
-          <ArrowUpRight className="w-4 h-4 text-gray-600" />
+        <button className="w-8 h-8 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+          <ArrowUpRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />
         </button>
       </div>
 
@@ -41,7 +41,7 @@ export default function AttendanceChart() {
         {data.map((day, index) => (
           <div key={index} className="flex flex-col h-full">
             {/* Day Label */}
-            <p className="text-[10px] font-medium text-gray-900 mb-1 flex-shrink-0">{day.label}</p>
+            <p className="text-[10px] font-medium text-gray-900 dark:text-white mb-1 flex-shrink-0">{day.label}</p>
 
             {/* Bars Container */}
             <div className="flex gap-1 items-end h-[150px]">
@@ -56,11 +56,11 @@ export default function AttendanceChart() {
 
               {/* Absent Bar - Gray */}
               <div
-                className="flex-1 bg-gray-100 rounded-md p-1.5 flex flex-col justify-start transition-all duration-500"
+                className="flex-1 bg-gray-100 dark:bg-white/10 rounded-md p-1.5 flex flex-col justify-start transition-all duration-500"
                 style={{ height: `${getBarHeightPercentage(day.absent)}%` }}
               >
-                <p className="text-[10px] font-medium text-gray-900">{day.absent}</p>
-                <p className="text-[9px] text-gray-500">Vắng mặt</p>
+                <p className="text-[10px] font-medium text-gray-900 dark:text-white">{day.absent}</p>
+                <p className="text-[9px] text-gray-500 dark:text-gray-300">Vắng mặt</p>
               </div>
             </div>
           </div>

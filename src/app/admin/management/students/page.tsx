@@ -279,7 +279,7 @@ export default function StudentsPage() {
   }
 
   return (
-    <div className="bg-[#F6F6F6] border border-white/60 rounded-2xl">
+    <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 rounded-2xl">
       {/* Header with Search and Filters */}
       <div className="px-6 py-4 border-b border-[#E5E1DC]">
         <div className="flex items-center justify-between">
@@ -291,7 +291,7 @@ export default function StudentsPage() {
               placeholder="Tìm kiếm theo tên, mã thiếu nhi,..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-[280px] h-[38px] bg-transparent text-sm text-black placeholder:text-primary-3 border-none focus:outline-none"
+              className="w-[280px] h-[38px] bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"
             />
           </div>
 
@@ -304,25 +304,25 @@ export default function StudentsPage() {
                   setIsClassDropdownOpen(!isClassDropdownOpen)
                   setIsStatusDropdownOpen(false)
                 }}
-                className="flex items-center justify-between gap-2 h-9 px-4 bg-white rounded-full text-sm text-black hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-between gap-2 h-9 px-4 bg-white dark:bg-white/10 rounded-full text-sm text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
               >
                 <span>{filterClass === 'all' ? 'Tất cả lớp' : getClassName(filterClass)}</span>
                 <ChevronDown className={`w-4 h-4 transition-transform ${isClassDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
               {isClassDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1 w-[200px] bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden max-h-[300px] overflow-y-auto">
+                <div className="absolute top-full right-0 mt-1 w-[200px] bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden max-h-[300px] overflow-y-auto">
                   <button
                     onClick={() => {
                       setFilterClass('all')
                       setIsClassDropdownOpen(false)
                     }}
-                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterClass === 'all' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterClass === 'all' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                   >
                     Tất cả lớp
                   </button>
                   {Object.entries(classesGroupedByBranch).map(([branch, branchClasses]) => (
                     <div key={branch}>
-                      <div className="px-4 py-2 text-xs font-semibold text-primary-3 uppercase bg-gray-50">
+                      <div className="px-4 py-2 text-xs font-semibold text-primary-3 uppercase bg-gray-50 dark:bg-white/5">
                         {branch}
                       </div>
                       {branchClasses.map((cls) => (
@@ -332,7 +332,7 @@ export default function StudentsPage() {
                             setFilterClass(cls.id)
                             setIsClassDropdownOpen(false)
                           }}
-                          className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterClass === cls.id ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                          className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterClass === cls.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                         >
                           {cls.name}
                         </button>
@@ -350,7 +350,7 @@ export default function StudentsPage() {
                   setIsStatusDropdownOpen(!isStatusDropdownOpen)
                   setIsClassDropdownOpen(false)
                 }}
-                className="flex items-center justify-between gap-2 h-9 px-4 bg-white rounded-full text-sm text-black hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-between gap-2 h-9 px-4 bg-white dark:bg-white/10 rounded-full text-sm text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
               >
                 <span>
                   {filterStatus === 'all' ? 'Tất cả trạng thái' : filterStatus === 'ACTIVE' ? 'Đang học' : 'Nghỉ học'}
@@ -358,13 +358,13 @@ export default function StudentsPage() {
                 <ChevronDown className={`w-4 h-4 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
               {isStatusDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden">
+                <div className="absolute top-full right-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden">
                   <button
                     onClick={() => {
                       setFilterStatus('all')
                       setIsStatusDropdownOpen(false)
                     }}
-                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterStatus === 'all' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterStatus === 'all' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                   >
                     Tất cả trạng thái
                   </button>
@@ -373,7 +373,7 @@ export default function StudentsPage() {
                       setFilterStatus('ACTIVE')
                       setIsStatusDropdownOpen(false)
                     }}
-                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterStatus === 'ACTIVE' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterStatus === 'ACTIVE' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                   >
                     Đang học
                   </button>
@@ -382,7 +382,7 @@ export default function StudentsPage() {
                       setFilterStatus('INACTIVE')
                       setIsStatusDropdownOpen(false)
                     }}
-                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${filterStatus === 'INACTIVE' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${filterStatus === 'INACTIVE' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                   >
                     Nghỉ học
                   </button>
@@ -405,7 +405,7 @@ export default function StudentsPage() {
             {/* Add Button - White with orange border */}
             <button
               onClick={() => router.push('/admin/management/students/add')}
-              className="flex items-center gap-2 h-[37px] px-5 bg-white border border-brand rounded-full text-sm font-medium text-brand hover:bg-brand/5 transition-colors"
+              className="flex items-center gap-2 h-[37px] px-5 bg-white dark:bg-white/10 border border-brand rounded-full text-sm font-medium text-brand hover:bg-brand/5 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Thêm
@@ -513,7 +513,7 @@ export default function StudentsPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={14} className="py-16 text-center bg-white">
+                <td colSpan={14} className="py-16 text-center bg-white dark:bg-white/10">
                   <div className="flex items-center justify-center">
                     <svg
                       className="animate-spin h-8 w-8 text-brand"
@@ -540,7 +540,7 @@ export default function StudentsPage() {
               </tr>
             ) : filteredStudents.length === 0 ? (
               <tr>
-                <td colSpan={14} className="py-16 text-center bg-white">
+                <td colSpan={14} className="py-16 text-center bg-white dark:bg-white/10">
                   <div className="flex flex-col items-center text-[#8B8685]">
                     {/* Empty state icon */}
                     <svg className="w-12 h-12 mb-3" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -742,7 +742,7 @@ export default function StudentsPage() {
                             {/* Medal/Award Icon - Chỉnh sửa điểm */}
                             <button
                               onClick={() => startEditing(student)}
-                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
                               title="Chỉnh sửa điểm"
                             >
                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -753,7 +753,7 @@ export default function StudentsPage() {
                             {/* Calendar Icon - Xem điểm danh */}
                             <button
                               onClick={() => router.push(`/admin/management/students/${student.id}/attendance`)}
-                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
                               title="Xem điểm danh"
                             >
                               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -766,7 +766,7 @@ export default function StudentsPage() {
                             {/* Edit Icon - Chỉnh sửa thiếu nhi */}
                             <button
                               onClick={() => router.push(`/admin/management/students/${student.id}/edit`)}
-                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] flex items-center justify-center hover:bg-gray-200 transition-colors"
+                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
                               title="Chỉnh sửa thiếu nhi"
                             >
                               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">

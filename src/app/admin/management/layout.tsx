@@ -70,7 +70,7 @@ const sidebarItems = [
 ]
 
 export default function ManagementLayout({ children }: ManagementLayoutProps) {
-  const { user, loading, isAdmin } = useAuth()
+  const { user, loading, isAdmin, logout } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -121,6 +121,7 @@ export default function ManagementLayout({ children }: ManagementLayoutProps) {
         userRole={ROLE_LABELS[user.role]}
         activeTab="management"
         userAvatar={user.avatar_url}
+        onLogout={logout}
       />
 
       {/* Main Content Area */}
@@ -137,7 +138,7 @@ export default function ManagementLayout({ children }: ManagementLayoutProps) {
                   className={`flex items-center gap-3 pl-2 pr-4 h-14 rounded-full transition-all shadow-sm ${
                     isActive
                       ? 'bg-brand text-white'
-                      : 'bg-[#F6F6F6] text-black hover:bg-gray-100'
+                      : 'bg-[#F6F6F6] dark:bg-white/10 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-white/20'
                   }`}
                 >
                   {/* Icon Circle */}

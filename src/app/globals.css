@@ -169,6 +169,14 @@
   --black-1: #000000;
 }
 
+.dark {
+  --background: #0a0a0a;
+  --foreground: #e5e5e5;
+  --primary-4: #2a2a2a;
+  --white-0: #1a1a1a;
+  --black-1: #ffffff;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -196,6 +204,11 @@ input[type="checkbox"] {
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
+}
+
+.dark input[type="checkbox"] {
+  background-color: #2a2a2a;
+  border-color: #4a4a4a;
 }
 
 input[type="checkbox"]:checked {
@@ -278,6 +291,18 @@ button:focus {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary-3);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
 }
 
 @layer utilities {

@@ -83,7 +83,7 @@ function SidebarButton({
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-2 h-14 rounded-full transition-all shadow-sm ${active
         ? 'bg-brand text-white'
-        : 'bg-[#F6F6F6] text-black hover:bg-gray-200'
+        : 'bg-[#F6F6F6] dark:bg-white/10 text-black dark:text-white hover:bg-gray-200 dark:hover:bg-white/10'
         }`}
     >
       <div
@@ -116,7 +116,7 @@ function Dropdown({
     <div className={`relative ${className}`}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="h-[38px] px-4 bg-white border border-white/60 rounded-full flex items-center gap-2 text-base font-semibold text-black whitespace-nowrap"
+        className="h-[38px] px-4 bg-white dark:bg-white/10 border border-white/60 dark:border-white/10 rounded-full flex items-center gap-2 text-base font-semibold text-black dark:text-white whitespace-nowrap"
       >
         <span>{selectedOption?.label || value}</span>
         <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -124,7 +124,7 @@ function Dropdown({
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full mt-1 left-0 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20 min-w-full">
+          <div className="absolute top-full mt-1 left-0 bg-white dark:bg-[#1a1a1a] rounded-xl shadow-lg border border-gray-100 dark:border-white/10 py-1 z-20 min-w-full">
             {options.map(option => (
               <button
                 key={option.value}
@@ -132,7 +132,7 @@ function Dropdown({
                   onChange(option.value)
                   setIsOpen(false)
                 }}
-                className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${option.value === value ? 'text-brand font-medium' : 'text-black'
+                className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${option.value === value ? 'text-brand font-medium' : 'text-black dark:text-white'
                   }`}
               >
                 {option.label}
@@ -282,23 +282,23 @@ function ClassStatsCard({
     <div
       className={`relative rounded-[15px] p-4 flex-1 min-w-[200px] h-[130px] overflow-hidden flex flex-col justify-between ${isPrimary
         ? 'bg-brand text-white'
-        : 'bg-white border border-white/60'
+        : 'bg-white dark:bg-white/10 border border-white/60 dark:border-white/10'
         }`}
     >
       {/* Title */}
-      <p className={`text-sm font-medium ${isPrimary ? 'text-white/80' : 'text-black/80'}`}>
+      <p className={`text-sm font-medium ${isPrimary ? 'text-white/80' : 'text-black/80 dark:text-white/80'}`}>
         {title}
       </p>
 
       {/* Value and Chart Row */}
       <div className="flex items-end justify-between">
-        <span className={`text-[40px] font-bold leading-none ${isPrimary ? 'text-white' : 'text-black'}`}>
+        <span className={`text-[40px] font-bold leading-none ${isPrimary ? 'text-white' : 'text-black dark:text-white'}`}>
           {value}
         </span>
 
         {/* Icon button in corner */}
         <div
-          className={`absolute top-3 right-3 w-11 h-11 rounded-full flex items-center justify-center ${isPrimary ? 'bg-white/10' : 'bg-[#F6F6F6]'
+          className={`absolute top-3 right-3 w-11 h-11 rounded-full flex items-center justify-center ${isPrimary ? 'bg-white/10' : 'bg-[#F6F6F6] dark:bg-white/10'
             }`}
         >
           <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
@@ -340,12 +340,12 @@ function ClassBarChart({
   const chartHeight = 260
 
   return (
-    <div className="bg-white rounded-[20px] p-6 shadow-[0px_20px_50px_rgba(191,21,108,0.05)]">
+    <div className="bg-white dark:bg-white/10 rounded-[20px] p-6 shadow-[0px_20px_50px_rgba(191,21,108,0.05)]">
       {/* Header Row */}
       <div className="flex items-start justify-between mb-6">
         {/* Left: Title */}
         <div>
-          <h3 className="text-[18px] font-bold text-black">{branchName}</h3>
+          <h3 className="text-[18px] font-bold text-black dark:text-white">{branchName}</h3>
           <p className="text-[14px] font-medium text-[#666D80]">{totalClasses} lớp</p>
         </div>
 
@@ -428,10 +428,10 @@ function StatsCard({
   type: 'line' | 'bar' | 'progress'
 }) {
   return (
-    <div className="relative bg-[#F6F6F6] rounded-[15px] p-4 flex-1 min-w-[280px] h-[165px] border border-[#E5E1DC] overflow-hidden flex flex-col">
+    <div className="relative bg-[#F6F6F6] dark:bg-white/5 rounded-[15px] p-4 flex-1 min-w-[280px] h-[165px] border border-[#E5E1DC] dark:border-white/10 overflow-hidden flex flex-col">
       {/* Header Row: Title + Icon */}
       <div className="flex items-start justify-between">
-        <p className="text-sm font-medium text-black/80">{title}</p>
+        <p className="text-sm font-medium text-black/80 dark:text-white/80">{title}</p>
         {/* Icon in top right corner */}
         <div className="w-10 h-10 rounded-full bg-black/[0.03] backdrop-blur-[4px] flex items-center justify-center border border-white/20">
           <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
@@ -449,7 +449,7 @@ function StatsCard({
       {/* Value and Chart Row */}
       <div className="flex items-end justify-between flex-1 mt-auto">
         {/* Value */}
-        <p className="text-[32px] font-bold text-black leading-none">{value.toLocaleString()}</p>
+        <p className="text-[32px] font-bold text-black dark:text-white leading-none">{value.toLocaleString()}</p>
 
         {/* Mini Chart */}
         <div className="flex-shrink-0">
@@ -530,12 +530,12 @@ function BranchCard({
     <div
       className={`relative rounded-[20px] p-4 h-[110px] flex-1 overflow-hidden ${variant === 'primary'
         ? 'bg-brand text-white'
-        : 'bg-white border border-white/60'
+        : 'bg-white dark:bg-white/10 border border-white/60 dark:border-white/10'
         }`}
     >
       {/* Title */}
       <p
-        className={`text-sm font-medium ${variant === 'primary' ? 'text-white/80' : 'text-black/60'
+        className={`text-sm font-medium ${variant === 'primary' ? 'text-white/80' : 'text-black/60 dark:text-white/60'
           }`}
       >
         {name}
@@ -545,12 +545,12 @@ function BranchCard({
       <div className="flex items-end justify-between mt-1">
         <div className="flex items-baseline gap-2">
           <span
-            className={`text-[36px] font-bold leading-none ${variant === 'primary' ? 'text-white' : 'text-black'}`}
+            className={`text-[36px] font-bold leading-none ${variant === 'primary' ? 'text-white' : 'text-black dark:text-white'}`}
           >
             {value}
           </span>
           <span
-            className={`text-sm ${variant === 'primary' ? 'text-white/60' : 'text-black/40'}`}
+            className={`text-sm ${variant === 'primary' ? 'text-white/60' : 'text-black/40 dark:text-white/40'}`}
           >
             -{total} HS
           </span>
@@ -597,7 +597,7 @@ function BranchCard({
           }`}
       >
         <TrendingUp
-          className={`w-4 h-4 ${variant === 'primary' ? 'text-white' : 'text-black/40'}`}
+          className={`w-4 h-4 ${variant === 'primary' ? 'text-white' : 'text-black/40 dark:text-white/40'}`}
         />
       </button>
     </div>
@@ -622,11 +622,11 @@ function BarChart({ data, chartType }: { data: ChartDataItem[], chartType: Chart
   const dayIndicator = chartType === 'sunday' ? 'Chủ nhật' : 'Thứ năm'
 
   return (
-    <div className="bg-white rounded-[15px] p-6 border border-white/60">
+    <div className="bg-white dark:bg-white/10 rounded-[15px] p-6 border border-white/60 dark:border-white/10">
       {/* Header Row - Title + Indicator */}
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="text-[26px] font-semibold text-black">{chartTitle}</h3>
+          <h3 className="text-[26px] font-semibold text-black dark:text-white">{chartTitle}</h3>
           <p className="text-[14px] font-medium mt-1" style={{ color: '#666D80' }}>Số điểm danh theo ngành - 3 tuần gần nhất</p>
         </div>
 
@@ -1177,7 +1177,7 @@ export default function PerformancePage() {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          <p className="text-gray-500 text-sm">Đang tải...</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Đang tải...</p>
         </div>
       </div>
     )
@@ -1218,12 +1218,12 @@ export default function PerformancePage() {
         <div className="mb-6">
           <Link
             href="/admin/dashboard"
-            className="inline-flex items-center gap-1.5 text-xs text-[#666d80] hover:text-black transition-colors mb-1"
+            className="inline-flex items-center gap-1.5 text-xs text-[#666d80] hover:text-black dark:hover:text-white transition-colors mb-1"
           >
             <ArrowLeft className="w-5 h-5" />
             <span>Quay trở lại</span>
           </Link>
-          <h1 className="text-[40px] font-bold text-black">So sánh hiệu suất</h1>
+          <h1 className="text-[40px] font-bold text-black dark:text-white">So sánh hiệu suất</h1>
         </div>
 
         {/* Top Row: Sidebar + Stats + Refresh + Right Controls */}
@@ -1268,8 +1268,8 @@ export default function PerformancePage() {
                   <div className="flex flex-col gap-3 w-[280px] flex-shrink-0">
                     {/* Date display - horizontal row */}
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-base font-semibold text-black whitespace-nowrap">{capitalizedDate}</span>
-                      <button className="h-[44px] px-5 bg-[#E5E1DC] border border-white/60 rounded-full text-base text-[#8A8C90] transition-all whitespace-nowrap">
+                      <span className="text-base font-semibold text-black dark:text-white whitespace-nowrap">{capitalizedDate}</span>
+                      <button className="h-[44px] px-5 bg-[#E5E1DC] dark:bg-white/20 border border-white/60 dark:border-white/10 rounded-full text-base text-[#8A8C90] transition-all whitespace-nowrap">
                         Hôm nay
                       </button>
                     </div>
@@ -1277,18 +1277,18 @@ export default function PerformancePage() {
                     {/* Chart type buttons - stacked vertically */}
                     <button
                       onClick={() => setChartType('thursday')}
-                      className={`h-[48px] w-full rounded-full text-base font-medium transition-all whitespace-nowrap border border-white/60 ${chartType === 'thursday'
+                      className={`h-[48px] w-full rounded-full text-base font-medium transition-all whitespace-nowrap border border-white/60 dark:border-white/10 ${chartType === 'thursday'
                         ? 'bg-[#FA865E] text-white'
-                        : 'bg-white text-black'
+                        : 'bg-white dark:bg-white/10 text-black dark:text-white'
                         }`}
                     >
                       Biểu đồ Thứ Năm
                     </button>
                     <button
                       onClick={() => setChartType('sunday')}
-                      className={`h-[48px] w-full rounded-full text-base font-medium transition-all whitespace-nowrap border border-white/60 ${chartType === 'sunday'
+                      className={`h-[48px] w-full rounded-full text-base font-medium transition-all whitespace-nowrap border border-white/60 dark:border-white/10 ${chartType === 'sunday'
                         ? 'bg-[#FA865E] text-white'
-                        : 'bg-white text-black'
+                        : 'bg-white dark:bg-white/10 text-black dark:text-white'
                         }`}
                     >
                       Biểu đồ Chúa Nhật
@@ -1299,7 +1299,7 @@ export default function PerformancePage() {
                 {/* Chart Section */}
                 <div>
                   {dataLoading ? (
-                    <div className="bg-white rounded-[15px] p-6 border border-white/60 h-[400px] flex items-center justify-center">
+                    <div className="bg-white dark:bg-white/10 rounded-[15px] p-6 border border-white/60 dark:border-white/10 h-[400px] flex items-center justify-center">
                       <div className="flex flex-col items-center gap-4">
                         <svg
                           className="animate-spin h-8 w-8 text-brand"
@@ -1310,7 +1310,7 @@ export default function PerformancePage() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <p className="text-gray-500 text-sm">Đang tải dữ liệu...</p>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">Đang tải dữ liệu...</p>
                       </div>
                     </div>
                   ) : (
@@ -1351,8 +1351,8 @@ export default function PerformancePage() {
                 <div className="flex items-center justify-between">
                   {/* Left: Date + Today button */}
                   <div className="flex items-center gap-4">
-                    <span className="text-[18px] text-black">{capitalizedDate}</span>
-                    <button className="h-[38px] px-4 bg-white border border-white/60 rounded-full text-[18px] text-black">
+                    <span className="text-[18px] text-black dark:text-white">{capitalizedDate}</span>
+                    <button className="h-[38px] px-4 bg-white dark:bg-white/10 border border-white/60 dark:border-white/10 rounded-full text-[18px] text-black dark:text-white">
                       Hôm nay
                     </button>
                   </div>
@@ -1387,7 +1387,7 @@ export default function PerformancePage() {
 
                 {/* Title Section */}
                 <div>
-                  <h2 className="text-[26px] font-semibold text-black">
+                  <h2 className="text-[26px] font-semibold text-black dark:text-white">
                     Thống kê theo lớp - {branchDisplayNames[selectedBranch]}
                   </h2>
                   <p className="text-[14px] font-medium text-[#666D80]">
@@ -1423,7 +1423,7 @@ export default function PerformancePage() {
                 {/* Class Bar Chart */}
                 <div>
                   {classDataLoading ? (
-                    <div className="bg-white rounded-[20px] p-6 shadow-[0px_20px_50px_rgba(191,21,108,0.05)] h-[400px] flex items-center justify-center">
+                    <div className="bg-white dark:bg-white/10 rounded-[20px] p-6 shadow-[0px_20px_50px_rgba(191,21,108,0.05)] h-[400px] flex items-center justify-center">
                       <div className="flex flex-col items-center gap-4">
                         <svg
                           className="animate-spin h-8 w-8 text-brand"
@@ -1434,7 +1434,7 @@ export default function PerformancePage() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <p className="text-gray-500 text-sm">Đang tải dữ liệu...</p>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">Đang tải dữ liệu...</p>
                       </div>
                     </div>
                   ) : classAttendanceData.length > 0 ? (
@@ -1445,8 +1445,8 @@ export default function PerformancePage() {
                       dayLabel={selectedDayType === 'cn' ? 'Chủ nhật' : 'Thứ năm'}
                     />
                   ) : (
-                    <div className="bg-white rounded-[20px] p-6 shadow-[0px_20px_50px_rgba(191,21,108,0.05)] h-[400px] flex items-center justify-center">
-                      <p className="text-gray-500 text-sm">Không có dữ liệu cho ngành này</p>
+                    <div className="bg-white dark:bg-white/10 rounded-[20px] p-6 shadow-[0px_20px_50px_rgba(191,21,108,0.05)] h-[400px] flex items-center justify-center">
+                      <p className="text-gray-500 dark:text-gray-400 text-sm">Không có dữ liệu cho ngành này</p>
                     </div>
                   )}
                 </div>

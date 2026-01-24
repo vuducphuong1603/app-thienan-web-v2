@@ -50,6 +50,12 @@ interface StudentWithAttendance extends ThieuNhiProfile {
   attendance_time?: string
   attendance_by?: string
   attendance_record_id?: string
+  // Compensatory attendance fields
+  has_thursday_attendance?: boolean
+  has_compensatory_attendance?: boolean
+  compensatory_record_id?: string
+  compensatory_time?: string
+  compensatory_by?: string
 }
 
 type TabType = 'attendance' | 'report'
@@ -74,6 +80,7 @@ export default function ActivitiesPage() {
   // QR Modal states
   const [isQRModalOpen, setIsQRModalOpen] = useState(false)
   const [selectedStudentForQR, setSelectedStudentForQR] = useState<StudentWithAttendance | null>(null)
+  const [isQRForCompensatory, setIsQRForCompensatory] = useState(false)
 
   // Confirmation Modal states
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
@@ -157,6 +164,51 @@ export default function ActivitiesPage() {
   const dayOfWeek = getDayOfWeek(selectedDate)
   const dayType = getDayType(selectedDate)
 
+  // Compensatory mode: when selected day is Mon-Wed, Fri-Sat (not Thu5 or CN)
+  const isCompensatoryMode = (() => {
+    const date = new Date(selectedDate)
+    const dayIndex = date.getDay()
+    // 1=Mon, 2=Tue, 3=Wed, 5=Fri, 6=Sat
+    return [1, 2, 3, 5, 6].includes(dayIndex)
+  })()
+
+  // Get the Thursday of the week for compensatory attendance
+  const getThursdayOfWeek = (dateString: string): string => {
+    const date = new Date(dateString)
+    const dayIndex = date.getDay()
+    let daysToThursday = 4 - dayIndex
+    if (dayIndex === 0) {
+      daysToThursday = -3
+    }
+    const thursday = new Date(date)
+    thursday.setDate(date.getDate() + daysToThursday)
+    return thursday.toISOString().split('T')[0]
+  }
+
+  // Get the start of the week (Monday)
+  const getWeekStart = (dateString: string): string => {
+    const date = new Date(dateString)
+    const dayIndex = date.getDay()
+    const daysToMonday = dayIndex === 0 ? -6 : 1 - dayIndex
+    const monday = new Date(date)
+    monday.setDate(date.getDate() + daysToMonday)
+    return monday.toISOString().split('T')[0]
+  }
+
+  // Get the end of the week (Sunday)
+  const getWeekEnd = (dateString: string): string => {
+    const date = new Date(dateString)
+    const dayIndex = date.getDay()
+    const daysToSunday = dayIndex === 0 ? 0 : 7 - dayIndex
+    const sunday = new Date(date)
+    sunday.setDate(date.getDate() + daysToSunday)
+    return sunday.toISOString().split('T')[0]
+  }
+
+  const thursdayOfWeek = getThursdayOfWeek(selectedDate)
+  const weekStart = getWeekStart(selectedDate)
+  const weekEnd = getWeekEnd(selectedDate)
+
   // Show notification
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message })
@@ -215,58 +267,227 @@ export default function ActivitiesPage() {
       // Get class name
       const selectedClass = classes.find(c => c.id === selectedClassId)
 
-      // Fetch attendance records for this class on selected date
-      let attendanceData: (AttendanceRecord & { created_by_user?: { full_name: string } })[] | null = null
-      try {
-        const { data, error: attendanceError } = await supabase
-          .from('attendance_records')
-          .select('*')
-          .eq('class_id', selectedClassId)
-          .eq('attendance_date', selectedDate)
+      if (isCompensatoryMode) {
+        // Compensatory mode: check Thursday attendance and existing compensatory records
+        const studentIds = (studentsData || []).map(s => s.id)
 
-        if (!attendanceError) {
-          attendanceData = data
-        } else {
-          console.warn('Attendance table may not exist yet:', attendanceError.message)
+        // Query all Thursday records (both regular and compensatory now share attendance_date = thursdayOfWeek)
+        // Filter out compensatory records to identify only regular Thursday attendance
+        const thursdayAttendanceMap = new Map<string, { check_in_time?: string; created_by?: string }>()
+        if (studentIds.length > 0) {
+          const { data: thursdayData } = await supabase
+            .from('attendance_records')
+            .select('student_id, is_compensatory, check_in_time, created_by')
+            .in('student_id', studentIds)
+            .eq('attendance_date', thursdayOfWeek)
+            .eq('day_type', 'thu5')
+            .eq('status', 'present')
+
+          if (thursdayData) {
+            thursdayData.forEach(record => {
+              // Only count as regular Thursday attendance if is_compensatory is not true
+              if (!record.is_compensatory) {
+                thursdayAttendanceMap.set(record.student_id, {
+                  check_in_time: record.check_in_time,
+                  created_by: record.created_by,
+                })
+              }
+            })
+          }
         }
-      } catch {
-        console.warn('Could not fetch attendance records - table may not exist')
-      }
 
-      // Map attendance records to students
-      const attendanceMap = new Map<string, AttendanceRecord & { created_by_user?: { full_name: string } }>()
-      if (attendanceData) {
-        attendanceData.forEach(record => {
-          attendanceMap.set(record.student_id, record)
+        // Check for compensatory attendance that compensates for this week's Thursday
+        const compensatoryMap = new Map<string, { id: string; check_in_time?: string; created_by?: string }>()
+        if (studentIds.length > 0) {
+          try {
+            const { data: compensatoryData } = await supabase
+              .from('attendance_records')
+              .select('id, student_id, check_in_time, created_by')
+              .in('student_id', studentIds)
+              .eq('is_compensatory', true)
+              .eq('compensated_for_date', thursdayOfWeek)
+              .eq('status', 'present')
+
+            if (compensatoryData) {
+              compensatoryData.forEach(record => {
+                compensatoryMap.set(record.student_id, {
+                  id: record.id,
+                  check_in_time: record.check_in_time,
+                  created_by: record.created_by,
+                })
+              })
+            }
+          } catch {
+            // Column might not exist yet
+          }
+        }
+
+        // Resolve created_by user IDs to names (both Thursday and compensatory)
+        const allCreatedByIds = [
+          ...Array.from(thursdayAttendanceMap.values()).map(v => v.created_by),
+          ...Array.from(compensatoryMap.values()).map(v => v.created_by),
+        ].filter((id): id is string => !!id)
+        const userNameMap = new Map<string, string>()
+        if (allCreatedByIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, full_name')
+            .in('id', Array.from(new Set(allCreatedByIds)))
+
+          if (usersData) {
+            usersData.forEach(u => userNameMap.set(u.id, u.full_name))
+          }
+        }
+
+        const studentsWithStatus: StudentWithAttendance[] = (studentsData || []).map(student => {
+          const thursdayRecord = thursdayAttendanceMap.get(student.id)
+          const hasThursday = !!thursdayRecord
+          const compensatory = compensatoryMap.get(student.id)
+
+          return {
+            ...student,
+            class_name: selectedClass?.name,
+            attendance_status: (hasThursday || !!compensatory) ? 'present' as const : null,
+            attendance_time: thursdayRecord?.check_in_time?.substring(0, 5),
+            attendance_by: thursdayRecord?.created_by ? userNameMap.get(thursdayRecord.created_by) : undefined,
+            has_thursday_attendance: hasThursday,
+            has_compensatory_attendance: !!compensatory,
+            compensatory_record_id: compensatory?.id,
+            compensatory_time: compensatory?.check_in_time?.substring(0, 5),
+            compensatory_by: compensatory?.created_by ? userNameMap.get(compensatory.created_by) : undefined,
+          }
         })
-      }
 
-      // Combine students with attendance data
-      const studentsWithAttendance: StudentWithAttendance[] = (studentsData || []).map(student => {
-        const attendance = attendanceMap.get(student.id)
-        return {
-          ...student,
-          class_name: selectedClass?.name,
-          attendance_status: attendance?.status || null,
-          attendance_time: attendance?.check_in_time?.substring(0, 5) || undefined,
-          attendance_by: attendance?.created_by_user?.full_name || undefined,
-          attendance_record_id: attendance?.id || undefined,
+        setStudents(studentsWithStatus)
+      } else {
+        // Normal mode: fetch attendance for selected date
+        let attendanceData: (AttendanceRecord & { created_by_user?: { full_name: string } })[] | null = null
+        try {
+          const { data, error: attendanceError } = await supabase
+            .from('attendance_records')
+            .select('*')
+            .eq('class_id', selectedClassId)
+            .eq('attendance_date', selectedDate)
+
+          if (!attendanceError) {
+            attendanceData = data
+          } else {
+            console.warn('Attendance table may not exist yet:', attendanceError.message)
+          }
+        } catch {
+          console.warn('Could not fetch attendance records - table may not exist')
         }
-      })
 
-      setStudents(studentsWithAttendance)
+        // If Thursday, also check for compensatory records for this Thursday
+        const compensatoryMap = new Map<string, { id: string; check_in_time?: string; created_by?: string }>()
+        if (dayType === 'thu5') {
+          const studentIds = (studentsData || []).map(s => s.id)
+          if (studentIds.length > 0) {
+            try {
+              const { data: compensatoryData } = await supabase
+                .from('attendance_records')
+                .select('id, student_id, check_in_time, created_by')
+                .in('student_id', studentIds)
+                .eq('is_compensatory', true)
+                .eq('compensated_for_date', selectedDate)
+                .eq('status', 'present')
+
+              if (compensatoryData) {
+                compensatoryData.forEach(record => {
+                  compensatoryMap.set(record.student_id, {
+                    id: record.id,
+                    check_in_time: record.check_in_time,
+                    created_by: record.created_by,
+                  })
+                })
+              }
+            } catch {
+              console.warn('Could not fetch compensatory records')
+            }
+          }
+        }
+
+        // Resolve created_by user IDs to names for compensatory records
+        const compensatoryUserIds = Array.from(compensatoryMap.values())
+          .map(v => v.created_by)
+          .filter((id): id is string => !!id)
+        const compensatoryUserNameMap = new Map<string, string>()
+        if (compensatoryUserIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, full_name')
+            .in('id', Array.from(new Set(compensatoryUserIds)))
+
+          if (usersData) {
+            usersData.forEach(u => compensatoryUserNameMap.set(u.id, u.full_name))
+          }
+        }
+
+        // Map attendance records to students (exclude compensatory records from regular attendance)
+        const attendanceMap = new Map<string, AttendanceRecord>()
+        if (attendanceData) {
+          attendanceData.forEach(record => {
+            // Skip compensatory records - they are handled separately via compensatoryMap
+            if ((record as unknown as { is_compensatory?: boolean }).is_compensatory === true) return
+            attendanceMap.set(record.student_id, record)
+          })
+        }
+
+        // Resolve created_by user IDs to names for regular attendance records
+        const attendanceUserIds = Array.from(attendanceMap.values())
+          .map(r => r.created_by)
+          .filter((id): id is string => !!id)
+        const attendanceUserNameMap = new Map<string, string>()
+        if (attendanceUserIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, full_name')
+            .in('id', Array.from(new Set(attendanceUserIds)))
+
+          if (usersData) {
+            usersData.forEach(u => attendanceUserNameMap.set(u.id, u.full_name))
+          }
+        }
+
+        // Combine students with attendance data
+        const studentsWithAttendance: StudentWithAttendance[] = (studentsData || []).map(student => {
+          const attendance = attendanceMap.get(student.id)
+          const compensatory = compensatoryMap.get(student.id)
+          return {
+            ...student,
+            class_name: selectedClass?.name,
+            attendance_status: attendance?.status || null,
+            attendance_time: attendance?.check_in_time?.substring(0, 5) || undefined,
+            attendance_by: attendance?.created_by ? attendanceUserNameMap.get(attendance.created_by) : undefined,
+            attendance_record_id: attendance?.id || undefined,
+            has_compensatory_attendance: !!compensatory,
+            compensatory_record_id: compensatory?.id,
+            compensatory_time: compensatory?.check_in_time?.substring(0, 5),
+            compensatory_by: compensatory?.created_by ? compensatoryUserNameMap.get(compensatory.created_by) : undefined,
+          }
+        })
+
+        setStudents(studentsWithAttendance)
+      }
     } catch (error) {
       console.error('Error:', error)
       showNotification('error', 'Đã có lỗi xảy ra')
     } finally {
       setLoading(false)
     }
-  }, [selectedClassId, selectedDate, classes])
+  }, [selectedClassId, selectedDate, classes, isCompensatoryMode, weekStart, weekEnd, thursdayOfWeek])
 
   useEffect(() => {
     fetchClasses()
     fetchSchoolYear()
   }, [fetchClasses, fetchSchoolYear])
+
+  // Auto-fetch students when date or class changes
+  useEffect(() => {
+    if (selectedClassId) {
+      fetchStudents()
+    }
+  }, [selectedClassId, selectedDate, fetchStudents])
 
   // Group classes by branch
   const classesGroupedByBranch = BRANCHES.reduce((acc, branch) => {
@@ -330,7 +551,41 @@ export default function ActivitiesPage() {
       return
     }
 
+    // Case 2: Block marking Thursday attendance if student already compensated for this Thursday
+    if (dayType === 'thu5') {
+      const student = students.find(s => s.id === studentId)
+      if (student?.has_compensatory_attendance) {
+        showNotification('error', 'Thiếu nhi này đã điểm danh bù cho Thứ 5 này rồi')
+        return
+      }
+    }
+
     setSaving(studentId)
+
+    // Server-side check for Thursday: verify no compensatory record exists
+    if (dayType === 'thu5') {
+      try {
+        const { data: existingCompensatory } = await supabase
+          .from('attendance_records')
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('is_compensatory', true)
+          .eq('compensated_for_date', selectedDate)
+          .eq('status', 'present')
+          .limit(1)
+
+        if (existingCompensatory && existingCompensatory.length > 0) {
+          setStudents(prev => prev.map(s =>
+            s.id === studentId ? { ...s, has_compensatory_attendance: true, compensatory_record_id: existingCompensatory[0].id } : s
+          ))
+          showNotification('error', 'Thiếu nhi này đã điểm danh bù cho Thứ 5 này rồi, không thể điểm danh trực tiếp')
+          setSaving(null)
+          return
+        }
+      } catch {
+        // If query fails (column doesn't exist), proceed normally
+      }
+    }
     try {
       const now = new Date()
       const checkInTime = now.toTimeString().substring(0, 8)
@@ -379,14 +634,12 @@ export default function ActivitiesPage() {
           : s
       ))
 
-      // Update attendance count in thieu_nhi table
-      await updateAttendanceCount(studentId)
-
+      setSaving(null)
       showNotification('success', status === 'present' ? 'Đã điểm danh có mặt' : 'Đã điểm danh vắng mặt')
+      updateAttendanceCount(studentId)
     } catch (error) {
       console.error('Error:', error)
       showNotification('error', 'Đã có lỗi xảy ra')
-    } finally {
       setSaving(null)
     }
   }
@@ -398,7 +651,7 @@ export default function ActivitiesPage() {
       return
     }
 
-    const studentsToMark = students.filter(s => s.attendance_status === null)
+    const studentsToMark = students.filter(s => s.attendance_status === null && !s.has_compensatory_attendance)
     if (studentsToMark.length === 0) {
       showNotification('success', 'Tất cả đã được điểm danh')
       return
@@ -446,14 +699,12 @@ export default function ActivitiesPage() {
         attendance_by: s.attendance_by || user?.full_name || 'Người dùng hiện tại',
       })))
 
-      // Update attendance count for all marked students
-      await Promise.all(studentsToMark.map(student => updateAttendanceCount(student.id)))
-
+      setSaving(null)
       showNotification('success', `Đã điểm danh ${studentsToMark.length} thiếu nhi`)
+      Promise.all(studentsToMark.map(student => updateAttendanceCount(student.id)))
     } catch (error) {
       console.error('Error:', error)
       showNotification('error', 'Đã có lỗi xảy ra')
-    } finally {
       setSaving(null)
     }
   }
@@ -495,14 +746,175 @@ export default function ActivitiesPage() {
           : s
       ))
 
-      // Update attendance count in thieu_nhi table
-      await updateAttendanceCount(studentId)
-
+      setSaving(null)
       showNotification('success', 'Đã xóa điểm danh')
+      updateAttendanceCount(studentId)
     } catch (error) {
       console.error('Error:', error)
       showNotification('error', 'Đã có lỗi xảy ra')
-    } finally {
+      setSaving(null)
+    }
+  }
+
+  // Handle compensatory attendance marking
+  const markCompensatoryAttendance = async (studentId: string) => {
+    if (!isCompensatoryMode) {
+      showNotification('error', 'Chỉ bổ sung điểm danh vào Thứ 2, 3, 4, 6, 7')
+      return
+    }
+
+    const student = students.find(s => s.id === studentId)
+    if (!student) return
+
+    if (student.has_thursday_attendance) {
+      showNotification('error', 'Thiếu nhi này đã điểm danh vào Thứ 5 tuần này')
+      return
+    }
+
+    if (student.has_compensatory_attendance) {
+      showNotification('error', 'Thiếu nhi này đã bổ sung điểm danh cho Thứ 5 tuần này rồi')
+      return
+    }
+
+    setSaving(studentId)
+    try {
+      // Server-side check: verify student hasn't already attended Thursday this week
+      const { data: existingThursday } = await supabase
+        .from('attendance_records')
+        .select('id')
+        .eq('student_id', studentId)
+        .eq('attendance_date', thursdayOfWeek)
+        .eq('day_type', 'thu5')
+        .eq('status', 'present')
+        .is('is_compensatory', null)
+        .limit(1)
+
+      // Also check for is_compensatory = false
+      const { data: existingThursdayFalse } = await supabase
+        .from('attendance_records')
+        .select('id')
+        .eq('student_id', studentId)
+        .eq('attendance_date', thursdayOfWeek)
+        .eq('day_type', 'thu5')
+        .eq('status', 'present')
+        .eq('is_compensatory', false)
+        .limit(1)
+
+      if ((existingThursday && existingThursday.length > 0) || (existingThursdayFalse && existingThursdayFalse.length > 0)) {
+        // Update local state to reflect actual Thursday attendance
+        setStudents(prev => prev.map(s =>
+          s.id === studentId ? { ...s, has_thursday_attendance: true } : s
+        ))
+        showNotification('error', 'Thiếu nhi này đã điểm danh Thứ 5 tuần này rồi, không thể bổ sung')
+        setSaving(null)
+        return
+      }
+
+      // Server-side check: verify student hasn't already compensated for this Thursday
+      const { data: existingCompensatory } = await supabase
+        .from('attendance_records')
+        .select('id')
+        .eq('student_id', studentId)
+        .eq('is_compensatory', true)
+        .eq('compensated_for_date', thursdayOfWeek)
+        .eq('status', 'present')
+        .limit(1)
+
+      if (existingCompensatory && existingCompensatory.length > 0) {
+        setStudents(prev => prev.map(s =>
+          s.id === studentId ? { ...s, has_compensatory_attendance: true, compensatory_record_id: existingCompensatory[0].id } : s
+        ))
+        showNotification('error', 'Thiếu nhi này đã bổ sung điểm danh cho Thứ 5 tuần này rồi')
+        setSaving(null)
+        return
+      }
+
+      const now = new Date()
+      const checkInTime = now.toTimeString().substring(0, 8)
+
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .insert({
+          student_id: studentId,
+          class_id: selectedClassId,
+          school_year_id: schoolYear?.id,
+          attendance_date: thursdayOfWeek,
+          day_type: 'thu5',
+          status: 'present',
+          check_in_time: checkInTime,
+          check_in_method: 'manual',
+          is_compensatory: true,
+          compensated_for_date: thursdayOfWeek,
+          notes: `Bổ sung điểm danh ngày ${selectedDate} cho Thứ 5 ngày ${thursdayOfWeek}`,
+          created_by: user?.id,
+        })
+        .select('id')
+        .single()
+
+      if (error) {
+        console.error('Error saving compensatory attendance:', error)
+        if (error.code === '23505') {
+          showNotification('error', 'Đã có bản ghi điểm danh cho ngày này')
+        } else {
+          showNotification('error', 'Không thể lưu điểm danh: ' + error.message)
+        }
+        return
+      }
+
+      // Update local state
+      setStudents(prev => prev.map(s =>
+        s.id === studentId
+          ? {
+              ...s,
+              attendance_status: 'present' as const,
+              has_compensatory_attendance: true,
+              compensatory_record_id: data?.id,
+              compensatory_time: checkInTime.substring(0, 5),
+              compensatory_by: user?.full_name,
+            }
+          : s
+      ))
+
+      setSaving(null)
+      showNotification('success', `Đã bổ sung điểm danh cho ${student.full_name}`)
+      updateAttendanceCount(studentId)
+    } catch (error) {
+      console.error('Error:', error)
+      showNotification('error', 'Đã có lỗi xảy ra')
+      setSaving(null)
+    }
+  }
+
+  // Clear compensatory attendance
+  const clearCompensatoryAttendance = async (studentId: string) => {
+    const student = students.find(s => s.id === studentId)
+    if (!student?.compensatory_record_id) return
+
+    setSaving(studentId)
+    try {
+      const { error } = await supabase
+        .from('attendance_records')
+        .delete()
+        .eq('id', student.compensatory_record_id)
+
+      if (error) {
+        console.error('Error deleting compensatory attendance:', error)
+        showNotification('error', 'Không thể xóa điểm danh bổ sung: ' + error.message)
+        return
+      }
+
+      setStudents(prev => prev.map(s =>
+        s.id === studentId
+          ? { ...s, attendance_status: null, has_compensatory_attendance: false, compensatory_record_id: undefined, compensatory_time: undefined }
+          : s
+      ))
+
+      setSaving(null)
+      showNotification('success', 'Đã xóa điểm danh bổ sung')
+      updateAttendanceCount(studentId)
+    } catch (error) {
+      console.error('Error:', error)
+      showNotification('error', 'Đã có lỗi xảy ra')
       setSaving(null)
     }
   }
@@ -514,24 +926,31 @@ export default function ActivitiesPage() {
   }
 
   // Open QR modal for a student
-  const openQRModal = (student: StudentWithAttendance) => {
+  const openQRModal = (student: StudentWithAttendance, forCompensatory = false) => {
     setSelectedStudentForQR(student)
+    setIsQRForCompensatory(forCompensatory)
     setIsQRModalOpen(true)
   }
 
   // Handle manual attendance from QR modal
   const handleManualAttendanceFromModal = () => {
     if (selectedStudentForQR) {
-      markAttendance(selectedStudentForQR.id, 'present')
+      if (isQRForCompensatory) {
+        markCompensatoryAttendance(selectedStudentForQR.id)
+      } else {
+        markAttendance(selectedStudentForQR.id, 'present')
+      }
     }
     setIsQRModalOpen(false)
     setSelectedStudentForQR(null)
+    setIsQRForCompensatory(false)
   }
 
   // Close QR modal
   const closeQRModal = () => {
     setIsQRModalOpen(false)
     setSelectedStudentForQR(null)
+    setIsQRForCompensatory(false)
   }
 
   // Open confirmation modal for a student
@@ -813,13 +1232,12 @@ export default function ActivitiesPage() {
           }
         })
 
-        // Count not checked
+        // Count not checked: each student counts as +1 if they have at least one null date
         reportStudentsData.forEach(student => {
-          sortedDates.forEach(date => {
-            if (student.attendance[date] === null) {
-              notChecked++
-            }
-          })
+          const hasNullDate = sortedDates.some(date => student.attendance[date] === null)
+          if (hasNullDate) {
+            notChecked++
+          }
         })
 
         setReportStats({
@@ -916,7 +1334,7 @@ export default function ActivitiesPage() {
           className={`h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors ${
             activeTab === 'attendance'
               ? 'bg-brand'
-              : 'bg-[#f6f6f6] hover:bg-[#eee]'
+              : 'bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10'
           }`}
         >
           <div className={`w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] ${
@@ -927,7 +1345,7 @@ export default function ActivitiesPage() {
             <List className={`w-5 h-5 ${activeTab === 'attendance' ? 'text-white' : 'text-brand'}`} />
           </div>
           <span className={`text-base font-semibold ${
-            activeTab === 'attendance' ? 'text-white' : 'text-black opacity-80'
+            activeTab === 'attendance' ? 'text-white' : 'text-black dark:text-white opacity-80'
           }`}>
             Điểm danh
           </span>
@@ -939,7 +1357,7 @@ export default function ActivitiesPage() {
           className={`h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors ${
             activeTab === 'report'
               ? 'bg-brand'
-              : 'bg-[#f6f6f6] hover:bg-[#eee]'
+              : 'bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10'
           }`}
         >
           <div className={`w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] ${
@@ -950,25 +1368,29 @@ export default function ActivitiesPage() {
             <FileText className={`w-5 h-5 ${activeTab === 'report' ? 'text-white' : 'text-brand'}`} />
           </div>
           <span className={`text-base font-semibold ${
-            activeTab === 'report' ? 'text-white' : 'text-black opacity-80'
+            activeTab === 'report' ? 'text-white' : 'text-black dark:text-white opacity-80'
           }`}>
             Báo cáo
           </span>
         </button>
+
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 bg-[#F6F6F6] border border-white rounded-2xl min-h-[768px]">
+      <div className="flex-1 min-w-0 bg-[#F6F6F6] dark:bg-white/5 border border-white dark:border-white/10 rounded-2xl min-h-[768px]">
         {activeTab === 'attendance' ? (
           <>
             {/* Header Section */}
             <div className="px-6 pt-6 pb-4">
               <div className="flex flex-col gap-1">
-                <h1 className="text-[26px] font-semibold text-black">Điểm danh</h1>
+                <h1 className="text-[26px] font-semibold text-black dark:text-white">Điểm danh</h1>
                 <p className="text-sm font-medium text-[#666d80]">
                   {selectedClassId ? `LỚP ${getClassName(selectedClassId).toUpperCase()}` : 'Chọn lớp để bắt đầu điểm danh'}
-                  {!dayType && selectedClassId && (
+                  {!dayType && selectedClassId && !isCompensatoryMode && (
                     <span className="text-orange-500 ml-2">(Chỉ điểm danh Thứ 5 hoặc Chủ nhật)</span>
+                  )}
+                  {isCompensatoryMode && selectedClassId && (
+                    <span className="text-blue-600 ml-2">(Bổ sung cho Thứ 5 ngày {formatDate(thursdayOfWeek)})</span>
                   )}
                 </p>
               </div>
@@ -984,13 +1406,13 @@ export default function ActivitiesPage() {
                       setIsClassDropdownOpen(!isClassDropdownOpen)
                       setIsDatePickerOpen(false)
                     }}
-                    className="flex items-center justify-between w-full h-[52px] px-6 bg-white rounded-full"
+                    className="flex items-center justify-between w-full h-[52px] px-6 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-base text-black">
+                    <span className="text-base text-black dark:text-white">
                       {selectedClassId ? getClassName(selectedClassId) : 'Chọn lớp'}
                     </span>
                     <svg
-                      className={`w-[9px] h-[18px] text-black transition-transform ${isClassDropdownOpen ? 'rotate-180' : ''}`}
+                      className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isClassDropdownOpen ? 'rotate-180' : ''}`}
                       viewBox="0 0 9 18"
                       fill="none"
                     >
@@ -1003,10 +1425,10 @@ export default function ActivitiesPage() {
                   </button>
 
                   {isClassDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden max-h-[350px] overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden max-h-[350px] overflow-y-auto">
                       {Object.entries(classesGroupedByBranch).map(([branch, branchClasses]) => (
                         <div key={branch}>
-                          <div className="px-5 py-2.5 text-sm font-semibold text-[#666d80] uppercase bg-gray-50">
+                          <div className="px-5 py-2.5 text-sm font-semibold text-[#666d80] uppercase bg-gray-50 dark:bg-white/5">
                             {branch}
                           </div>
                           {branchClasses.map((cls) => (
@@ -1016,8 +1438,8 @@ export default function ActivitiesPage() {
                                 setSelectedClassId(cls.id)
                                 setIsClassDropdownOpen(false)
                               }}
-                              className={`w-full px-5 py-3 text-left text-base hover:bg-gray-50 ${
-                                selectedClassId === cls.id ? 'bg-brand/10 text-brand' : 'text-black'
+                              className={`w-full px-5 py-3 text-left text-base hover:bg-gray-50 dark:hover:bg-white/10 ${
+                                selectedClassId === cls.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'
                               }`}
                             >
                               {cls.name}
@@ -1036,9 +1458,9 @@ export default function ActivitiesPage() {
                       setIsDatePickerOpen(!isDatePickerOpen)
                       setIsClassDropdownOpen(false)
                     }}
-                    className="flex items-center justify-between w-full h-[52px] px-6 bg-white rounded-full"
+                    className="flex items-center justify-between w-full h-[52px] px-6 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-base text-black">{formatDate(selectedDate)}</span>
+                    <span className="text-base text-black dark:text-white">{formatDate(selectedDate)}</span>
                     {/* Calendar Icon from Figma */}
                     <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <rect x="2" y="4" width="20" height="18" rx="3" stroke="#8A8C90" strokeWidth="1.5"/>
@@ -1055,12 +1477,15 @@ export default function ActivitiesPage() {
                   </button>
 
                   {isDatePickerOpen && (
-                    <div className="absolute top-full left-0 mt-1 z-20">
+                    <div className="absolute top-full right-0 mt-1 z-20">
                       <CustomCalendar
                         value={selectedDate}
-                        onChange={(date) => setSelectedDate(date)}
+                        onChange={(date) => {
+                          setSelectedDate(date)
+                          setIsDatePickerOpen(false)
+                        }}
                         onClose={() => setIsDatePickerOpen(false)}
-                        showConfirmButton={true}
+                        showConfirmButton={false}
                         highlightWeek={true}
                       />
                     </div>
@@ -1069,10 +1494,15 @@ export default function ActivitiesPage() {
 
                 {/* Day Badge */}
                 <div className={`h-[52px] px-8 border border-[#F6F6F6] rounded-full flex items-center justify-center flex-1 ${
-                  dayType ? 'bg-[#E5E1DC]' : 'bg-orange-100'
+                  dayType ? 'bg-[#E5E1DC]' : isCompensatoryMode ? 'bg-blue-100' : 'bg-orange-100'
                 }`}>
-                  <span className={`text-base ${dayType ? 'text-black' : 'text-orange-600'}`}>
-                    Buổi: {dayOfWeek.toLowerCase()} {!dayType && '(không điểm danh)'}
+                  <span className={`text-base ${dayType ? 'text-black dark:text-white' : isCompensatoryMode ? 'text-blue-700' : 'text-orange-600'}`}>
+                    {dayType
+                      ? `Buổi: ${dayOfWeek.toLowerCase()}`
+                      : isCompensatoryMode
+                        ? `Bổ sung Thứ 5`
+                        : `Buổi: ${dayOfWeek.toLowerCase()} (không điểm danh)`
+                    }
                   </span>
                 </div>
 
@@ -1093,11 +1523,11 @@ export default function ActivitiesPage() {
 
             {/* Content Area */}
             <div className="px-6 pb-6">
-              <div className="bg-white rounded-3xl min-h-[580px]">
+              <div className="bg-white dark:bg-white/10 rounded-3xl min-h-[580px]">
                 {!selectedClassId || students.length === 0 ? (
                   /* Empty State */
                   <div className="flex flex-col items-center justify-center h-[580px]">
-                    <div className="bg-[#f6f6f6] rounded-2xl px-10 py-6 flex flex-col items-center gap-2">
+                    <div className="bg-[#f6f6f6] dark:bg-white/5 rounded-2xl px-10 py-6 flex flex-col items-center gap-2">
                       {/* Calendar Icon */}
                       <svg className="w-12 h-12" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <rect x="3" y="6" width="30" height="27" rx="3" stroke="#f6f6f6" strokeWidth="2" fill="#f6f6f6"/>
@@ -1112,8 +1542,8 @@ export default function ActivitiesPage() {
                         <rect x="22" y="22" width="6" height="4" rx="1" fill="#666d80"/>
                         <rect x="8" y="28" width="6" height="4" rx="1" fill="#666d80"/>
                       </svg>
-                      <p className="text-sm text-black">
-                        {selectedClassId ? 'Nhấn "Tải dữ liệu" để xem danh sách' : 'Chọn lớp để bắt đầu điểm danh'}
+                      <p className="text-sm text-black dark:text-white">
+                        {selectedClassId ? 'Nhấn "Tải dữ liệu" hoặc chọn ngày trên lịch để xem danh sách' : 'Chọn lớp để bắt đầu điểm danh'}
                       </p>
                     </div>
                   </div>
@@ -1122,11 +1552,13 @@ export default function ActivitiesPage() {
                   <div className="p-6">
                     {/* Stats Row */}
                     <div className="flex items-stretch gap-4 mb-6">
-                      {/* Có mặt Card */}
-                      <div className="h-[130px] flex-1 bg-brand rounded-[18px] p-5 flex flex-col justify-between relative overflow-hidden">
+                      {/* Có mặt / Đã bổ sung Card */}
+                      <div className={`h-[130px] flex-1 rounded-[18px] p-5 flex flex-col justify-between relative overflow-hidden ${
+                        isCompensatoryMode ? 'bg-blue-500' : 'bg-brand'
+                      }`}>
                         <div className="flex items-start justify-between">
                           <div className="flex flex-col gap-1">
-                            <span className="text-sm text-white/80">Có mặt</span>
+                            <span className="text-sm text-white/80">{isCompensatoryMode ? 'Đã đi/bổ sung' : 'Có mặt'}</span>
                           </div>
                           {/* Chart icon in circle */}
                           <div className="w-[48px] h-[48px] rounded-full bg-white/10 backdrop-blur-[4.24px] flex items-center justify-center border border-white/20">
@@ -1135,36 +1567,41 @@ export default function ActivitiesPage() {
                             </svg>
                           </div>
                         </div>
-                        <span className="text-[48px] font-bold text-white leading-none">{presentCount}</span>
-                        {/* Decorative wave chart */}
-                        <div className="absolute bottom-0 left-0 right-0 h-[45px]">
-                          <svg viewBox="0 0 300 45" fill="none" preserveAspectRatio="none" className="w-full h-full">
-                            <path d="M0 20C30 35 50 8 90 25C130 42 150 12 190 28C220 40 240 20 267 30" stroke="url(#wave1)" strokeWidth="2.6" fill="none"/>
-                            <path d="M0 15C25 35 60 5 100 22C140 38 165 10 200 25C240 38 255 18 267 28" stroke="url(#wave2)" strokeWidth="2.6" fill="none"/>
+                        <span className="text-[48px] font-bold text-white leading-none">
+                          {isCompensatoryMode
+                            ? students.filter(s => s.has_thursday_attendance || s.has_compensatory_attendance).length
+                            : presentCount
+                          }
+                        </span>
+                        {/* Decorative graph */}
+                        <div className="absolute bottom-4 right-4">
+                          <svg width="93" height="25" viewBox="0 0 93 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1.17773 19.5001C38.5648 -28.6006 38.3594 44.0149 65.2699 16.7144C70.0294 11.8859 81.6216 5.94291 91.9749 18.5717" stroke="url(#paint0_wave)" strokeWidth="2.6"/>
+                            <path d="M0.766602 14.8571C34.8669 39.7433 28.0879 -19.5005 58.2852 17.8285C61.9828 23.7716 75.1299 29.3431 91.5638 10.7714" stroke="url(#paint1_wave)" strokeWidth="2.6"/>
+                            <path d="M23.3638 0.519531C24.7153 0.519554 25.719 1.49912 25.7192 2.59961C25.7192 3.70027 24.7155 4.67967 23.3638 4.67969C22.012 4.67969 21.0073 3.70028 21.0073 2.59961C21.0076 1.49911 22.0122 0.519531 23.3638 0.519531Z" fill="#FA865E" stroke="white" strokeWidth="1.04"/>
                             <defs>
-                              <linearGradient id="wave1" x1="0" y1="20" x2="267" y2="20">
+                              <linearGradient id="paint0_wave" x1="1.17773" y1="12.8221" x2="91.7695" y2="12.8221" gradientUnits="userSpaceOnUse">
                                 <stop stopColor="white" stopOpacity="0"/>
-                                <stop offset="0.25" stopColor="white"/>
-                                <stop offset="0.75" stopColor="white"/>
+                                <stop offset="0.257" stopColor="white"/>
+                                <stop offset="0.527" stopColor="white"/>
+                                <stop offset="0.789" stopColor="white"/>
                                 <stop offset="1" stopColor="white" stopOpacity="0"/>
                               </linearGradient>
-                              <linearGradient id="wave2" x1="0" y1="20" x2="267" y2="20">
+                              <linearGradient id="paint1_wave" x1="0.766602" y1="14.3078" x2="91.3584" y2="14.3078" gradientUnits="userSpaceOnUse">
                                 <stop stopColor="white" stopOpacity="0"/>
-                                <stop offset="0.6" stopColor="white"/>
+                                <stop offset="0.597" stopColor="white"/>
                                 <stop offset="1" stopColor="white" stopOpacity="0"/>
                               </linearGradient>
                             </defs>
                           </svg>
-                          {/* Dot indicator */}
-                          <div className="absolute left-[85px] top-[15px] w-[9px] h-[9px] rounded-full bg-brand border-2 border-white"/>
                         </div>
                       </div>
 
                       {/* Tổng số Card */}
-                      <div className="h-[130px] flex-1 bg-white border border-white/60 rounded-[18px] p-5 flex flex-col justify-between">
+                      <div className="h-[130px] flex-1 bg-white dark:bg-white/10 border border-white/60 rounded-[18px] p-5 flex flex-col justify-between">
                         <div className="flex items-start justify-between">
                           <div className="flex flex-col gap-1">
-                            <span className="text-sm text-black/80">Tổng số</span>
+                            <span className="text-sm text-black/80 dark:text-white/80">Tổng số</span>
                             <span className="text-xs text-[#666d80]">Năm học {schoolYear?.name || '2025-2026'}</span>
                           </div>
                           {/* Activity icon */}
@@ -1175,7 +1612,7 @@ export default function ActivitiesPage() {
                           </div>
                         </div>
                         <div className="flex items-end justify-between">
-                          <span className="text-[48px] font-bold text-black leading-none">{totalStudents}</span>
+                          <span className="text-[48px] font-bold text-black dark:text-white leading-none">{totalStudents}</span>
                           {/* Mini bar chart */}
                           <div className="flex items-end gap-2 h-[28px] mr-2">
                             <div className="w-[16px] h-[4px] rounded-full bg-[#E5E1DC]"/>
@@ -1191,11 +1628,11 @@ export default function ActivitiesPage() {
                       </div>
 
                       {/* Chưa điểm danh Card */}
-                      <div className="h-[130px] flex-1 bg-white border border-white/60 rounded-[18px] p-5 flex flex-col justify-between">
+                      <div className="h-[130px] flex-1 bg-white dark:bg-white/10 border border-white/60 rounded-[18px] p-5 flex flex-col justify-between">
                         <div className="flex items-start justify-between">
                           <div className="flex flex-col gap-1">
-                            <span className="text-sm text-black/80">Chưa điểm danh</span>
-                            <span className="text-xs text-[#666d80]">Ngày {formatDate(selectedDate)}</span>
+                            <span className="text-sm text-black/80 dark:text-white/80">{isCompensatoryMode ? 'Chưa bổ sung' : 'Thiếu nhi chưa điểm danh'}</span>
+                            <span className="text-xs text-[#666d80]">{isCompensatoryMode ? `Thứ 5 ngày ${formatDate(thursdayOfWeek)}` : `Ngày ${formatDate(selectedDate)}`}</span>
                           </div>
                           {/* Moon icon */}
                           <div className="w-[48px] h-[48px] rounded-full bg-black/[0.03] flex items-center justify-center">
@@ -1205,7 +1642,12 @@ export default function ActivitiesPage() {
                           </div>
                         </div>
                         <div className="flex items-end justify-between">
-                          <span className="text-[48px] font-bold text-black leading-none">{notCheckedCount}</span>
+                          <span className="text-[48px] font-bold text-black dark:text-white leading-none">
+                            {isCompensatoryMode
+                              ? students.filter(s => !s.has_thursday_attendance && !s.has_compensatory_attendance).length
+                              : notCheckedCount
+                            }
+                          </span>
                           {/* Vertical indicator bars */}
                           <div className="flex items-end gap-[10px] h-[28px] mr-2">
                             {[
@@ -1233,30 +1675,50 @@ export default function ActivitiesPage() {
 
                       {/* Actions - Right side */}
                       <div className="flex-1 flex flex-col gap-2">
-                        {/* Mark All Present Checkbox */}
-                        <button
-                          onClick={markAllPresent}
-                          disabled={saving === 'all' || !dayType}
-                          className="h-[60px] w-full bg-white border border-white/60 rounded-[18px] flex items-center gap-4 px-5 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {saving === 'all' ? (
-                            <Loader2 className="w-[20px] h-[20px] animate-spin text-brand" />
-                          ) : (
-                            <div className="w-[20px] h-[20px] rounded border border-black flex items-center justify-center">
-                              <Check className="w-4 h-4 text-black" strokeWidth={2.5} />
+                        {isCompensatoryMode ? (
+                          /* Compensatory mode actions */
+                          <>
+                            <div className="h-[130px] bg-blue-50 border border-blue-200 rounded-[18px] p-5 flex flex-col justify-between">
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm font-medium text-blue-800">Bổ sung điểm danh Thứ 5</span>
+                                <span className="text-xs text-blue-600">
+                                  Tuần: {formatDate(weekStart)} - {formatDate(weekEnd)}
+                                </span>
+                              </div>
+                              <div className="text-xs text-blue-700 space-y-0.5">
+                                <p>Đã đi/bổ sung: <strong>{students.filter(s => s.has_thursday_attendance || s.has_compensatory_attendance).length}</strong></p>
+                                <p>Chưa điểm danh: <strong>{students.filter(s => !s.has_thursday_attendance && !s.has_compensatory_attendance).length}</strong></p>
+                              </div>
                             </div>
-                          )}
-                          <span className="text-sm text-black/80">Có mặt tất cả</span>
-                        </button>
+                          </>
+                        ) : (
+                          <>
+                            {/* Mark All Present Checkbox */}
+                            <button
+                              onClick={markAllPresent}
+                              disabled={saving === 'all' || !dayType}
+                              className="h-[60px] w-full bg-white dark:bg-white/10 border border-white/60 rounded-[18px] flex items-center gap-4 px-5 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {saving === 'all' ? (
+                                <Loader2 className="w-[20px] h-[20px] animate-spin text-brand" />
+                              ) : (
+                                <div className="w-[20px] h-[20px] rounded border border-black dark:border-white flex items-center justify-center">
+                                  <Check className="w-4 h-4 text-black dark:text-white" strokeWidth={2.5} />
+                                </div>
+                              )}
+                              <span className="text-sm text-black/80 dark:text-white/80">Có mặt tất cả</span>
+                            </button>
 
-                        {/* Import Excel Button */}
-                        <button
-                          onClick={openImportExcelModal}
-                          disabled={!dayType}
-                          className="h-[60px] w-full bg-[#E5E1DC] border border-white/60 rounded-[18px] flex items-center gap-4 px-5 hover:bg-[#d9d5d0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <span className="text-sm text-black/80">Import Excel</span>
-                        </button>
+                            {/* Import Excel Button */}
+                            <button
+                              onClick={openImportExcelModal}
+                              disabled={!dayType}
+                              className="h-[60px] w-full bg-[#E5E1DC] border border-white/60 rounded-[18px] flex items-center gap-4 px-5 hover:bg-[#d9d5d0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <span className="text-sm text-black/80 dark:text-white/80">Import Excel</span>
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -1269,7 +1731,158 @@ export default function ActivitiesPage() {
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
                         </div>
+                      ) : isCompensatoryMode ? (
+                        /* Compensatory mode student list - same layout as regular attendance */
+                        students.map((student, index) => (
+                          <div
+                            key={student.id}
+                            className={`flex items-center py-5 ${index !== students.length - 1 ? 'border-b border-[#f0f0f0]' : ''} ${saving === student.id ? 'opacity-50' : ''}`}
+                          >
+                            {/* Checkbox Column */}
+                            <div className="w-[60px] flex items-center justify-center">
+                              {saving === student.id ? (
+                                <Loader2 className="w-6 h-6 animate-spin text-brand" />
+                              ) : student.has_thursday_attendance || student.has_compensatory_attendance ? (
+                                <div className={`w-[26px] h-[26px] rounded-[5px] flex items-center justify-center ${
+                                  student.has_thursday_attendance ? 'bg-[#00a86b]' : 'bg-brand'
+                                }`}>
+                                  <Check className="w-5 h-5 text-white" strokeWidth={3} />
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => markCompensatoryAttendance(student.id)}
+                                  className="w-[26px] h-[26px] rounded-[5px] border-2 border-[#e0e0e0] hover:border-brand transition-colors"
+                                />
+                              )}
+                            </div>
+
+                            {/* Avatar Column */}
+                            <div className="w-[64px] flex items-center justify-center">
+                              <div className="w-12 h-12 rounded-full bg-[#f5eaf6] flex items-center justify-center overflow-hidden">
+                                {student.avatar_url ? (
+                                  <img
+                                    src={student.avatar_url}
+                                    alt={student.full_name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-base font-medium text-[#8B8685]">
+                                    {student.full_name.charAt(0)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Name & Code Column */}
+                            <div className="w-[220px] flex flex-col pl-3">
+                              <span className="text-base font-medium text-black dark:text-white leading-tight">
+                                {student.saint_name && `${student.saint_name} `}{student.full_name}
+                              </span>
+                              <span className="text-sm text-[#666d80] mt-1">{student.student_code || '---'}</span>
+                            </div>
+
+                            {/* Status Text Column */}
+                            <div className="w-[150px]">
+                              <span className={`text-base font-medium ${
+                                student.has_thursday_attendance
+                                  ? 'text-[#00a86b]'
+                                  : student.has_compensatory_attendance
+                                    ? 'text-[#00a86b]'
+                                    : 'text-brand'
+                              }`}>
+                                {student.has_thursday_attendance
+                                  ? 'Đã đi Thứ 5'
+                                  : student.has_compensatory_attendance
+                                    ? 'Đã bổ sung'
+                                    : 'Chưa điểm danh'
+                                }
+                              </span>
+                            </div>
+
+                            {/* Badge Column */}
+                            <div className="w-[120px]">
+                              {student.has_thursday_attendance ? (
+                                <div className="h-[34px] px-4 bg-[rgba(0,168,107,0.12)] rounded-full flex items-center gap-2">
+                                  <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-[#00a86b] flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-[#00a86b]" strokeWidth={3} />
+                                  </div>
+                                  <span className="text-sm font-medium text-[#00a86b]">Có mặt</span>
+                                </div>
+                              ) : student.has_compensatory_attendance ? (
+                                <div className="h-[34px] px-4 bg-[rgba(0,168,107,0.12)] rounded-full flex items-center gap-2">
+                                  <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-[#00a86b] flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-[#00a86b]" strokeWidth={3} />
+                                  </div>
+                                  <span className="text-sm font-medium text-[#00a86b]">Đã bổ sung</span>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => markCompensatoryAttendance(student.id)}
+                                  disabled={saving === student.id}
+                                  className="h-[34px] px-4 bg-[rgba(250,134,94,0.15)] rounded-full flex items-center gap-2 hover:bg-[rgba(250,134,94,0.25)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <Plus className="w-4 h-4 text-brand" strokeWidth={2.5} />
+                                  <span className="text-sm font-medium text-brand">Bổ sung</span>
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Timestamp & By Column */}
+                            <div className="flex-1 flex flex-col pl-5">
+                              {student.has_compensatory_attendance && student.compensatory_time ? (
+                                <>
+                                  <span className="text-sm font-medium text-black dark:text-white leading-tight">
+                                    {student.compensatory_time} {dayOfWeek} {formatDate(selectedDate)}
+                                  </span>
+                                  <span className="text-sm text-[#666d80] mt-0.5">
+                                    Bổ sung cho: Thứ 5 {formatDate(thursdayOfWeek)}
+                                  </span>
+                                  <span className="text-sm text-[#666d80] mt-0.5">
+                                    Điểm danh bởi: {student.compensatory_by || 'Không rõ'}
+                                  </span>
+                                </>
+                              ) : student.has_thursday_attendance ? (
+                                <>
+                                  <span className="text-sm font-medium text-black dark:text-white leading-tight">
+                                    {student.attendance_time ? `${student.attendance_time} ` : ''}Thứ 5 {formatDate(thursdayOfWeek)}
+                                  </span>
+                                  <span className="text-sm text-[#666d80] mt-0.5">
+                                    Điểm danh bởi: {student.attendance_by || 'Không rõ'}
+                                  </span>
+                                </>
+                              ) : null}
+                            </div>
+
+                            {/* Actions Column */}
+                            <div className="w-[80px] flex items-center justify-end gap-3">
+                              {student.has_compensatory_attendance ? (
+                                <button
+                                  onClick={() => clearCompensatoryAttendance(student.id)}
+                                  disabled={saving === student.id}
+                                  className="flex items-center justify-center hover:opacity-70 transition-opacity disabled:opacity-50"
+                                  title="Xóa điểm danh bổ sung"
+                                >
+                                  <svg width="18" height="18" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12.293 0.292896C12.6836 -0.0976321 13.3166 -0.0976321 13.7071 0.292896C14.0976 0.683425 14.0976 1.31645 13.7071 1.70697L8.41408 7L13.7071 12.293C14.0976 12.6836 14.0976 13.3166 13.7071 13.7071C13.3166 14.0976 12.6836 14.0976 12.293 13.7071L7 8.41408L1.70697 13.7071C1.31645 14.0976 0.683425 14.0976 0.292896 13.7071C-0.0976321 13.3166 -0.0976321 12.6836 0.292896 12.293L5.58592 7L0.292896 1.70697C-0.0976321 1.31645 -0.0976321 0.683425 0.292896 0.292896C0.683425 -0.0976321 1.31645 -0.0976321 1.70697 0.292896L7 5.58592L12.293 0.292896Z" fill="#8A8C90"/>
+                                  </svg>
+                                </button>
+                              ) : !student.has_thursday_attendance && (
+                                <button
+                                  onClick={() => openQRModal(student, true)}
+                                  disabled={saving === student.id}
+                                  className="flex items-center justify-center hover:opacity-70 transition-opacity disabled:opacity-50"
+                                  title="Quét QR điểm danh bổ sung"
+                                >
+                                  <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.2915 19.0834V17.1667H18.1665V14.2917H20.0832V17.6459C20.0832 18.0292 19.8915 18.3167 19.604 18.6042C19.3165 18.8917 18.9332 19.0834 18.6457 19.0834H15.2915ZM5.70825 19.0834H2.354C1.97067 19.0834 1.68317 18.8917 1.39567 18.6042C1.10817 18.3167 0.916504 17.9334 0.916504 17.6459V14.2917H2.83317V17.1667H5.70825V19.0834ZM15.2915 0.916748H18.6457C19.029 0.916748 19.3165 1.10841 19.604 1.39591C19.8915 1.68341 20.0832 1.97091 20.0832 2.35425V5.70841H18.1665V2.83341H15.2915V0.916748ZM5.70825 0.916748V2.83341H2.83317V5.70841H0.916504V2.35425C0.916504 1.97091 1.10817 1.68341 1.39567 1.39591C1.68317 1.10841 1.97067 0.916748 2.354 0.916748H5.70825ZM17.2082 9.54175H3.79159V11.4584H17.2082V9.54175Z" fill="#FA865E"/>
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))
                       ) : (
+                        /* Normal attendance mode student list */
                         students.map((student, index) => (
                           <div
                             key={student.id}
@@ -1283,6 +1896,10 @@ export default function ActivitiesPage() {
                                 <div className={`w-[26px] h-[26px] rounded-[5px] flex items-center justify-center ${
                                   student.attendance_status === 'present' ? 'bg-brand' : 'bg-[#666d80]'
                                 }`}>
+                                  <Check className="w-5 h-5 text-white" strokeWidth={3} />
+                                </div>
+                              ) : student.has_compensatory_attendance ? (
+                                <div className="w-[26px] h-[26px] rounded-[5px] flex items-center justify-center bg-blue-500">
                                   <Check className="w-5 h-5 text-white" strokeWidth={3} />
                                 </div>
                               ) : (
@@ -1313,7 +1930,7 @@ export default function ActivitiesPage() {
 
                             {/* Name & Code Column */}
                             <div className="w-[220px] flex flex-col pl-3">
-                              <span className="text-base font-medium text-black leading-tight">
+                              <span className="text-base font-medium text-black dark:text-white leading-tight">
                                 {student.saint_name && `${student.saint_name} `}{student.full_name}
                               </span>
                               <span className="text-sm text-[#666d80] mt-1">{student.student_code || '---'}</span>
@@ -1322,17 +1939,30 @@ export default function ActivitiesPage() {
                             {/* Status Text Column */}
                             <div className="w-[150px]">
                               <span className={`text-base font-medium ${
-                                student.attendance_status === null
-                                  ? 'text-brand'
-                                  : 'text-[#00a86b]'
+                                student.has_compensatory_attendance && !student.attendance_status
+                                  ? 'text-blue-600'
+                                  : student.attendance_status === null
+                                    ? 'text-brand'
+                                    : 'text-[#00a86b]'
                               }`}>
-                                {student.attendance_status === null ? 'Chưa điểm danh' : 'Đã điểm danh'}
+                                {student.has_compensatory_attendance && !student.attendance_status
+                                  ? 'Đã bổ sung'
+                                  : student.attendance_status === null
+                                    ? 'Chưa điểm danh'
+                                    : 'Đã điểm danh'}
                               </span>
                             </div>
 
                             {/* Attendance Badge Column */}
                             <div className="w-[120px]">
-                              {student.attendance_status === null ? (
+                              {student.has_compensatory_attendance && !student.attendance_status ? (
+                                <div className="h-[34px] px-4 rounded-full flex items-center gap-2 bg-blue-50">
+                                  <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-blue-500 flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-blue-500" strokeWidth={3} />
+                                  </div>
+                                  <span className="text-sm font-medium text-blue-600">Đã bổ sung</span>
+                                </div>
+                              ) : student.attendance_status === null ? (
                                 <button
                                   onClick={() => markAttendance(student.id, 'absent')}
                                   disabled={!dayType || saving === student.id}
@@ -1373,9 +2003,21 @@ export default function ActivitiesPage() {
 
                             {/* Timestamp & By Column */}
                             <div className="flex-1 flex flex-col pl-5">
-                              {student.attendance_status !== null ? (
+                              {student.has_compensatory_attendance && !student.attendance_status ? (
                                 <>
-                                  <span className="text-sm font-medium text-black leading-tight">
+                                  <span className="text-sm font-medium text-blue-600 leading-tight">
+                                    {student.compensatory_time} (Điểm danh bù)
+                                  </span>
+                                  <span className="text-sm text-[#666d80] mt-0.5">
+                                    Đã bổ sung cho Thứ 5 này
+                                  </span>
+                                  <span className="text-sm text-[#666d80] mt-0.5">
+                                    Điểm danh bởi: {student.compensatory_by || 'Không rõ'}
+                                  </span>
+                                </>
+                              ) : student.attendance_status !== null ? (
+                                <>
+                                  <span className="text-sm font-medium text-black dark:text-white leading-tight">
                                     {student.attendance_time} {dayOfWeek} {formatDate(selectedDate)}
                                   </span>
                                   <span className="text-sm text-[#666d80] mt-1">
@@ -1426,14 +2068,14 @@ export default function ActivitiesPage() {
             <div className="flex items-start gap-6 mb-6">
               {/* Title */}
               <div className="w-[300px]">
-                <h1 className="text-[26px] font-semibold text-black">Tạo báo cáo mới</h1>
+                <h1 className="text-[26px] font-semibold text-black dark:text-white">Tạo báo cáo mới</h1>
                 <p className="text-sm font-medium text-[#666d80] mt-1">Tạo và xuất báo cáo</p>
               </div>
 
               {/* Time Filter Mode Selector */}
-              <div className="flex-1 bg-white border border-[#e5e1dc] rounded-2xl overflow-hidden">
+              <div className="flex-1 bg-white dark:bg-white/10 border border-[#e5e1dc] rounded-2xl overflow-hidden">
                 <div className="flex items-center h-12 px-4">
-                  <span className="flex-1 text-base font-semibold text-black">Cách chọn lọc thời gian</span>
+                  <span className="flex-1 text-base font-semibold text-black dark:text-white">Cách chọn lọc thời gian</span>
                   <div className="flex items-center gap-4">
                     {/* Chọn tuần option */}
                     <button
@@ -1441,13 +2083,13 @@ export default function ActivitiesPage() {
                       className="flex items-center gap-2"
                     >
                       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        reportTimeFilterMode === 'week' ? 'border-brand' : 'border-gray-300'
+                        reportTimeFilterMode === 'week' ? 'border-brand' : 'border-gray-300 dark:border-white/30'
                       }`}>
                         {reportTimeFilterMode === 'week' && (
                           <div className="w-2 h-2 rounded-full bg-brand" />
                         )}
                       </div>
-                      <span className="text-sm font-medium text-black">Chọn tuần</span>
+                      <span className="text-sm font-medium text-black dark:text-white">Chọn tuần</span>
                     </button>
 
                     {/* Chọn từ ngày - đến ngày option */}
@@ -1456,13 +2098,13 @@ export default function ActivitiesPage() {
                       className="flex items-center gap-2"
                     >
                       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        reportTimeFilterMode === 'dateRange' ? 'border-brand' : 'border-gray-300'
+                        reportTimeFilterMode === 'dateRange' ? 'border-brand' : 'border-gray-300 dark:border-white/30'
                       }`}>
                         {reportTimeFilterMode === 'dateRange' && (
                           <div className="w-2 h-2 rounded-full bg-brand" />
                         )}
                       </div>
-                      <span className="text-sm font-medium text-black">Chọn từ ngày - đến ngày</span>
+                      <span className="text-sm font-medium text-black dark:text-white">Chọn từ ngày - đến ngày</span>
                     </button>
                   </div>
                 </div>
@@ -1485,13 +2127,13 @@ export default function ActivitiesPage() {
                           closeAllReportDropdowns()
                           setIsReportFromDatePickerOpen(!isReportFromDatePickerOpen)
                         }}
-                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                       >
-                        <span className="text-sm text-black">{formatDisplayDate(reportFromDate)}</span>
+                        <span className="text-sm text-black dark:text-white">{formatDisplayDate(reportFromDate)}</span>
                         <Calendar className="w-5 h-5 text-[#8A8C90]" />
                       </button>
                       {isReportFromDatePickerOpen && (
-                        <div className="absolute top-full left-0 mt-1 z-20">
+                        <div className="absolute top-full right-0 mt-1 z-20">
                           <CustomCalendar
                             value={reportFromDate}
                             onChange={(date) => setReportFromDate(date)}
@@ -1513,13 +2155,13 @@ export default function ActivitiesPage() {
                           closeAllReportDropdowns()
                           setIsReportToDatePickerOpen(!isReportToDatePickerOpen)
                         }}
-                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                       >
-                        <span className="text-sm text-black">{formatDisplayDate(reportToDate)}</span>
+                        <span className="text-sm text-black dark:text-white">{formatDisplayDate(reportToDate)}</span>
                         <Calendar className="w-5 h-5 text-[#8A8C90]" />
                       </button>
                       {isReportToDatePickerOpen && (
-                        <div className="absolute top-full left-0 mt-1 z-20">
+                        <div className="absolute top-full right-0 mt-1 z-20">
                           <CustomCalendar
                             value={reportToDate}
                             onChange={(date) => setReportToDate(date)}
@@ -1543,9 +2185,9 @@ export default function ActivitiesPage() {
                         closeAllReportDropdowns()
                         setIsReportWeekPickerOpen(!isReportWeekPickerOpen)
                       }}
-                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                     >
-                      <span className="text-sm text-black">
+                      <span className="text-sm text-black dark:text-white">
                         {reportWeekStart && reportWeekEnd
                           ? `${formatDisplayDate(reportWeekStart)} - ${formatDisplayDate(reportWeekEnd)}`
                           : 'Chọn tuần'}
@@ -1553,7 +2195,7 @@ export default function ActivitiesPage() {
                       <Calendar className="w-5 h-5 text-[#8A8C90]" />
                     </button>
                     {isReportWeekPickerOpen && (
-                      <div className="absolute top-full left-0 mt-1 z-20">
+                      <div className="absolute top-full right-0 mt-1 z-20">
                         <CustomCalendar
                           value={reportWeekStart}
                           onChange={(date) => {
@@ -1582,23 +2224,23 @@ export default function ActivitiesPage() {
                       closeAllReportDropdowns()
                       setIsReportTypeDropdownOpen(!isReportTypeDropdownOpen)
                     }}
-                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-sm text-black">
+                    <span className="text-sm text-black dark:text-white">
                       {reportType === 'attendance' ? 'Báo cáo điểm danh' : 'Báo cáo điểm số'}
                     </span>
-                    <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                    <svg className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isReportTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
                       <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
                     </svg>
                   </button>
                   {isReportTypeDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden">
                       <button
                         onClick={() => {
                           setReportType('attendance')
                           setIsReportTypeDropdownOpen(false)
                         }}
-                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportType === 'attendance' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${reportType === 'attendance' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                       >
                         Báo cáo điểm danh
                       </button>
@@ -1607,7 +2249,7 @@ export default function ActivitiesPage() {
                           setReportType('score')
                           setIsReportTypeDropdownOpen(false)
                         }}
-                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportType === 'score' ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${reportType === 'score' ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                       >
                         Báo cáo điểm số
                       </button>
@@ -1628,22 +2270,22 @@ export default function ActivitiesPage() {
                       closeAllReportDropdowns()
                       setIsReportBranchDropdownOpen(!isReportBranchDropdownOpen)
                     }}
-                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-sm text-black">{reportBranch || 'Tất cả ngành'}</span>
-                    <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportBranchDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                    <span className="text-sm text-black dark:text-white">{reportBranch || 'Tất cả ngành'}</span>
+                    <svg className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isReportBranchDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
                       <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
                     </svg>
                   </button>
                   {isReportBranchDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden max-h-[200px] overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden max-h-[200px] overflow-y-auto">
                       <button
                         onClick={() => {
                           setReportBranch('')
                           setReportClassId('')
                           setIsReportBranchDropdownOpen(false)
                         }}
-                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${!reportBranch ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                        className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${!reportBranch ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                       >
                         Tất cả ngành
                       </button>
@@ -1655,7 +2297,7 @@ export default function ActivitiesPage() {
                             setReportClassId('')
                             setIsReportBranchDropdownOpen(false)
                           }}
-                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportBranch === branch ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${reportBranch === branch ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                         >
                           {branch}
                         </button>
@@ -1674,15 +2316,15 @@ export default function ActivitiesPage() {
                       closeAllReportDropdowns()
                       setIsReportClassDropdownOpen(!isReportClassDropdownOpen)
                     }}
-                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-sm text-black">{reportClassId ? getReportClassName(reportClassId) : 'Chọn lớp'}</span>
-                    <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportClassDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                    <span className="text-sm text-black dark:text-white">{reportClassId ? getReportClassName(reportClassId) : 'Chọn lớp'}</span>
+                    <svg className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isReportClassDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
                       <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
                     </svg>
                   </button>
                   {isReportClassDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden max-h-[300px] overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden max-h-[300px] overflow-y-auto">
                       {getClassesByBranch(reportBranch).map((cls) => (
                         <button
                           key={cls.id}
@@ -1690,7 +2332,7 @@ export default function ActivitiesPage() {
                             setReportClassId(cls.id)
                             setIsReportClassDropdownOpen(false)
                           }}
-                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportClassId === cls.id ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                          className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${reportClassId === cls.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                         >
                           {cls.name}
                         </button>
@@ -1703,9 +2345,9 @@ export default function ActivitiesPage() {
               {/* Năm học */}
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-2">Năm học</label>
-                <div className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full">
-                  <span className="text-sm text-black">{schoolYear?.name || 'Năm học hiện tại'}</span>
-                  <svg className="w-[9px] h-[18px] text-black" viewBox="0 0 9 18" fill="none">
+                <div className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full">
+                  <span className="text-sm text-black dark:text-white">{schoolYear?.name || 'Năm học hiện tại'}</span>
+                  <svg className="w-[9px] h-[18px] text-black dark:text-white" viewBox="0 0 9 18" fill="none">
                     <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
                   </svg>
                 </div>
@@ -1721,17 +2363,17 @@ export default function ActivitiesPage() {
                         closeAllReportDropdowns()
                         setIsReportAttendanceTypeDropdownOpen(!isReportAttendanceTypeDropdownOpen)
                       }}
-                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white rounded-full"
+                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                     >
-                      <span className="text-sm text-black">
+                      <span className="text-sm text-black dark:text-white">
                         {reportAttendanceType === 'all' ? 'Tất cả' : reportAttendanceType === 'thu5' ? 'Thứ 5' : 'Chủ nhật'}
                       </span>
-                      <svg className={`w-[9px] h-[18px] text-black transition-transform ${isReportAttendanceTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                      <svg className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isReportAttendanceTypeDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
                         <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
                       </svg>
                     </button>
                     {isReportAttendanceTypeDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-1 w-full bg-white border border-[#E5E1DC] rounded-xl shadow-lg z-20 overflow-hidden">
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden">
                         {[
                           { value: 'all', label: 'Tất cả' },
                           { value: 'thu5', label: 'Thứ 5' },
@@ -1743,7 +2385,7 @@ export default function ActivitiesPage() {
                               setReportAttendanceType(option.value as AttendanceTypeFilter)
                               setIsReportAttendanceTypeDropdownOpen(false)
                             }}
-                            className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${reportAttendanceType === option.value ? 'bg-brand/10 text-brand' : 'text-black'}`}
+                            className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${reportAttendanceType === option.value ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                           >
                             {option.label}
                           </button>
@@ -1769,7 +2411,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, diLeT5: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Đi Lễ T5</span>
+                    <span className="text-sm text-black dark:text-white">Đi Lễ T5</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1778,7 +2420,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, hocGL: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Học GL</span>
+                    <span className="text-sm text-black dark:text-white">Học GL</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1787,7 +2429,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, diemTB: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Điểm TB</span>
+                    <span className="text-sm text-black dark:text-white">Điểm TB</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1796,7 +2438,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, score45HK1: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">45&apos; HKI</span>
+                    <span className="text-sm text-black dark:text-white">45&apos; HKI</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1805,7 +2447,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, scoreExamHK1: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Thi HKI</span>
+                    <span className="text-sm text-black dark:text-white">Thi HKI</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1814,7 +2456,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, score45HK2: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">45&apos; HKII</span>
+                    <span className="text-sm text-black dark:text-white">45&apos; HKII</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1823,7 +2465,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, scoreExamHK2: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Thi HKII</span>
+                    <span className="text-sm text-black dark:text-white">Thi HKII</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1832,7 +2474,7 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, diemTong: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black">Điểm Tổng</span>
+                    <span className="text-sm text-black dark:text-white">Điểm Tổng</span>
                   </label>
                 </div>
               </div>
@@ -1861,7 +2503,7 @@ export default function ActivitiesPage() {
 
             {/* Report Result Section */}
             {isReportGenerated && (
-              <div className="bg-white rounded-[24px] p-6">
+              <div className="bg-white dark:bg-white/10 rounded-[24px] p-6 overflow-hidden">
                 {/* Report Preview Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -1870,7 +2512,7 @@ export default function ActivitiesPage() {
                       <path d="M12.0001 12C15.0793 12 18.0179 13.8185 20.1133 17.1592C20.8187 18.2839 20.8187 19.7161 20.1133 20.8408C18.0179 24.1815 15.0793 26 12.0001 26C8.92077 26 5.98224 24.1815 3.88678 20.8408C3.18144 19.7161 3.18144 18.2839 3.88678 17.1592C5.98224 13.8185 8.92077 12 12.0001 12ZM12.0001 14C9.77455 14 7.40822 15.3088 5.58112 18.2217C5.28324 18.6966 5.28324 19.3034 5.58112 19.7783C7.40822 22.6912 9.77455 24 12.0001 24C14.2256 24 16.5919 22.6912 18.419 19.7783C18.7169 19.3034 18.7169 18.6966 18.419 18.2217C16.5919 15.3088 14.2256 14 12.0001 14ZM12.0001 15C14.2092 15 16.0001 16.7909 16.0001 19C16.0001 21.2091 14.2092 23 12.0001 23C9.79092 23 8.00006 21.2091 8.00006 19C8.00006 16.7909 9.79092 15 12.0001 15ZM11.9141 17.0039C11.9687 17.1594 12.0001 17.3259 12.0001 17.5C12.0001 18.3284 11.3285 19 10.5001 19C10.326 19 10.1594 18.9686 10.004 18.9141C10.0028 18.9426 10.0001 18.9712 10.0001 19C10.0001 20.1046 10.8955 21 12.0001 21C13.1046 21 14.0001 20.1045 14.0001 19C14.0001 17.8955 13.1046 17 12.0001 17C11.9713 17 11.9426 17.0027 11.9141 17.0039Z" fill="#8A8C90" transform="translate(0, -7)"/>
                     </svg>
                     <span className="text-sm text-[#666D80]">
-                      Xem trước báo cáo: <span className="font-medium text-black">{reportType === 'attendance' ? 'Báo cáo điểm danh' : 'Báo cáo điểm số'}</span>
+                      Xem trước báo cáo: <span className="font-medium text-black dark:text-white">{reportType === 'attendance' ? 'Báo cáo điểm danh' : 'Báo cáo điểm số'}</span>
                     </span>
                     {reportClassId && (
                       <span className="h-[26px] px-4 bg-[#8A8C90] rounded-[13px] text-xs font-medium text-white uppercase flex items-center">
@@ -1919,47 +2561,47 @@ export default function ActivitiesPage() {
                     </div>
 
                     {/* Có mặt chủ nhật */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">Có mặt chủ nhật</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">Có mặt chủ nhật</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportStats.presentCn}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportStats.presentCn}</span>
                       </div>
                     </div>
 
                     {/* Học sinh chưa điểm danh */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">Chưa điểm danh</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">Thiếu nhi chưa điểm danh</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportStats.notChecked}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportStats.notChecked}</span>
                       </div>
                     </div>
 
                     {/* Tổng lượt điểm danh */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">Tổng lượt điểm danh</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">Tổng lượt điểm danh</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportStats.totalAttendance}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportStats.totalAttendance}</span>
                       </div>
                     </div>
                   </div>
@@ -1981,47 +2623,47 @@ export default function ActivitiesPage() {
                     </div>
 
                     {/* TB HK2 */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">TB HK2</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">TB HK2</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportScoreStats.averageHK2}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportScoreStats.averageHK2}</span>
                       </div>
                     </div>
 
                     {/* TB cả năm */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">TB cả năm</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">TB cả năm</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportScoreStats.averageYear}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportScoreStats.averageYear}</span>
                       </div>
                     </div>
 
                     {/* Tổng số học sinh */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80">Tổng học sinh</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                        <span className="text-sm text-black/80 dark:text-white/80">Tổng học sinh</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black leading-none">{reportScoreStats.totalStudents}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportScoreStats.totalStudents}</span>
                       </div>
                     </div>
                   </div>
@@ -2029,76 +2671,70 @@ export default function ActivitiesPage() {
 
                 {/* Data Table */}
                 {reportType === 'attendance' ? (
-                  <div className="overflow-hidden relative">
-                    {/* Table Header */}
-                    <div className="relative h-[38px] bg-[#E5E1DC] rounded-[15px] border border-white/60">
-                      <span className="absolute left-[30px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">STT</span>
-                      <span className="absolute left-[150px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">Tên thánh</span>
-                      <span className="absolute left-[350px] top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]">Họ và tên</span>
-                      {reportDates.map((date, idx) => (
-                        <span
-                          key={date}
-                          className="absolute top-1/2 -translate-y-1/2 text-[16px] font-medium text-[#666d80]"
-                          style={{ right: `${(reportDates.length - 1 - idx) * 134 + 40}px` }}
-                        >
-                          {formatShortDate(date)}
-                        </span>
-                      ))}
-                      {reportDates.length === 0 && (
-                        <span className="absolute right-[40px] top-1/2 -translate-y-1/2 text-[16px] text-[#666d80]">Không có dữ liệu</span>
-                      )}
-                    </div>
-
-                    {/* Table Body */}
-                    {reportStudents.length === 0 ? (
-                      <div className="py-12 text-center text-[16px] text-[#666d80]">
-                        Không có học sinh trong lớp này
-                      </div>
-                    ) : (
-                      reportStudents.map((student, index) => {
-                        const nameParts = student.full_name.split(' ')
-                        const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
-                        const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
-
-                        return (
-                          <div key={student.id} className="relative h-[56px]">
-                            <span className="absolute left-[37px] top-1/2 -translate-y-1/2 text-[14px] font-medium text-black">{index + 1}</span>
-                            <div className="absolute left-[90px] top-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-[12px] bg-[#F3F3F3] flex items-center justify-center overflow-hidden">
-                              {student.avatar_url ? (
-                                <img src={student.avatar_url} alt={student.full_name} className="w-full h-full object-cover" />
-                              ) : null}
-                            </div>
-                            <span className="absolute left-[150px] top-1/2 -translate-y-1/2 text-[14px] font-medium text-black">{student.saint_name || '-'}</span>
-                            <span className="absolute left-[350px] top-1/2 -translate-y-1/2 w-[150px] text-[14px] font-semibold text-[#8A8C90]">{familyMiddleName}</span>
-                            <span className="absolute left-[700px] top-1/2 -translate-y-1/2 text-[14px] font-semibold text-black">{givenName}</span>
-
-                            {reportDates.map((date, dateIndex) => {
-                              const rightPosition = (reportDates.length - 1 - dateIndex) * 134
-                              return (
-                                <div key={date} className="absolute top-0 h-[56px]" style={{ right: `${rightPosition}px`, width: '134px' }}>
-                                  <div className="absolute left-0 top-0 w-[1px] h-full bg-[#8A8C90]" />
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    {student.attendance[date] === 'present' ? (
-                                      <div className="w-[24px] h-[24px] rounded-full bg-green-500 flex items-center justify-center">
-                                        <Check className="w-4 h-4 text-white" />
-                                      </div>
-                                    ) : student.attendance[date] === 'absent' ? (
-                                      <div className="w-[24px] h-[24px] rounded-full bg-red-500 flex items-center justify-center">
-                                        <X className="w-4 h-4 text-white" />
-                                      </div>
-                                    ) : (
-                                      <span className="text-[#666d80]">-</span>
-                                    )}
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse" style={{ minWidth: `${550 + reportDates.length * 90}px` }}>
+                      <thead>
+                        <tr className="bg-[#E5E1DC] h-[38px]">
+                          <th className="text-left px-4 text-[16px] font-medium text-[#666d80] w-[100px] whitespace-nowrap">STT</th>
+                          <th className="text-left px-4 text-[16px] font-medium text-[#666d80] w-[300px] whitespace-nowrap">Tên thánh</th>
+                          <th className="text-left px-4 text-[16px] font-medium text-[#666d80] whitespace-nowrap" colSpan={2}>Họ và tên</th>
+                          {reportDates.length === 0 ? (
+                            <th className="text-center px-4 text-[16px] text-[#666d80]">Không có dữ liệu</th>
+                          ) : (
+                            reportDates.map((date) => (
+                              <th key={date} className="text-center px-2 text-[14px] font-medium text-[#666d80] whitespace-nowrap min-w-[70px]">
+                                {formatShortDate(date)}
+                              </th>
+                            ))
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportStudents.length === 0 ? (
+                          <tr>
+                            <td colSpan={4 + reportDates.length} className="py-12 text-center text-[16px] text-[#666d80]">
+                              Không có học sinh trong lớp này
+                            </td>
+                          </tr>
+                        ) : (
+                          reportStudents.map((student, index) => {
+                            const nameParts = student.full_name.split(' ')
+                            const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
+                            const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
+                            return (
+                            <tr key={student.id} className="h-[56px] border-b border-[#8A8C90]">
+                              <td className="px-4 text-[14px] font-medium text-black dark:text-white">{index + 1}</td>
+                              <td className="px-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-[36px] h-[36px] rounded-[10px] bg-[#F3F3F3] flex items-center justify-center overflow-hidden flex-shrink-0">
+                                    {student.avatar_url ? (
+                                      <img src={student.avatar_url} alt={student.full_name} className="w-full h-full object-cover" />
+                                    ) : null}
                                   </div>
-                                  <div className="absolute right-0 top-0 w-[1px] h-full bg-[#8A8C90]" />
+                                  <span className="text-[14px] font-medium text-black dark:text-white whitespace-nowrap">{student.saint_name || '-'}</span>
                                 </div>
-                              )
-                            })}
-                            <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[#8A8C90]" />
-                          </div>
-                        )
-                      })
-                    )}
+                              </td>
+                              <td className="px-2 text-[14px] font-semibold text-[#8A8C90] whitespace-nowrap w-[300px]">{familyMiddleName}</td>
+                              <td className="px-2 text-[14px] font-semibold text-black dark:text-white whitespace-nowrap w-[105px]">{givenName}</td>
+                              {reportDates.map((date) => (
+                                <td key={date} className={`text-center border-l border-[#8A8C90] ${student.attendance[date] === 'present' ? 'bg-[#F5D5D5]' : ''}`}>
+                                  {student.attendance[date] === 'present' ? (
+                                    <span className="text-[#8A8C90] text-[16px]">×</span>
+                                  ) : student.attendance[date] === 'absent' ? (
+                                    <div className="w-[24px] h-[24px] rounded-full bg-[#22C55E] flex items-center justify-center mx-auto">
+                                      <Check className="w-4 h-4 text-white" />
+                                    </div>
+                                  ) : (
+                                    <span className="text-[#666d80]">-</span>
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -2165,17 +2801,17 @@ export default function ActivitiesPage() {
                                 }
 
                                 return (
-                                  <tr key={student.id} className="border-b border-[#E5E1DC] h-[52px] hover:bg-gray-50">
-                                    <td className="px-4 text-[14px] text-black">{index + 1}</td>
-                                    <td className="px-4 text-[14px] text-black">{student.saint_name || '-'}</td>
-                                    <td className="px-4 text-[14px] font-medium text-black">{student.full_name}</td>
-                                    {showDiLeT5 && <td className="text-center px-2 text-[14px] text-black">{student.score_di_le_t5 !== null ? student.score_di_le_t5 : '-'}</td>}
-                                    {showHocGL && <td className="text-center px-2 text-[14px] text-black">{student.score_hoc_gl !== null ? student.score_hoc_gl : '-'}</td>}
-                                    {show45HK1 && <td className="text-center px-2 text-[14px] text-black">{student.score_45_hk1 !== null ? student.score_45_hk1 : '-'}</td>}
-                                    {showExamHK1 && <td className="text-center px-2 text-[14px] text-black">{student.score_exam_hk1 !== null ? student.score_exam_hk1 : '-'}</td>}
+                                  <tr key={student.id} className="border-b border-[#E5E1DC] h-[52px] hover:bg-gray-50 dark:hover:bg-white/10">
+                                    <td className="px-4 text-[14px] text-black dark:text-white">{index + 1}</td>
+                                    <td className="px-4 text-[14px] text-black dark:text-white">{student.saint_name || '-'}</td>
+                                    <td className="px-4 text-[14px] font-medium text-black dark:text-white">{student.full_name}</td>
+                                    {showDiLeT5 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_di_le_t5 !== null ? student.score_di_le_t5 : '-'}</td>}
+                                    {showHocGL && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_hoc_gl !== null ? student.score_hoc_gl : '-'}</td>}
+                                    {show45HK1 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_45_hk1 !== null ? student.score_45_hk1 : '-'}</td>}
+                                    {showExamHK1 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_exam_hk1 !== null ? student.score_exam_hk1 : '-'}</td>}
                                     {(show45HK1 || showExamHK1) && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.average_hk1 !== null ? student.average_hk1 : '-'}</td>}
-                                    {show45HK2 && <td className="text-center px-2 text-[14px] text-black">{student.score_45_hk2 !== null ? student.score_45_hk2 : '-'}</td>}
-                                    {showExamHK2 && <td className="text-center px-2 text-[14px] text-black">{student.score_exam_hk2 !== null ? student.score_exam_hk2 : '-'}</td>}
+                                    {show45HK2 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_45_hk2 !== null ? student.score_45_hk2 : '-'}</td>}
+                                    {showExamHK2 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_exam_hk2 !== null ? student.score_exam_hk2 : '-'}</td>}
                                     {(show45HK2 || showExamHK2) && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.average_hk2 !== null ? student.average_hk2 : '-'}</td>}
                                     {showDiemTong && <td className="text-center px-2 text-[14px] font-bold text-brand">{student.average_year !== null ? student.average_year : '-'}</td>}
                                     <td className={`text-center px-2 text-[14px] ${classColor}`}>{classification}</td>

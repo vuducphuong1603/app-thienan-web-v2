@@ -191,19 +191,19 @@ export default function CustomDateRangePicker({
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
-        className={`w-full px-3 py-2 text-left border border-gray-300 rounded-lg bg-white flex items-center gap-2
+        className={`w-full px-3 py-2 text-left border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/10 flex items-center gap-2
           ${disabled ? 'bg-gray-100 cursor-not-allowed text-gray-400' : 'hover:border-[#FA865E] focus:border-[#FA865E] focus:ring-2 focus:ring-[#FA865E]/20'}
           transition-colors duration-200`}
       >
         <Calendar className="w-4 h-4 text-gray-400" />
-        <span className={startDate || endDate ? 'text-gray-900' : 'text-gray-400'}>
+        <span className={startDate || endDate ? 'text-gray-900 dark:text-white' : 'text-gray-400'}>
           {startDate || endDate ? formatDisplayValue() : placeholder}
         </span>
       </button>
 
       {isOpen && (
         <div
-          className="absolute z-50 mt-2 bg-white rounded-[15px] border border-[#E5E1DC] shadow-[1px_3px_4px_rgba(0,0,0,0.25)]"
+          className="absolute z-50 mt-2 bg-white dark:bg-[#1a1a1a] rounded-[15px] border border-[#E5E1DC] dark:border-white/10 shadow-[1px_3px_4px_rgba(0,0,0,0.25)]"
           style={{ width: '297px' }}
         >
           {/* Header */}
@@ -211,25 +211,25 @@ export default function CustomDateRangePicker({
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
             >
               <ChevronLeft className="w-5 h-5 text-gray-400" />
             </button>
-            <span className="text-sm font-bold text-gray-900 font-['Inter_Tight']">
+            <span className="text-sm font-bold text-gray-900 dark:text-white font-['Inter_Tight']">
               {MONTHS_VI[viewDate.month]} {viewDate.year}
             </span>
             <button
               type="button"
               onClick={handleNextMonth}
-              className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
             >
-              <ChevronRight className="w-5 h-5 text-gray-900" />
+              <ChevronRight className="w-5 h-5 text-gray-900 dark:text-white" />
             </button>
           </div>
 
           {/* Selection indicator */}
           <div className="px-3 pb-2 text-center">
-            <span className="text-xs text-gray-500 font-['Inter_Tight']">
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-['Inter_Tight']">
               {selectingStart ? 'Chọn ngày bắt đầu' : 'Chọn ngày kết thúc'}
             </span>
           </div>
@@ -240,7 +240,7 @@ export default function CustomDateRangePicker({
               {DAYS_EN.map((day) => (
                 <div
                   key={day}
-                  className="w-10 py-2 text-center text-[10px] text-gray-500 font-['Inter_Tight']"
+                  className="w-10 py-2 text-center text-[10px] text-gray-500 dark:text-gray-400 font-['Inter_Tight']"
                 >
                   {day}
                 </div>
@@ -272,10 +272,10 @@ export default function CustomDateRangePicker({
                           : inRange
                             ? 'bg-[#FA865E]/20 text-[#8A8C90] font-medium text-sm'
                             : today
-                              ? 'bg-gray-100 text-gray-900 font-medium text-sm'
+                              ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-medium text-sm'
                               : dayInfo.isCurrentMonth
-                                ? 'text-[#8A8C90] text-xs hover:bg-gray-100'
-                                : 'text-[#D1D5DB] text-xs hover:bg-gray-50'
+                                ? 'text-[#8A8C90] text-xs hover:bg-gray-100 dark:hover:bg-white/10'
+                                : 'text-[#D1D5DB] text-xs hover:bg-gray-50 dark:hover:bg-white/5'
                         }
                         cursor-pointer
                       `}
