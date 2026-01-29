@@ -1,6 +1,7 @@
 'use client'
 
 import { ArrowUpRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface DayData {
   label: string
@@ -14,6 +15,7 @@ const data: DayData[] = [
 ]
 
 export default function AttendanceChart() {
+  const router = useRouter()
   // Calculate max value for scaling bars
   const maxValue = Math.max(...data.flatMap(d => [d.present, d.absent]))
 
@@ -31,7 +33,11 @@ export default function AttendanceChart() {
           <h3 className="text-xl font-medium text-gray-900 dark:text-white leading-tight">Điểm danh</h3>
           <p className="text-xl font-medium text-gray-900 dark:text-white leading-tight">7 ngày qua</p>
         </div>
-        <button className="w-8 h-8 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+        <button
+          onClick={() => router.push('/admin/performance')}
+          className="w-8 h-8 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+          title="Xem so sánh hiệu suất"
+        >
           <ArrowUpRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />
         </button>
       </div>
