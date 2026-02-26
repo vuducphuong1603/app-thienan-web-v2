@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { useClassStats } from '@/lib/queries'
 
 interface BranchData {
   name: string
@@ -13,12 +12,6 @@ interface BranchData {
   }[]
 }
 
-interface BranchStats {
-  name: string
-  classes: number
-  students: number
-  teachers: number
-}
 
 // Sparkle Icon Component
 function SparkleIcon({ className }: { className?: string }) {
@@ -264,111 +257,7 @@ function LineChart({ branchesData }: { branchesData: BranchData[] }) {
 
 export default function ClassStats() {
   const router = useRouter()
-  const [branchesData, setBranchesData] = useState<BranchData[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        // Fetch branches
-        const { data: branches } = await supabase
-          .from('branches')
-          .select('id, name, order_index')
-          .order('order_index')
-
-        if (!branches) return
-
-        // Fetch classes grouped by branch
-        const { data: classes } = await supabase
-          .from('classes')
-          .select('id, branch')
-          .eq('status', 'ACTIVE')
-
-        // Fetch students with their class info to get branch
-        const { data: students } = await supabase
-          .from('thieu_nhi')
-          .select('id, class_id')
-          .eq('status', 'ACTIVE')
-
-        // Fetch teachers (giáo lý viên) with class_id to get branch
-        const { data: teachers } = await supabase
-          .from('users')
-          .select('id, class_id')
-          .eq('role', 'giao_ly_vien')
-          .eq('status', 'ACTIVE')
-
-        // Create a map of class_id to branch for quick lookup
-        const classBranchMap = new Map<string, string>()
-        classes?.forEach(c => {
-          if (c.id && c.branch) {
-            classBranchMap.set(c.id, c.branch.toLowerCase())
-          }
-        })
-
-        // Calculate stats for each branch (case-insensitive comparison)
-        const branchStats: BranchStats[] = branches.map(branch => {
-          const branchNameLower = branch.name.toLowerCase()
-          const branchClasses = classes?.filter(c => c.branch?.toLowerCase() === branchNameLower).length || 0
-
-          // Count students by looking up their class's branch
-          const branchStudents = students?.filter(s => {
-            if (!s.class_id) return false
-            const classBranch = classBranchMap.get(s.class_id)
-            return classBranch === branchNameLower
-          }).length || 0
-
-          // Count teachers by looking up their class's branch
-          const branchTeachers = teachers?.filter(t => {
-            if (!t.class_id) return false
-            const classBranch = classBranchMap.get(t.class_id)
-            return classBranch === branchNameLower
-          }).length || 0
-
-          return {
-            name: branch.name,
-            classes: branchClasses,
-            students: branchStudents,
-            teachers: branchTeachers,
-          }
-        })
-
-        // Calculate totals for percentage
-        const totalClasses = branchStats.reduce((sum, b) => sum + b.classes, 0)
-        const totalStudents = branchStats.reduce((sum, b) => sum + b.students, 0)
-        const totalTeachers = branchStats.reduce((sum, b) => sum + b.teachers, 0)
-
-        // Convert to BranchData format with percentages
-        const formattedData: BranchData[] = branchStats.map(branch => ({
-          name: branch.name,
-          stats: [
-            {
-              label: 'Lớp',
-              value: branch.classes,
-              percentage: totalClasses > 0 ? Math.round((branch.classes / totalClasses) * 100) : 0,
-            },
-            {
-              label: 'Thiếu nhi',
-              value: branch.students,
-              percentage: totalStudents > 0 ? Math.round((branch.students / totalStudents) * 100) : 0,
-            },
-            {
-              label: 'Giáo lý viên',
-              value: branch.teachers,
-              percentage: totalTeachers > 0 ? Math.round((branch.teachers / totalTeachers) * 100) : 0,
-            },
-          ],
-        }))
-
-        setBranchesData(formattedData)
-      } catch (error) {
-        console.error('Error fetching class stats:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStats()
-  }, [])
+  const { data: branchesData = [], isLoading: loading } = useClassStats()
 
   return (
     <div className="bg-white dark:bg-white/10 rounded-[15px] p-4 border border-gray-100 dark:border-white/10 flex flex-col h-full">

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, ThieuNhiProfile, Class, BRANCHES } from '@/lib/supabase'
 import { Search, ChevronDown, Plus } from 'lucide-react'
 import ImportStudentsModal from '@/components/management/ImportStudentsModal'
 import DeleteStudentModal from '@/components/management/DeleteStudentModal'
+import { useStudentsWithDetails, useInvalidateQueries } from '@/lib/queries'
 
 interface StudentWithDetails extends ThieuNhiProfile {
   class_name?: string
@@ -39,9 +40,6 @@ type FilterStatus = 'all' | 'ACTIVE' | 'INACTIVE'
 
 export default function StudentsPage() {
   const router = useRouter()
-  const [students, setStudents] = useState<StudentWithDetails[]>([])
-  const [classes, setClasses] = useState<Class[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterClass, setFilterClass] = useState<FilterClass>('all')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
@@ -61,94 +59,12 @@ export default function StudentsPage() {
   })
   const [isSaving, setIsSaving] = useState(false)
 
-  // Fetch data from Supabase
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      // Fetch current school year to get total_weeks
-      const { data: schoolYearData } = await supabase
-        .from('school_years')
-        .select('total_weeks')
-        .eq('is_current', true)
-        .single()
+  const { data: queryData, isLoading: loading } = useStudentsWithDetails()
+  const students = queryData?.students || []
+  const classes = queryData?.classes || []
+  const { invalidateStudents } = useInvalidateQueries()
 
-      const currentTotalWeeks = schoolYearData?.total_weeks || 40
-
-      // Fetch classes first
-      const { data: classesData } = await supabase
-        .from('classes')
-        .select('*')
-        .eq('status', 'ACTIVE')
-        .order('display_order', { ascending: true })
-
-      setClasses(classesData || [])
-
-      // Fetch students (thieu_nhi table)
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('thieu_nhi')
-        .select('*')
-        .order('full_name', { ascending: true })
-
-      if (studentsError) {
-        console.error('Error fetching students:', studentsError)
-        return
-      }
-
-      // Map students with class details
-      const studentsWithDetails: StudentWithDetails[] = (studentsData || []).map((student) => {
-        const studentClass = (classesData || []).find((c) => c.id === student.class_id)
-        const birthDate = student.date_of_birth ? new Date(student.date_of_birth) : null
-        const age = birthDate ? Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : undefined
-
-        // Calculate averages
-        const score_45_hk1 = student.score_45_hk1 || 0
-        const score_exam_hk1 = student.score_exam_hk1 || 0
-        const score_45_hk2 = student.score_45_hk2 || 0
-        const score_exam_hk2 = student.score_exam_hk2 || 0
-        const attendance_thu5 = student.attendance_thu5 || 0
-        const attendance_cn = student.attendance_cn || 0
-
-        // TB Giáo lý = (45' HK1 + 45' HK2 + Thi HK1×2 + Thi HK2×2) / 6
-        const avg_catechism = (score_45_hk1 + score_45_hk2 + score_exam_hk1 * 2 + score_exam_hk2 * 2) / 6
-        // Điểm T5 = (số buổi T5 × 0.4) × (10 / tổng tuần)
-        const score_thu5 = (attendance_thu5 * 0.4) * (10 / currentTotalWeeks)
-        // Điểm CN = (số buổi CN × 0.6) × (10 / tổng tuần)
-        const score_cn = (attendance_cn * 0.6) * (10 / currentTotalWeeks)
-        // TB Điểm danh = Điểm T5 + Điểm CN
-        const avg_attendance = score_thu5 + score_cn
-        // Tổng TB = TB Giáo lý × 0.6 + TB Điểm danh × 0.4
-        const total_avg = avg_catechism * 0.6 + avg_attendance * 0.4
-
-        return {
-          ...student,
-          class_name: studentClass?.name || undefined,
-          class_branch: studentClass?.branch || undefined,
-          age,
-          score_45_hk1,
-          score_exam_hk1,
-          score_45_hk2,
-          score_exam_hk2,
-          avg_catechism,
-          attendance_thu5,
-          attendance_cn,
-          score_thu5,
-          score_cn,
-          avg_attendance,
-          total_avg,
-        }
-      })
-
-      setStudents(studentsWithDetails)
-    } catch (err) {
-      console.error('Error:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const fetchData = invalidateStudents
 
   // Filter students
   const filteredStudents = students.filter((student) => {

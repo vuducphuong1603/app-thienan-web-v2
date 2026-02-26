@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { Calendar, Plus, List, FileText, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
-import { supabase, PlanCategory, WeeklyPlan, Class } from '@/lib/supabase'
+import { supabase, WeeklyPlan } from '@/lib/supabase'
 import { WeeklyPlanCalendar, PlanModal, DeletePlanModal } from '@/components/weekly-plan'
+import { usePlanStaticData, useWeeklyPlans, useInvalidateQueries } from '@/lib/queries'
 
 function getMonday(date: Date): Date {
   const d = new Date(date)
@@ -29,10 +30,6 @@ function formatWeekRange(weekStart: Date) {
 
 export default function WeeklyPlanPage() {
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
-  const [plans, setPlans] = useState<WeeklyPlan[]>([])
-  const [categories, setCategories] = useState<PlanCategory[]>([])
-  const [classes, setClasses] = useState<Class[]>([])
-  const [loading, setLoading] = useState(true)
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // Modal states
@@ -46,45 +43,13 @@ export default function WeeklyPlanPage() {
   const formattedDayOfWeek = dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1)
   const formattedDate = `${formattedDayOfWeek}, ${today.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
 
-  // Fetch categories + classes once
-  useEffect(() => {
-    const fetchStatic = async () => {
-      const [catRes, classRes] = await Promise.all([
-        supabase.from('plan_categories').select('*').order('display_order'),
-        supabase.from('classes').select('*').eq('status', 'ACTIVE').order('display_order'),
-      ])
-      if (catRes.data) setCategories(catRes.data)
-      if (classRes.data) setClasses(classRes.data)
-    }
-    fetchStatic()
-  }, [])
+  const { data: staticData } = usePlanStaticData()
+  const categories = staticData?.categories || []
+  const classes = staticData?.classes || []
+  const { data: plans = [], isLoading: loading } = useWeeklyPlans(weekStart)
+  const { invalidateWeeklyPlans } = useInvalidateQueries()
 
-  // Fetch plans when weekStart changes
-  const fetchPlans = useCallback(async () => {
-    setLoading(true)
-    const weekEnd = new Date(weekStart)
-    weekEnd.setDate(weekStart.getDate() + 6)
-
-    const { data, error } = await supabase
-      .from('weekly_plans')
-      .select('*, plan_categories(*)')
-      .gte('plan_date', toDateString(weekStart))
-      .lte('plan_date', toDateString(weekEnd))
-      .order('plan_date')
-      .order('time_start')
-
-    if (error) {
-      console.error('Error fetching plans:', error)
-      setNotification({ type: 'error', message: 'Lỗi tải kế hoạch' })
-    } else {
-      setPlans(data || [])
-    }
-    setLoading(false)
-  }, [weekStart])
-
-  useEffect(() => {
-    fetchPlans()
-  }, [fetchPlans])
+  const fetchPlans = () => invalidateWeeklyPlans(toDateString(weekStart))
 
   // Auto-clear notification
   useEffect(() => {

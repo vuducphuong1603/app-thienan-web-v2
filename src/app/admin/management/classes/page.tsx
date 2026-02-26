@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase, Class, BRANCHES, Branch } from '@/lib/supabase'
 import { Search, ChevronDown, Plus, Edit2, Eye, Trash2 } from 'lucide-react'
 import AddClassForm from '@/components/management/AddClassForm'
 import EditClassForm from '@/components/management/EditClassForm'
+import { useClassesWithDetails, useInvalidateQueries } from '@/lib/queries'
 
 interface ClassWithDetails extends Class {
   teachers?: string[]
@@ -22,8 +23,6 @@ export default function ClassesPage() {
     : undefined
   const initialBranch: FilterBranch = matchedBranch || 'all'
 
-  const [classes, setClasses] = useState<ClassWithDetails[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterBranch, setFilterBranch] = useState<FilterBranch>(initialBranch)
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false)
@@ -33,100 +32,10 @@ export default function ClassesPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [classToDelete, setClassToDelete] = useState<ClassWithDetails | null>(null)
 
-  // Fetch classes from Supabase
-  const fetchClasses = useCallback(async () => {
-    setLoading(true)
-    try {
-      // Fetch classes
-      const { data: classesData, error: classesError } = await supabase
-        .from('classes')
-        .select('*')
-        .order('display_order', { ascending: true })
+  const { data: classes = [], isLoading: loading } = useClassesWithDetails()
+  const { invalidateClasses } = useInvalidateQueries()
 
-      if (classesError) {
-        console.error('Error fetching classes:', classesError)
-        return
-      }
-
-      // Fetch teachers for each class
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('id, full_name, saint_name, class_id, class_name')
-        .eq('role', 'giao_ly_vien')
-
-      // Fetch student count per class from thieu_nhi table
-      // Note: Supabase has server-side row limit, need to paginate
-      const allStudents: { id: string; class_id: string | null }[] = []
-      const pageSize = 1000
-      let page = 0
-      let hasMore = true
-
-      while (hasMore) {
-        const from = page * pageSize
-        const to = from + pageSize - 1
-        const { data: pageData } = await supabase
-          .from('thieu_nhi')
-          .select('id, class_id')
-          .range(from, to)
-
-        if (pageData && pageData.length > 0) {
-          allStudents.push(...pageData)
-          page++
-          hasMore = pageData.length === pageSize
-        } else {
-          hasMore = false
-        }
-      }
-
-      // Count students per class_id
-      const studentCountByClass: Record<string, number> = {}
-      let totalWithClassId = 0
-      let totalWithoutClassId = 0
-      allStudents.forEach((student) => {
-        if (student.class_id) {
-          studentCountByClass[student.class_id] = (studentCountByClass[student.class_id] || 0) + 1
-          totalWithClassId++
-        } else {
-          totalWithoutClassId++
-        }
-      })
-      console.log('DEBUG Classes page:')
-      console.log('- Total students fetched:', allStudents.length)
-      console.log('- Students with class_id:', totalWithClassId)
-      console.log('- Students without class_id:', totalWithoutClassId)
-      console.log('- Student count by class:', studentCountByClass)
-
-      // Map teachers and student counts to classes
-      const classesWithDetails: ClassWithDetails[] = (classesData || []).map((cls) => {
-        const classTeachers = (usersData || [])
-          .filter((user) => user.class_id === cls.id || user.class_name === cls.name)
-          .map((user) => `${user.saint_name || ''} ${user.full_name}`.trim())
-
-        return {
-          ...cls,
-          teachers: classTeachers,
-          student_count: studentCountByClass[cls.id] || 0,
-        }
-      })
-
-      setClasses(classesWithDetails)
-    } catch (err) {
-      console.error('Error:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchClasses()
-  }, [fetchClasses])
-
-  // Sync filterBranch with URL parameter
-  useEffect(() => {
-    if (matchedBranch) {
-      setFilterBranch(matchedBranch)
-    }
-  }, [matchedBranch])
+  const fetchClasses = invalidateClasses
 
   // Filter classes based on search and branch filter
   const filteredClasses = classes.filter((cls) => {

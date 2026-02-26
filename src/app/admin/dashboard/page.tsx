@@ -3,9 +3,9 @@
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Calendar } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { useDashboardStats } from '@/lib/queries'
 import {
   DashboardHeader,
   StatsCard,
@@ -16,23 +16,11 @@ import {
   ClassStats,
 } from '@/components/dashboard'
 
-interface Stats {
-  totalBranches: number
-  totalClasses: number
-  totalThieuNhi: number
-  totalGiaoLyVien: number
-}
-
 export default function AdminDashboard() {
   const { user, loading, isAdmin, logout } = useAuth()
   const router = useRouter()
-  const [stats, setStats] = useState<Stats>({
-    totalBranches: 4,
-    totalClasses: 0,
-    totalThieuNhi: 0,
-    totalGiaoLyVien: 0,
-  })
-  const [loadingStats, setLoadingStats] = useState(true)
+
+  const { data: stats, isLoading: loadingStats } = useDashboardStats(!!user && isAdmin)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -42,46 +30,6 @@ export default function AdminDashboard() {
       router.push('/dashboard')
     }
   }, [user, loading, isAdmin, router])
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        // Fetch users stats
-        const { data: usersData } = await supabase
-          .from('users')
-          .select('role')
-
-        // Fetch thieu_nhi count
-        const { count: thieuNhiCount } = await supabase
-          .from('thieu_nhi')
-          .select('*', { count: 'exact', head: true })
-
-        // Fetch classes count
-        const { count: classesCount } = await supabase
-          .from('classes')
-          .select('*', { count: 'exact', head: true })
-
-        if (usersData) {
-          const totalGiaoLyVien = usersData.filter(u => u.role === 'giao_ly_vien').length
-
-          setStats({
-            totalBranches: 4,
-            totalClasses: classesCount || 0,
-            totalThieuNhi: thieuNhiCount || 0,
-            totalGiaoLyVien,
-          })
-        }
-      } catch (err) {
-        console.error('Error fetching stats:', err)
-      } finally {
-        setLoadingStats(false)
-      }
-    }
-
-    if (user && isAdmin) {
-      fetchStats()
-    }
-  }, [user, isAdmin])
 
   if (loading) {
     return (
@@ -164,28 +112,28 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-4 gap-4">
             <StatsCard
               title="Tổng số ngành"
-              value={loadingStats ? '...' : stats.totalBranches}
+              value={loadingStats ? '...' : stats?.totalBranches ?? 0}
               icon="branch"
               variant="primary"
               chart="line"
             />
             <StatsCard
               title="Tổng số lớp"
-              value={loadingStats ? '...' : stats.totalClasses}
+              value={loadingStats ? '...' : stats?.totalClasses ?? 0}
               icon="class"
               chart="bar"
               href="/admin/management/classes"
             />
             <StatsCard
               title="Tổng thiếu nhi"
-              value={loadingStats ? '...' : stats.totalThieuNhi}
+              value={loadingStats ? '...' : stats?.totalThieuNhi ?? 0}
               icon="student"
               chart="people"
               href="/admin/management/students"
             />
             <StatsCard
               title="Giáo lý viên"
-              value={loadingStats ? '...' : stats.totalGiaoLyVien}
+              value={loadingStats ? '...' : stats?.totalGiaoLyVien ?? 0}
               icon="teacher"
               chart="wave"
               href="/admin/management/users"

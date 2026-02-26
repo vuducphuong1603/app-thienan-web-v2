@@ -47,6 +47,13 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-shrink-0">
         <h3 className="text-base font-semibold text-black dark:text-white">Kế hoạch tuần này</h3>
+        <button className="w-9 h-9 rounded-full bg-[#F6F6F6] dark:bg-white/10 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors">
+          <svg width="16" height="4" viewBox="0 0 16 4" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="2" cy="2" r="1.65" fill="currentColor" className="text-black dark:text-white" />
+            <circle cx="8" cy="2" r="1.65" fill="currentColor" className="text-black dark:text-white" />
+            <circle cx="14" cy="2" r="1.65" fill="currentColor" className="text-black dark:text-white" />
+          </svg>
+        </button>
       </div>
 
       {/* Week Days Row */}

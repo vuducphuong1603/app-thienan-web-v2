@@ -9,6 +9,7 @@ import { useTheme } from '@/lib/theme-context'
 import Image from 'next/image'
 import { Eye, EyeOff, Check, X } from 'lucide-react'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
+import { useCurrentSchoolYear } from '@/lib/queries'
 
 type SettingsTab = 'personal' | 'password' | 'school-year' | 'notifications' | 'system'
 
@@ -122,10 +123,10 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // School Year State
+  const { data: fetchedSchoolYear, isLoading: loadingSchoolYear, error: schoolYearQueryError } = useCurrentSchoolYear(!!user && isAdmin)
   const [currentSchoolYear, setCurrentSchoolYear] = useState<SchoolYear | null>(null)
-  const [loadingSchoolYear, setLoadingSchoolYear] = useState(false)
   const [isEditingSchoolYear, setIsEditingSchoolYear] = useState(false)
-  const [schoolYearError, setSchoolYearError] = useState<string | null>(null)
+  const schoolYearError = schoolYearQueryError?.message === 'TABLE_NOT_FOUND' ? 'TABLE_NOT_FOUND' : schoolYearQueryError ? 'FETCH_ERROR' : null
   const [schoolYearForm, setSchoolYearForm] = useState<SchoolYearFormData>({
     name: '',
     startDate: '',
@@ -178,65 +179,18 @@ export default function SettingsPage() {
     }
   }, [])
 
-  // Fetch current school year
+  // Sync school year from React Query
   useEffect(() => {
-    const fetchCurrentSchoolYear = async () => {
-      if (!user || !isAdmin) return
-
-      setLoadingSchoolYear(true)
-      setSchoolYearError(null)
-      try {
-        const { data, error } = await supabase
-          .from('school_years')
-          .select('*')
-          .eq('is_current', true)
-          .single()
-
-        if (error) {
-          // Handle various error cases
-          const errorCode = error.code
-          const errorMessage = error.message?.toLowerCase() || ''
-          const errorHint = ((error as { hint?: string }).hint || '').toLowerCase()
-
-          // Table doesn't exist (various indicators)
-          const isTableNotFound =
-            errorCode === '42P01' || // PostgreSQL "relation does not exist"
-            errorMessage.includes('does not exist') ||
-            errorMessage.includes('relation') ||
-            errorHint.includes('does not exist') ||
-            errorMessage.includes('406') // HTTP Not Acceptable (table not in schema)
-
-          // No rows found (expected when table exists but is empty)
-          const isNoRowsFound = errorCode === 'PGRST116'
-
-          if (isTableNotFound) {
-            setSchoolYearError('TABLE_NOT_FOUND')
-          } else if (!isNoRowsFound) {
-            console.error('Error fetching school year:', error)
-            setSchoolYearError('FETCH_ERROR')
-          }
-          // If isNoRowsFound, we don't set an error - table exists but is empty
-        }
-
-        if (data) {
-          setCurrentSchoolYear(data)
-          setSchoolYearForm({
-            name: data.name,
-            startDate: data.start_date,
-            endDate: data.end_date,
-            parishName: data.parish_name,
-          })
-        }
-      } catch (err) {
-        console.error('Error:', err)
-        setSchoolYearError('TABLE_NOT_FOUND')
-      } finally {
-        setLoadingSchoolYear(false)
-      }
+    if (fetchedSchoolYear) {
+      setCurrentSchoolYear(fetchedSchoolYear)
+      setSchoolYearForm({
+        name: fetchedSchoolYear.name,
+        startDate: fetchedSchoolYear.start_date,
+        endDate: fetchedSchoolYear.end_date,
+        parishName: fetchedSchoolYear.parish_name,
+      })
     }
-
-    fetchCurrentSchoolYear()
-  }, [user, isAdmin])
+  }, [fetchedSchoolYear])
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))

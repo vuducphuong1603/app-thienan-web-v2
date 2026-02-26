@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, UserProfile, UserRole, ROLE_LABELS, BRANCHES, Class } from '@/lib/supabase'
+import { supabase, UserProfile, UserRole, ROLE_LABELS, BRANCHES } from '@/lib/supabase'
 import { Search, ChevronDown, FileSpreadsheet, Plus, Edit2, KeyRound, Trash2, X } from 'lucide-react'
 import Image from 'next/image'
 import ImportUsersModal from '@/components/management/ImportUsersModal'
@@ -10,6 +10,7 @@ import DeleteUserModal from '@/components/management/DeleteUserModal'
 import ResetPasswordModal from '@/components/management/ResetPasswordModal'
 import AddUserForm from '@/components/management/AddUserForm'
 import EditUserForm from '@/components/management/EditUserForm'
+import { useUsers, useClassesByBranch, useInvalidateQueries } from '@/lib/queries'
 
 interface User extends UserProfile {
   class_name?: string
@@ -32,8 +33,6 @@ const STATUS_BADGE_STYLES = {
 
 export default function UsersPage() {
   const router = useRouter()
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterRole, setFilterRole] = useState<FilterRole>('all')
   const [filterBranch, setFilterBranch] = useState<FilterBranch>('all')
@@ -49,62 +48,12 @@ export default function UsersPage() {
   const [showAddUserForm, setShowAddUserForm] = useState(false)
   const [showEditUserForm, setShowEditUserForm] = useState(false)
   const [userToEdit, setUserToEdit] = useState<User | null>(null)
-  const [classes, setClasses] = useState<Class[]>([])
 
-  // Fetch classes based on selected branch
-  const fetchClasses = useCallback(async () => {
-    if (filterBranch === 'all') {
-      setClasses([])
-      setFilterClass('all')
-      return
-    }
+  const { data: users = [], isLoading: loading } = useUsers()
+  const { data: classes = [] } = useClassesByBranch(filterBranch)
+  const { invalidateUsers } = useInvalidateQueries()
 
-    try {
-      const { data, error } = await supabase
-        .from('classes')
-        .select('*')
-        .eq('branch', filterBranch)
-        .eq('status', 'ACTIVE')
-        .order('display_order', { ascending: true })
-
-      if (error) {
-        console.error('Error fetching classes:', error)
-      } else {
-        setClasses(data || [])
-      }
-    } catch (err) {
-      console.error('Error:', err)
-    }
-  }, [filterBranch])
-
-  useEffect(() => {
-    fetchClasses()
-  }, [fetchClasses])
-
-  // Fetch users from Supabase
-  const fetchUsers = useCallback(async () => {
-    setLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching users:', error)
-      } else {
-        setUsers(data || [])
-      }
-    } catch (err) {
-      console.error('Error:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchUsers()
-  }, [fetchUsers])
+  const fetchUsers = invalidateUsers
 
   // Filter users based on search and filters
   const filteredUsers = users.filter((user) => {
