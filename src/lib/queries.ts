@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, UserProfile, Class, Branch } from './supabase'
+import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory } from './supabase'
 
 // ============ Query Keys ============
 export const queryKeys = {
@@ -15,6 +15,7 @@ export const queryKeys = {
   weeklyPlans: (weekStart: string) => ['weeklyPlans', weekStart] as const,
   performanceTrend: (chartType: string) => ['performanceTrend', chartType] as const,
   classAttendance: (branch: string, date: string, dayType: string) => ['classAttendance', branch, date, dayType] as const,
+  myNotesData: (userId: string) => ['myNotesData', userId] as const,
 }
 
 // ============ Dashboard Stats ============
@@ -560,6 +561,174 @@ export function useClassAttendanceData(branch: Branch, date: string, dayType: 'c
   })
 }
 
+// ============ MyNotes Dashboard Data ============
+type DerivedStatus = 'pending' | 'in_progress' | 'completed'
+
+interface MyNotesResult {
+  classCount: number
+  studentCount: number
+  todayPlans: (WeeklyPlan & { plan_categories?: PlanCategory; derivedStatus: DerivedStatus })[]
+  completionPercentage: number
+  nextActivity: WeeklyPlan | null
+}
+
+function deriveStatus(planDate: string, timeStart: string, timeEnd: string): DerivedStatus {
+  const now = new Date()
+  const start = new Date(`${planDate}T${timeStart}`)
+  const end = new Date(`${planDate}T${timeEnd}`)
+  if (now < start) return 'pending'
+  if (now >= end) return 'completed'
+  return 'in_progress'
+}
+
+function toLocalDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+export function useMyNotesData(user: UserProfile | null) {
+  return useQuery({
+    queryKey: queryKeys.myNotesData(user?.id || ''),
+    queryFn: async (): Promise<MyNotesResult> => {
+      if (!user) throw new Error('No user')
+
+      const todayStr = toLocalDateString(new Date())
+
+      // ---- Class & Student counts (role-based) ----
+      let classCount = 0
+      let studentCount = 0
+
+      if (user.role === 'admin') {
+        const [classesRes, studentsRes] = await Promise.all([
+          supabase.from('classes').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+          supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+        ])
+        classCount = classesRes.count || 0
+        studentCount = studentsRes.count || 0
+      } else if (user.role === 'phan_doan_truong' && user.branch) {
+        const { data: branchClasses } = await supabase
+          .from('classes')
+          .select('id')
+          .eq('branch', user.branch)
+          .eq('status', 'ACTIVE')
+        classCount = branchClasses?.length || 0
+        if (branchClasses && branchClasses.length > 0) {
+          const classIds = branchClasses.map(c => c.id)
+          const { count } = await supabase
+            .from('thieu_nhi')
+            .select('*', { count: 'exact', head: true })
+            .in('class_id', classIds)
+            .eq('status', 'ACTIVE')
+          studentCount = count || 0
+        }
+      } else if (user.role === 'giao_ly_vien' && user.class_id) {
+        classCount = 1
+        const { count } = await supabase
+          .from('thieu_nhi')
+          .select('*', { count: 'exact', head: true })
+          .eq('class_id', user.class_id)
+          .eq('status', 'ACTIVE')
+        studentCount = count || 0
+      }
+
+      // ---- Today's plans (role-based) ----
+      let todayQuery = supabase
+        .from('weekly_plans')
+        .select('*, plan_categories(*)')
+        .eq('plan_date', todayStr)
+        .order('time_start')
+
+      if (user.role === 'phan_doan_truong' && user.branch) {
+        todayQuery = todayQuery.eq('branch', user.branch)
+      } else if (user.role === 'giao_ly_vien' && user.class_id) {
+        // For giao_ly_vien: plans where branch matches OR class_ids contains their class
+        // Supabase doesn't support OR across different columns easily in a single query,
+        // so we fetch by branch and by class_ids, then merge
+        const [byBranchRes, byClassRes] = await Promise.all([
+          user.branch
+            ? supabase.from('weekly_plans').select('*, plan_categories(*)').eq('plan_date', todayStr).eq('branch', user.branch).order('time_start')
+            : Promise.resolve({ data: [] as (WeeklyPlan & { plan_categories?: PlanCategory })[] }),
+          supabase.from('weekly_plans').select('*, plan_categories(*)').eq('plan_date', todayStr).contains('class_ids', [user.class_id]).order('time_start'),
+        ])
+        const byBranch = (byBranchRes as { data: (WeeklyPlan & { plan_categories?: PlanCategory })[] | null }).data || []
+        const byClass = byClassRes.data || []
+        // Merge and deduplicate
+        const merged = new Map<string, WeeklyPlan & { plan_categories?: PlanCategory }>()
+        for (const p of [...byBranch, ...byClass]) {
+          merged.set(p.id, p as WeeklyPlan & { plan_categories?: PlanCategory })
+        }
+        const todayRaw = Array.from(merged.values()).sort((a, b) => a.time_start.localeCompare(b.time_start))
+
+        const todayPlans = todayRaw.map(p => ({
+          ...p,
+          derivedStatus: deriveStatus(p.plan_date, p.time_start, p.time_end),
+        }))
+        const completedCount = todayPlans.filter(p => p.derivedStatus === 'completed').length
+        const completionPercentage = todayPlans.length > 0 ? Math.round((completedCount / todayPlans.length) * 100) : 0
+
+        // Next upcoming activity
+        let nextActivity: WeeklyPlan | null = null
+        const now = new Date()
+        const todayFuture = todayPlans.find(p => new Date(`${p.plan_date}T${p.time_start}`) > now)
+        if (todayFuture) {
+          nextActivity = todayFuture
+        } else {
+          // Check future days
+          const [futBranchRes, futClassRes] = await Promise.all([
+            user.branch
+              ? supabase.from('weekly_plans').select('*, plan_categories(*)').gt('plan_date', todayStr).eq('branch', user.branch).order('plan_date').order('time_start').limit(1)
+              : Promise.resolve({ data: [] as WeeklyPlan[] }),
+            supabase.from('weekly_plans').select('*, plan_categories(*)').gt('plan_date', todayStr).contains('class_ids', [user.class_id]).order('plan_date').order('time_start').limit(1),
+          ])
+          const futBranch = (futBranchRes as { data: WeeklyPlan[] | null }).data || []
+          const futClass = futClassRes.data || []
+          const candidates = [...futBranch, ...futClass].sort((a, b) => {
+            const cmp = a.plan_date.localeCompare(b.plan_date)
+            return cmp !== 0 ? cmp : a.time_start.localeCompare(b.time_start)
+          })
+          nextActivity = candidates[0] || null
+        }
+
+        return { classCount, studentCount, todayPlans, completionPercentage, nextActivity }
+      }
+
+      // Admin and phan_doan_truong path
+      const { data: todayRaw } = await todayQuery
+      const plans = (todayRaw || []) as (WeeklyPlan & { plan_categories?: PlanCategory })[]
+
+      const todayPlans = plans.map(p => ({
+        ...p,
+        derivedStatus: deriveStatus(p.plan_date, p.time_start, p.time_end),
+      }))
+      const completedCount = todayPlans.filter(p => p.derivedStatus === 'completed').length
+      const completionPercentage = todayPlans.length > 0 ? Math.round((completedCount / todayPlans.length) * 100) : 0
+
+      // Next upcoming activity
+      let nextActivity: WeeklyPlan | null = null
+      const now = new Date()
+      const todayFuture = todayPlans.find(p => new Date(`${p.plan_date}T${p.time_start}`) > now)
+      if (todayFuture) {
+        nextActivity = todayFuture
+      } else {
+        let nextQuery = supabase
+          .from('weekly_plans')
+          .select('*, plan_categories(*)')
+          .gt('plan_date', todayStr)
+          .order('plan_date')
+          .order('time_start')
+          .limit(1)
+        if (user.role === 'phan_doan_truong' && user.branch) {
+          nextQuery = nextQuery.eq('branch', user.branch)
+        }
+        const { data: nextData } = await nextQuery
+        nextActivity = (nextData?.[0] as WeeklyPlan) || null
+      }
+
+      return { classCount, studentCount, todayPlans, completionPercentage, nextActivity }
+    },
+    enabled: !!user,
+  })
+}
+
 // ============ Invalidation helpers ============
 export function useInvalidateQueries() {
   const queryClient = useQueryClient()
@@ -572,6 +741,7 @@ export function useInvalidateQueries() {
     invalidateClassStats: () => queryClient.invalidateQueries({ queryKey: queryKeys.classStats }),
     invalidateWeeklyPlans: (weekStart: string) =>
       queryClient.invalidateQueries({ queryKey: queryKeys.weeklyPlans(weekStart) }),
+    invalidateMyNotes: () => queryClient.invalidateQueries({ queryKey: ['myNotesData'] }),
     invalidateAll: () => queryClient.invalidateQueries(),
   }
 }
