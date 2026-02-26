@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Plus, MoreHorizontal } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
@@ -22,12 +22,46 @@ export default function MyNotes() {
   const { invalidateMyNotes } = useInvalidateQueries()
   const router = useRouter()
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [filterCategory, setFilterCategory] = useState<string | null>(null)
+  const [showFilterMenu, setShowFilterMenu] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
+
+  // Close filter menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setShowFilterMenu(false)
+      }
+    }
+    if (showFilterMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showFilterMenu])
 
   const classCount = data?.classCount ?? 0
   const studentCount = data?.studentCount ?? 0
   const todayPlans = data?.todayPlans ?? []
   const completionPercentage = data?.completionPercentage ?? 0
   const nextActivity = data?.nextActivity ?? null
+
+  // Get unique categories from today's plans for filter menu
+  const categories = todayPlans.reduce<{ id: string; name: string; color: string }[]>((acc, plan) => {
+    const catId = plan.category_id || 'none'
+    if (!acc.find(c => c.id === catId)) {
+      acc.push({
+        id: catId,
+        name: plan.plan_categories?.name || 'Không phân loại',
+        color: plan.plan_categories?.color || '#999',
+      })
+    }
+    return acc
+  }, [])
+
+  // Filter plans by selected category
+  const filteredPlans = filterCategory
+    ? todayPlans.filter(p => (p.category_id || 'none') === filterCategory)
+    : todayPlans
 
   const totalBars = 26
   const filledBars = Math.round((completionPercentage / 100) * totalBars)
@@ -172,14 +206,47 @@ export default function MyNotes() {
 
       {/* Today's Plans Header */}
       <div className="flex items-center justify-between mb-3 flex-shrink-0">
-        <h3 className="text-sm font-medium text-black dark:text-white">Kế hoạch hoạt động hôm nay</h3>
+        <h3 className="text-sm font-medium text-black dark:text-white">
+          Kế hoạch hoạt động hôm nay
+          {filterCategory && <span className="text-xs text-brand ml-1">({categories.find(c => c.id === filterCategory)?.name})</span>}
+        </h3>
         <div className="flex items-center gap-[15px] w-[60px]">
-          <button className="hover:opacity-70 transition-opacity">
-            <svg width="23" height="23" viewBox="0 0 23 23" fill="none">
-              <path d="M2.875 6.70833H20.125M5.75 11.5H17.25M8.625 16.2917H14.375" stroke="currentColor" className="text-black/40 dark:text-white/50" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
-          <button className="hover:opacity-70 transition-opacity">
+          {/* Filter button */}
+          <div className="relative" ref={filterRef}>
+            <button
+              onClick={() => setShowFilterMenu(!showFilterMenu)}
+              className={`hover:opacity-70 transition-opacity ${filterCategory ? 'text-brand' : ''}`}
+            >
+              <svg width="23" height="23" viewBox="0 0 23 23" fill="none">
+                <path d="M2.875 6.70833H20.125M5.75 11.5H17.25M8.625 16.2917H14.375" stroke="currentColor" className={filterCategory ? 'text-brand' : 'text-black/40 dark:text-white/50'} strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+            {showFilterMenu && (
+              <div className="absolute right-0 top-8 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-white/10 py-1 min-w-[160px]">
+                <button
+                  onClick={() => { setFilterCategory(null); setShowFilterMenu(false) }}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-white/10 transition-colors ${!filterCategory ? 'text-brand font-medium' : 'text-black/70 dark:text-white/70'}`}
+                >
+                  Tất cả
+                </button>
+                {categories.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => { setFilterCategory(cat.id); setShowFilterMenu(false) }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-white/10 transition-colors flex items-center gap-2 ${filterCategory === cat.id ? 'text-brand font-medium' : 'text-black/70 dark:text-white/70'}`}
+                  >
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* More button -> go to weekly plan page */}
+          <button
+            onClick={() => router.push('/admin/activities/weekly-plan')}
+            className="hover:opacity-70 transition-opacity"
+          >
             <MoreHorizontal className="w-[22px] h-[22px] text-black/40 dark:text-white/50" />
           </button>
         </div>
@@ -197,12 +264,14 @@ export default function MyNotes() {
             </div>
             <div className="w-[70px] h-[50px] bg-gray-200 dark:bg-white/10 rounded-[28px] animate-pulse flex-shrink-0" />
           </div>
-        ) : todayPlans.length === 0 ? (
+        ) : filteredPlans.length === 0 ? (
           <div className="flex items-center justify-center py-8">
-            <p className="text-sm text-black/40 dark:text-white/50">Không có hoạt động hôm nay</p>
+            <p className="text-sm text-black/40 dark:text-white/50">
+              {filterCategory ? 'Không có hoạt động trong danh mục này' : 'Không có hoạt động hôm nay'}
+            </p>
           </div>
         ) : (
-          todayPlans.map((plan) => {
+          filteredPlans.map((plan) => {
             const categoryColor = plan.plan_categories?.color || '#FA865E'
             const categoryName = plan.plan_categories?.name || ''
             const categoryLetter = categoryName.charAt(0).toUpperCase() || '?'
