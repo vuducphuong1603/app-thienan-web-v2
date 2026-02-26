@@ -40,7 +40,7 @@ interface ReportStudentScore {
   average_year: number | null
 }
 
-type TimeFilterMode = 'week' | 'dateRange'
+type TimeFilterMode = 'week' | 'dateRange' | 'month'
 type ReportType = 'attendance' | 'score'
 type AttendanceTypeFilter = 'all' | 'thu5' | 'cn'
 
@@ -90,7 +90,7 @@ export default function ActivitiesPage() {
   const [isImportExcelModalOpen, setIsImportExcelModalOpen] = useState(false)
 
   // Report states
-  const [reportTimeFilterMode, setReportTimeFilterMode] = useState<TimeFilterMode>('dateRange')
+  const [reportTimeFilterMode, setReportTimeFilterMode] = useState<TimeFilterMode>('month')
   const [reportFromDate, setReportFromDate] = useState<string>(new Date().toISOString().split('T')[0])
   const [reportToDate, setReportToDate] = useState<string>(new Date().toISOString().split('T')[0])
   const [reportWeekStart, setReportWeekStart] = useState<string>('')
@@ -99,6 +99,9 @@ export default function ActivitiesPage() {
   const [reportBranch, setReportBranch] = useState<string>('')
   const [reportClassId, setReportClassId] = useState<string>('')
   const [reportAttendanceType, setReportAttendanceType] = useState<AttendanceTypeFilter>('all')
+  const [reportMonth, setReportMonth] = useState<number>(new Date().getMonth()) // 0-11
+  const [reportYear, setReportYear] = useState<number>(new Date().getFullYear())
+  const [isReportMonthDropdownOpen, setIsReportMonthDropdownOpen] = useState(false)
   const [isReportGenerated, setIsReportGenerated] = useState(false)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportStudents, setReportStudents] = useState<ReportStudent[]>([])
@@ -1024,6 +1027,7 @@ export default function ActivitiesPage() {
     setIsReportFromDatePickerOpen(false)
     setIsReportToDatePickerOpen(false)
     setIsReportWeekPickerOpen(false)
+    setIsReportMonthDropdownOpen(false)
   }
 
   // Generate report
@@ -1151,6 +1155,11 @@ export default function ActivitiesPage() {
         if (reportTimeFilterMode === 'week' && reportWeekStart && reportWeekEnd) {
           fromDate = reportWeekStart
           toDate = reportWeekEnd
+        } else if (reportTimeFilterMode === 'month') {
+          const firstDay = new Date(reportYear, reportMonth, 1)
+          const lastDay = new Date(reportYear, reportMonth + 1, 0)
+          fromDate = firstDay.toISOString().split('T')[0]
+          toDate = lastDay.toISOString().split('T')[0]
         }
 
         // Fetch students in the class
@@ -1278,7 +1287,9 @@ export default function ActivitiesPage() {
       const reportTypeName = reportType === 'attendance' ? 'diem_danh' : 'diem_so'
       link.download = `${reportTypeName}_${today}.png`
       link.href = canvas.toDataURL('image/png')
+      document.body.appendChild(link)
       link.click()
+      document.body.removeChild(link)
 
       setExportSuccessMessage('Đã xuất ảnh thành công!')
       setIsExportSuccessModalOpen(true)
@@ -1289,11 +1300,117 @@ export default function ActivitiesPage() {
     }
   }
 
-  // Export Excel (placeholder)
-  const handleExportExcel = () => {
-    setExportSuccessMessage('Đã xuất Excel!')
-    setIsExportSuccessModalOpen(true)
-    setTimeout(() => setIsExportSuccessModalOpen(false), 2000)
+  // Export Excel
+  const handleExportExcel = async () => {
+    try {
+      const XLSX = await import('xlsx')
+      const wb = XLSX.utils.book_new()
+      const today = new Date().toISOString().split('T')[0]
+      const clsName = getReportClassName(reportClassId)
+
+      if (reportType === 'attendance') {
+        const header = ['STT', 'Tên thánh', 'Họ đệm', 'Tên']
+        reportDates.forEach(date => header.push(formatShortDate(date)))
+
+        const rows = reportStudents.map((student, index) => {
+          const nameParts = student.full_name.split(' ')
+          const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
+          const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
+          const row: (string | number)[] = [index + 1, student.saint_name || '', familyMiddleName, givenName]
+          reportDates.forEach(date => {
+            const status = student.attendance[date]
+            row.push(status === 'present' ? 'x' : status === 'absent' ? 'v' : '')
+          })
+          return row
+        })
+
+        const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
+        ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, ...reportDates.map(() => ({ wch: 8 }))]
+        XLSX.utils.book_append_sheet(wb, ws, 'Diem danh')
+
+        const typeLabel = reportAttendanceType === 'thu5' ? '_thu5' : reportAttendanceType === 'cn' ? '_cn' : ''
+        const fileName = `diem_danh_${clsName}${typeLabel}_${today}.xlsx`
+
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } else {
+        const anySelected = Object.values(scoreColumns).some(v => v)
+        const showAll = !anySelected
+        const showDiLeT5 = showAll || scoreColumns.diLeT5
+        const showHocGL = showAll || scoreColumns.hocGL
+        const show45HK1 = showAll || scoreColumns.score45HK1
+        const showExamHK1 = showAll || scoreColumns.scoreExamHK1
+        const show45HK2 = showAll || scoreColumns.score45HK2
+        const showExamHK2 = showAll || scoreColumns.scoreExamHK2
+        const showDiemTong = showAll || scoreColumns.diemTong
+
+        const header: string[] = ['STT', 'Tên thánh', 'Họ và tên']
+        if (showDiLeT5) header.push('Đi Lễ T5')
+        if (showHocGL) header.push('Học GL')
+        if (show45HK1) header.push('45p HK1')
+        if (showExamHK1) header.push('Thi HK1')
+        if (show45HK1 || showExamHK1) header.push('TB HK1')
+        if (show45HK2) header.push('45p HK2')
+        if (showExamHK2) header.push('Thi HK2')
+        if (show45HK2 || showExamHK2) header.push('TB HK2')
+        if (showDiemTong) header.push('TB Năm')
+        header.push('Xếp loại')
+
+        const rows = reportScoreStudents.map((student, index) => {
+          const row: (string | number)[] = [index + 1, student.saint_name || '', student.full_name]
+          if (showDiLeT5) row.push(student.score_di_le_t5 ?? '')
+          if (showHocGL) row.push(student.score_hoc_gl ?? '')
+          if (show45HK1) row.push(student.score_45_hk1 ?? '')
+          if (showExamHK1) row.push(student.score_exam_hk1 ?? '')
+          if (show45HK1 || showExamHK1) row.push(student.average_hk1 ?? '')
+          if (show45HK2) row.push(student.score_45_hk2 ?? '')
+          if (showExamHK2) row.push(student.score_exam_hk2 ?? '')
+          if (show45HK2 || showExamHK2) row.push(student.average_hk2 ?? '')
+          if (showDiemTong) row.push(student.average_year ?? '')
+          if (student.average_year !== null) {
+            if (student.average_year >= 8.0) row.push('Giỏi')
+            else if (student.average_year >= 6.5) row.push('Khá')
+            else if (student.average_year >= 5.0) row.push('TB')
+            else row.push('Yếu')
+          } else {
+            row.push('')
+          }
+          return row
+        })
+
+        const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
+        ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 25 }, ...header.slice(3).map(() => ({ wch: 10 }))]
+        XLSX.utils.book_append_sheet(wb, ws, 'Diem so')
+
+        const fileName = `diem_so_${clsName}_${today}.xlsx`
+
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+
+      setExportSuccessMessage('Đã xuất Excel thành công!')
+      setIsExportSuccessModalOpen(true)
+      setTimeout(() => setIsExportSuccessModalOpen(false), 2000)
+    } catch (error) {
+      console.error('Error exporting Excel:', error)
+      showNotification('error', 'Lỗi khi xuất Excel')
+    }
   }
 
   // Set week dates (get current week by default)
@@ -2077,6 +2194,21 @@ export default function ActivitiesPage() {
                 <div className="flex items-center h-12 px-4">
                   <span className="flex-1 text-base font-semibold text-black dark:text-white">Cách chọn lọc thời gian</span>
                   <div className="flex items-center gap-4">
+                    {/* Chọn tháng option */}
+                    <button
+                      onClick={() => setReportTimeFilterMode('month')}
+                      className="flex items-center gap-2"
+                    >
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        reportTimeFilterMode === 'month' ? 'border-brand' : 'border-gray-300 dark:border-white/30'
+                      }`}>
+                        {reportTimeFilterMode === 'month' && (
+                          <div className="w-2 h-2 rounded-full bg-brand" />
+                        )}
+                      </div>
+                      <span className="text-sm font-medium text-black dark:text-white">Chọn tháng</span>
+                    </button>
+
                     {/* Chọn tuần option */}
                     <button
                       onClick={() => setReportTimeFilterMode('week')}
@@ -2175,6 +2307,67 @@ export default function ActivitiesPage() {
                     </div>
                   </div>
                 </>
+              ) : reportTimeFilterMode === 'month' ? (
+                /* Chọn tháng */
+                <div className="w-[55%]">
+                  <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn tháng</label>
+                  <div className="flex items-center gap-3">
+                    {/* Month dropdown */}
+                    <div className="relative flex-1">
+                      <button
+                        onClick={() => {
+                          closeAllReportDropdowns()
+                          setIsReportMonthDropdownOpen(!isReportMonthDropdownOpen)
+                        }}
+                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
+                      >
+                        <span className="text-sm text-black dark:text-white">
+                          Tháng {reportMonth + 1} / {reportYear}
+                        </span>
+                        <Calendar className="w-5 h-5 text-[#8A8C90]" />
+                      </button>
+                      {isReportMonthDropdownOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden">
+                          {/* Year navigation */}
+                          <div className="flex items-center justify-between px-4 py-2 border-b border-[#E5E1DC] dark:border-white/10">
+                            <button
+                              onClick={() => setReportYear(prev => prev - 1)}
+                              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
+                            >
+                              <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M7 1L1 7L7 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </button>
+                            <span className="text-sm font-semibold text-black dark:text-white">{reportYear}</span>
+                            <button
+                              onClick={() => setReportYear(prev => prev + 1)}
+                              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
+                            >
+                              <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1L7 7L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </button>
+                          </div>
+                          {/* Month grid */}
+                          <div className="grid grid-cols-3 gap-1 p-2">
+                            {Array.from({ length: 12 }, (_, i) => (
+                              <button
+                                key={i}
+                                onClick={() => {
+                                  setReportMonth(i)
+                                  setIsReportMonthDropdownOpen(false)
+                                }}
+                                className={`px-3 py-2.5 rounded-lg text-sm text-center transition-colors ${
+                                  reportMonth === i
+                                    ? 'bg-brand text-white font-semibold'
+                                    : 'text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/10'
+                                }`}
+                              >
+                                Tháng {i + 1}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               ) : (
                 /* Chọn tuần */
                 <div className="w-[55%]">
@@ -2863,8 +3056,8 @@ export default function ActivitiesPage() {
             students={reportStudents}
             dates={reportDates}
             className={getReportClassName(reportClassId)}
-            fromDate={reportTimeFilterMode === 'week' ? reportWeekStart : reportFromDate}
-            toDate={reportTimeFilterMode === 'week' ? reportWeekEnd : reportToDate}
+            fromDate={reportTimeFilterMode === 'week' ? reportWeekStart : reportTimeFilterMode === 'month' ? new Date(reportYear, reportMonth, 1).toISOString().split('T')[0] : reportFromDate}
+            toDate={reportTimeFilterMode === 'week' ? reportWeekEnd : reportTimeFilterMode === 'month' ? new Date(reportYear, reportMonth + 1, 0).toISOString().split('T')[0] : reportToDate}
           />
         )}
         {isReportGenerated && reportType === 'score' && (
