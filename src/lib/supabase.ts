@@ -123,6 +123,86 @@ export interface PlanCategory {
   updated_at?: string
 }
 
+// ============ Alert System Types ============
+export type AlertSeverity = 'high' | 'medium' | 'low'
+export type AlertType = 'attendance' | 'score' | 'system'
+export type AlertStatus = 'unread' | 'read' | 'resolved' | 'dismissed'
+
+export interface RuleCondition {
+  key: string
+  enabled: boolean
+  value?: number
+}
+
+export interface AlertRule {
+  id: string
+  name: string
+  description?: string
+  type: AlertType
+  severity: AlertSeverity
+  threshold?: number
+  conditions: RuleCondition[]
+  condition_expression?: string
+  notification_types: string[]
+  is_active: boolean
+  created_by?: string
+  created_at: string
+  updated_at?: string
+}
+
+export interface AlertRecord {
+  id: string
+  rule_id?: string
+  title: string
+  description?: string
+  type: AlertType
+  severity: AlertSeverity
+  status: AlertStatus
+  student_id?: string
+  student_name?: string
+  student_code?: string
+  class_id?: string
+  class_name?: string
+  source: string
+  metadata: Record<string, unknown>
+  resolved_by?: string
+  resolved_at?: string
+  created_at: string
+  updated_at?: string
+}
+
+export const ALERT_TYPE_LABELS: Record<AlertType, string> = {
+  attendance: 'Điểm danh',
+  score: 'Điểm số',
+  system: 'Hệ thống',
+}
+
+export const ALERT_SEVERITY_LABELS: Record<AlertSeverity, string> = {
+  high: 'Cao',
+  medium: 'Trung bình',
+  low: 'Thấp',
+}
+
+export const ALERT_CONDITION_KEYS: Record<AlertType, { key: string; label: string; expression: string }[]> = {
+  attendance: [
+    { key: 'attendance_rate_below', label: 'Tỷ lệ điểm danh thấp hơn', expression: 'attendance_rate < {threshold}' },
+    { key: 'consecutive_absent', label: 'Vắng mặt liên tục từ', expression: 'consecutive_absent >= {threshold}' },
+    { key: 'sunday_lower_thursday', label: 'CN thấp hơn T5 từ', expression: 'cn_lower_thu5 >= {threshold}' },
+  ],
+  score: [
+    { key: 'study_score_below', label: 'Điểm học tập thấp hơn', expression: 'study_score < {threshold}' },
+    { key: 'total_score_below', label: 'Điểm tổng thấp hơn', expression: 'student_final_score < {threshold}' },
+    { key: 'score_decline', label: 'Điểm giảm từ', expression: 'score_decline >= {threshold}' },
+    { key: 'individual_study_low', label: 'Điểm học từng học sinh thấp', expression: 'individual_study < {threshold}' },
+    { key: 'individual_total_low', label: 'Điểm tổng từng học sinh thấp', expression: 'individual_total < {threshold}' },
+  ],
+  system: [
+    { key: 'class_size_below', label: 'Sĩ số lớp ít hơn', expression: 'class_size < {threshold}' },
+    { key: 'teacher_ratio_above', label: 'Tỷ lệ GV/TN cao hơn', expression: 'teacher_ratio > {threshold}' },
+    { key: 'missing_data_days', label: 'Thiếu dữ liệu từ ngày', expression: 'missing_data_days >= {threshold}' },
+  ],
+}
+
 // Weekly plan
 export interface WeeklyPlan {
   id: string

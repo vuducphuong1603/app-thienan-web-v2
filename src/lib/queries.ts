@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory } from './supabase'
+import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord } from './supabase'
 
 // ============ Query Keys ============
 export const queryKeys = {
@@ -16,6 +16,10 @@ export const queryKeys = {
   performanceTrend: (chartType: string) => ['performanceTrend', chartType] as const,
   classAttendance: (branch: string, date: string, dayType: string) => ['classAttendance', branch, date, dayType] as const,
   myNotesData: (userId: string) => ['myNotesData', userId] as const,
+  alertRules: ['alertRules'] as const,
+  alerts: (filters: Record<string, string>) => ['alerts', filters] as const,
+  alertStats: ['alertStats'] as const,
+  alertHistory: ['alertHistory'] as const,
 }
 
 // ============ Dashboard Stats ============
@@ -727,6 +731,125 @@ export function useMyNotesData(user: UserProfile | null) {
   })
 }
 
+// ============ Alert Rules ============
+export function useAlertRules() {
+  return useQuery({
+    queryKey: queryKeys.alertRules,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('alert_rules')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return (data || []) as AlertRule[]
+    },
+  })
+}
+
+// ============ Alerts (with filters) ============
+export function useAlerts(filters: Record<string, string> = {}) {
+  return useQuery({
+    queryKey: queryKeys.alerts(filters),
+    queryFn: async () => {
+      let query = supabase
+        .from('alerts')
+        .select('*')
+        .in('status', ['unread', 'read'])
+        .order('created_at', { ascending: false })
+
+      if (filters.severity && filters.severity !== 'all') {
+        query = query.eq('severity', filters.severity)
+      }
+      if (filters.status && filters.status !== 'all') {
+        query = query.eq('status', filters.status)
+      }
+      if (filters.type && filters.type !== 'all') {
+        query = query.eq('type', filters.type)
+      }
+      if (filters.timeRange && filters.timeRange !== 'all') {
+        const now = new Date()
+        let startDate: Date
+        switch (filters.timeRange) {
+          case 'today':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+            break
+          case '7days':
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            break
+          case '30days':
+            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+            break
+          default:
+            startDate = new Date(0)
+        }
+        query = query.gte('created_at', startDate.toISOString())
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+      return (data || []) as AlertRecord[]
+    },
+  })
+}
+
+// ============ Alert Stats ============
+export function useAlertStats() {
+  return useQuery({
+    queryKey: queryKeys.alertStats,
+    queryFn: async () => {
+      const [totalRes, unreadRes, highRes, resolvedRes] = await Promise.all([
+        supabase.from('alerts').select('*', { count: 'exact', head: true }),
+        supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('status', 'unread'),
+        supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('severity', 'high').in('status', ['unread', 'read']),
+        supabase.from('alerts').select('*', { count: 'exact', head: true }).in('status', ['resolved', 'dismissed']),
+      ])
+
+      return {
+        total: totalRes.count || 0,
+        unread: unreadRes.count || 0,
+        high: highRes.count || 0,
+        resolved: resolvedRes.count || 0,
+      }
+    },
+  })
+}
+
+// ============ Alert History ============
+export function useAlertHistory() {
+  return useQuery({
+    queryKey: queryKeys.alertHistory,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('alerts')
+        .select('*')
+        .in('status', ['resolved', 'dismissed'])
+        .order('resolved_at', { ascending: false })
+        .limit(50)
+
+      if (error) throw error
+      return (data || []) as AlertRecord[]
+    },
+  })
+}
+
+// ============ Dashboard Alerts (latest 2) ============
+export function useDashboardAlerts() {
+  return useQuery({
+    queryKey: ['dashboardAlerts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('alerts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(2)
+
+      if (error) throw error
+      return (data || []) as AlertRecord[]
+    },
+  })
+}
+
 // ============ Invalidation helpers ============
 export function useInvalidateQueries() {
   const queryClient = useQueryClient()
@@ -740,6 +863,11 @@ export function useInvalidateQueries() {
     invalidateWeeklyPlans: (weekStart: string) =>
       queryClient.invalidateQueries({ queryKey: queryKeys.weeklyPlans(weekStart) }),
     invalidateMyNotes: () => queryClient.invalidateQueries({ queryKey: ['myNotesData'] }),
+    invalidateAlerts: () => queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+    invalidateAlertRules: () => queryClient.invalidateQueries({ queryKey: queryKeys.alertRules }),
+    invalidateAlertStats: () => queryClient.invalidateQueries({ queryKey: queryKeys.alertStats }),
+    invalidateAlertHistory: () => queryClient.invalidateQueries({ queryKey: queryKeys.alertHistory }),
+    invalidateDashboardAlerts: () => queryClient.invalidateQueries({ queryKey: ['dashboardAlerts'] }),
     invalidateAll: () => queryClient.invalidateQueries(),
   }
 }
