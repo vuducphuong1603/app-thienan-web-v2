@@ -1,6 +1,7 @@
 'use client'
 
-import { Clock, User, AlertTriangle, ArrowUp, Minus, ArrowDown } from 'lucide-react'
+import { useState } from 'react'
+import { Clock, User, AlertTriangle, ArrowUp, Minus, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react'
 import { NotificationWithStatus, NotificationPriority } from '@/lib/supabase'
 
 function formatTimeAgo(dateStr: string): string {
@@ -41,24 +42,36 @@ interface NotificationItemProps {
 }
 
 export default function NotificationItem({ notification, showReadStatus = true, compact = false }: NotificationItemProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
   return (
-    <div className={`bg-[#f6f6f6] dark:bg-white/5 rounded-[15px] p-3 ${
-      !notification.is_read && showReadStatus ? 'ring-1 ring-brand/30' : ''
-    }`}>
+    <div
+      className={`bg-[#f6f6f6] dark:bg-white/5 rounded-[15px] p-3 cursor-pointer hover:bg-[#efefef] dark:hover:bg-white/8 transition-colors ${
+        !notification.is_read && showReadStatus ? 'ring-1 ring-brand/30' : ''
+      }`}
+      onClick={() => setIsExpanded(!isExpanded)}
+    >
       {/* Top Row - Badges */}
-      <div className="flex items-center gap-2 mb-2">
-        {showReadStatus && (
-          <div className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 ${
-            notification.is_read
-              ? 'bg-[#e5e1dc] dark:bg-white/10'
-              : 'bg-brand/10 text-brand'
-          }`}>
-            <span className="text-[10px] font-medium">
-              {notification.is_read ? 'Đã đọc' : 'Chưa đọc'}
-            </span>
-          </div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          {showReadStatus && (
+            <div className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 ${
+              notification.is_read
+                ? 'bg-[#e5e1dc] dark:bg-white/10'
+                : 'bg-brand/10 text-brand'
+            }`}>
+              <span className="text-[10px] font-medium">
+                {notification.is_read ? 'Đã đọc' : 'Chưa đọc'}
+              </span>
+            </div>
+          )}
+          <PriorityBadge priority={notification.priority} />
+        </div>
+        {!compact && (
+          isExpanded
+            ? <ChevronUp className="w-4 h-4 text-[#8a8c90]" />
+            : <ChevronDown className="w-4 h-4 text-[#8a8c90]" />
         )}
-        <PriorityBadge priority={notification.priority} />
       </div>
 
       {/* Title */}
@@ -68,7 +81,9 @@ export default function NotificationItem({ notification, showReadStatus = true, 
 
       {/* Content */}
       {!compact && (
-        <p className="text-xs text-black/50 dark:text-white/50 mb-2 line-clamp-2">
+        <p className={`text-xs text-black/50 dark:text-white/50 mb-2 whitespace-pre-wrap ${
+          isExpanded ? '' : 'line-clamp-2'
+        }`}>
           {notification.content}
         </p>
       )}

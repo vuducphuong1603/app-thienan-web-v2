@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarDays, Bell } from 'lucide-react'
+import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarDays, Bell, ShieldAlert } from 'lucide-react'
 import Link from 'next/link'
 import CustomCalendar from '@/components/ui/CustomCalendar'
 import QRAttendanceModal from '@/components/QRAttendanceModal'
@@ -1537,7 +1537,7 @@ export default function ActivitiesPage() {
 
         {/* Thông báo Tab */}
         <Link
-          href="/admin/alerts"
+          href="/admin/notifications"
           className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
         >
           <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
@@ -1545,6 +1545,19 @@ export default function ActivitiesPage() {
           </div>
           <span className="text-base font-semibold text-black dark:text-white opacity-80">
             Thông báo
+          </span>
+        </Link>
+
+        {/* Hệ thống cảnh báo Tab */}
+        <Link
+          href="/admin/alerts"
+          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
+        >
+          <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
+            <ShieldAlert className="w-5 h-5 text-brand" />
+          </div>
+          <span className="text-base font-semibold text-black dark:text-white opacity-80">
+            Cảnh báo
           </span>
         </Link>
 
