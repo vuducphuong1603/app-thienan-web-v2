@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
 import { supabase, UserProfile, UserRole } from './supabase'
 import { useRouter, usePathname } from 'next/navigation'
 
@@ -24,129 +24,174 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 // Routes that don't require authentication
 const publicRoutes = ['/login', '/register', '/forgot-password']
 
+// Convert phone number to email format used in Supabase Auth
+function phoneToEmail(phone: string): string {
+  // Remove whitespace and normalize
+  let normalized = phone.trim().replace(/\s/g, '')
+  // Remove +84 prefix and add leading 0
+  if (normalized.startsWith('+84')) {
+    normalized = '0' + normalized.slice(3)
+  }
+  // Remove 84 prefix (without +)
+  if (normalized.startsWith('84') && normalized.length === 11) {
+    normalized = '0' + normalized.slice(2)
+  }
+  return `${normalized}@thienan.app`
+}
+
+// Fetch user profile from public.users table
+async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error || !data) return null
+
+  return {
+    id: data.id,
+    username: data.username || data.phone,
+    email: data.email,
+    full_name: data.full_name || 'Người dùng',
+    saint_name: data.saint_name,
+    phone: data.phone,
+    address: data.address,
+    role: data.role || 'giao_ly_vien',
+    status: data.status,
+    class_id: data.class_id,
+    class_name: data.class_name,
+    branch: data.branch,
+    avatar_url: data.avatar_url,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
 
-  useEffect(() => {
-    // Check for stored session on mount
-    const storedUser = localStorage.getItem('thien_an_user')
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser) as UserProfile
-        setUser(parsedUser)
-
-        // Auto redirect if on login page and already logged in
-        if (pathname === '/login') {
-          redirectBasedOnRole(parsedUser.role)
-        }
-      } catch {
-        localStorage.removeItem('thien_an_user')
-      }
-    } else {
-      // Redirect to login if not on public route
-      if (!publicRoutes.includes(pathname || '')) {
-        router.push('/login')
-      }
-    }
-    setLoading(false)
-  }, [pathname, router])
-
   // Redirect user based on their role
-  const redirectBasedOnRole = (role: UserRole) => {
+  const redirectBasedOnRole = useCallback((role: UserRole) => {
     if (role === 'admin') {
       router.push('/admin/dashboard')
     } else {
       router.push('/dashboard')
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    // Initialize: check existing Supabase Auth session
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (session?.user) {
+          // Fetch profile from users table
+          const profile = await fetchUserProfile(session.user.id)
+          if (profile && profile.status === 'ACTIVE') {
+            setUser(profile)
+            localStorage.setItem('thien_an_user', JSON.stringify(profile))
+            if (pathname === '/login') {
+              redirectBasedOnRole(profile.role)
+            }
+          } else {
+            // User inactive or profile not found, sign out
+            await supabase.auth.signOut()
+            localStorage.removeItem('thien_an_user')
+            if (!publicRoutes.includes(pathname || '')) {
+              router.push('/login')
+            }
+          }
+        } else {
+          // No session - check localStorage cache for quick load
+          const storedUser = localStorage.getItem('thien_an_user')
+          if (storedUser) {
+            // Cached but no session - clear cache
+            localStorage.removeItem('thien_an_user')
+          }
+          if (!publicRoutes.includes(pathname || '')) {
+            router.push('/login')
+          }
+        }
+      } catch {
+        localStorage.removeItem('thien_an_user')
+        if (!publicRoutes.includes(pathname || '')) {
+          router.push('/login')
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    initAuth()
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        localStorage.removeItem('thien_an_user')
+        router.push('/login')
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        const profile = await fetchUserProfile(session.user.id)
+        if (profile && profile.status === 'ACTIVE') {
+          setUser(profile)
+          localStorage.setItem('thien_an_user', JSON.stringify(profile))
+        }
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [pathname, router, redirectBasedOnRole])
 
   const login = async (identifier: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true)
 
-      // Normalize identifier (remove whitespace)
+      // Normalize identifier
       const normalizedIdentifier = identifier.trim().replace(/\s/g, '')
 
-      // Try to find user by phone or by username/id
-      let data = null
-      let error = null
+      // Convert phone/identifier to email format for Supabase Auth
+      const email = phoneToEmail(normalizedIdentifier)
 
-      // First try by phone
-      const phoneResult = await supabase
-        .from('users')
-        .select('*')
-        .eq('phone', normalizedIdentifier)
-        .eq('password', password)
-        .maybeSingle()
+      // Sign in via Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-      if (phoneResult.data) {
-        data = phoneResult.data
-      } else {
-        // Try by email if phone didn't work
-        const emailResult = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', normalizedIdentifier)
-          .eq('password', password)
-          .maybeSingle()
-
-        if (emailResult.data) {
-          data = emailResult.data
-        } else {
-          // Try by username column if exists
-          const usernameResult = await supabase
-            .from('users')
-            .select('*')
-            .eq('username', normalizedIdentifier)
-            .eq('password', password)
-            .maybeSingle()
-
-          if (usernameResult.data) {
-            data = usernameResult.data
-          } else {
-            error = 'User not found'
-          }
-        }
+      if (authError || !authData.user) {
+        return { success: false, error: 'Số điện thoại hoặc mật khẩu không đúng' }
       }
 
-      if (error || !data) {
-        return { success: false, error: 'Ten dang nhap hoac mat khau khong dung' }
+      // Fetch user profile from public.users table
+      const profile = await fetchUserProfile(authData.user.id)
+
+      if (!profile) {
+        await supabase.auth.signOut()
+        return { success: false, error: 'Không tìm thấy thông tin tài khoản' }
       }
 
-      // Check account status
-      if (data.status === 'INACTIVE') {
-        return { success: false, error: 'Tai khoan cua ban da bi vo hieu hoa. Vui long lien he Ban dieu hanh.' }
+      if (profile.status === 'INACTIVE') {
+        await supabase.auth.signOut()
+        return { success: false, error: 'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Ban điều hành.' }
       }
 
-      const userProfile: UserProfile = {
-        id: data.id,
-        username: data.username || data.phone,
-        email: data.email,
-        full_name: data.full_name || 'Nguoi dung',
-        saint_name: data.saint_name,
-        phone: data.phone,
-        address: data.address,
-        role: data.role || 'giao_ly_vien',
-        status: data.status,
-        class_id: data.class_id,
-        avatar_url: data.avatar_url,
-        created_at: data.created_at,
-        updated_at: data.updated_at
-      }
-
-      setUser(userProfile)
-      localStorage.setItem('thien_an_user', JSON.stringify(userProfile))
+      setUser(profile)
+      localStorage.setItem('thien_an_user', JSON.stringify(profile))
 
       // Redirect based on role
-      redirectBasedOnRole(userProfile.role)
+      redirectBasedOnRole(profile.role)
 
       return { success: true }
     } catch (err) {
       console.error('Login error:', err)
-      return { success: false, error: 'Da co loi xay ra. Vui long thu lai.' }
+      return { success: false, error: 'Đã có lỗi xảy ra. Vui lòng thử lại.' }
     } finally {
       setLoading(false)
     }
@@ -161,7 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true)
 
-      // Check if username already exists
+      // Check if username already exists in public.users
       const { data: existingUsername } = await supabase
         .from('users')
         .select('id')
@@ -172,36 +217,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: 'Tên đăng nhập đã tồn tại' }
       }
 
-      // Check if email already exists
-      const { data: existingEmail } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', email.trim().toLowerCase())
-        .maybeSingle()
+      // Sign up via Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: {
+            full_name: fullName?.trim() || username.trim(),
+            role: 'giao_ly_vien',
+          },
+        },
+      })
 
-      if (existingEmail) {
-        return { success: false, error: 'Email đã được sử dụng' }
+      if (authError || !authData.user) {
+        console.error('Register auth error:', authError)
+        if (authError?.message?.includes('already registered')) {
+          return { success: false, error: 'Email đã được sử dụng' }
+        }
+        return { success: false, error: 'Đăng ký thất bại. Vui lòng thử lại.' }
       }
 
-      // Create new user
-      const { error } = await supabase
+      // Create profile in public.users table
+      const { error: profileError } = await supabase
         .from('users')
         .insert({
+          id: authData.user.id,
           username: username.trim(),
           email: email.trim().toLowerCase(),
-          password: password, // Note: In production, this should be hashed
           full_name: fullName?.trim() || username.trim(),
-          role: 'giao_ly_vien', // Default role for new users
+          role: 'giao_ly_vien',
           status: 'ACTIVE',
           created_at: new Date().toISOString(),
         })
         .select()
         .single()
 
-      if (error) {
-        console.error('Register error:', error)
+      if (profileError) {
+        console.error('Register profile error:', profileError)
         return { success: false, error: 'Đăng ký thất bại. Vui lòng thử lại.' }
       }
+
+      // Sign out after register so user goes to login page
+      await supabase.auth.signOut()
 
       return { success: true }
     } catch (err) {
@@ -213,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
+    await supabase.auth.signOut()
     setUser(null)
     localStorage.removeItem('thien_an_user')
     router.push('/login')
@@ -260,29 +318,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Verify current password
-      const { data: userData, error: verifyError } = await supabase
-        .from('users')
-        .select('password')
-        .eq('id', user.id)
-        .single()
-
-      if (verifyError || !userData) {
-        return { success: false, error: 'Không thể xác minh mật khẩu' }
+      // Verify current password by trying to sign in
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user?.email) {
+        return { success: false, error: 'Không thể xác minh phiên đăng nhập' }
       }
 
-      if (userData.password !== currentPassword) {
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: session.user.email,
+        password: currentPassword,
+      })
+
+      if (verifyError) {
         return { success: false, error: 'Mật khẩu hiện tại không đúng' }
       }
 
-      // Update password
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          password: newPassword,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id)
+      // Update password via Supabase Auth
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
 
       if (updateError) {
         console.error('Change password error:', updateError)

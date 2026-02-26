@@ -31,7 +31,7 @@ function LoginForm() {
     setSuccess('')
 
     if (!username.trim()) {
-      setError('Vui lòng nhập tên đăng nhập')
+      setError('Vui lòng nhập số điện thoại')
       return
     }
 
@@ -99,17 +99,17 @@ function LoginForm() {
               </div>
             )}
 
-            {/* Username Field */}
+            {/* Phone Field */}
             <div className="space-y-2">
               <label className="flex items-center gap-1">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Tên đăng nhập</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Số điện thoại</span>
                 <span className="text-sm font-medium text-red-500">*</span>
               </label>
               <input
-                type="text"
+                type="tel"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Nhập tên đăng nhập"
+                placeholder="Nhập số điện thoại"
                 className="w-full h-[44px] px-4 py-2 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-xl text-sm text-black dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-colors"
                 disabled={isLoading}
               />
