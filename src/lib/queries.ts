@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord, NotificationWithStatus, Notification, UserNote } from './supabase'
+import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord, NotificationWithStatus, Notification, UserNote, Holiday } from './supabase'
 
 // ============ Query Keys ============
 export const queryKeys = {
@@ -24,6 +24,7 @@ export const queryKeys = {
   notifications: ['notifications'] as const,
   unreadNotifications: ['notifications', 'unread'] as const,
   allNotifications: ['notifications', 'all'] as const,
+  holidays: (schoolYearId: string) => ['holidays', schoolYearId] as const,
 }
 
 // ============ Dashboard Stats ============
@@ -181,14 +182,31 @@ export function useStudentsWithDetails() {
     queryKey: queryKeys.students,
     queryFn: async () => {
       const [schoolYearRes, classesRes, studentsRes] = await Promise.all([
-        supabase.from('school_years').select('total_weeks').eq('is_current', true).single(),
+        supabase.from('school_years').select('id, total_weeks').eq('is_current', true).single(),
         supabase.from('classes').select('*').eq('status', 'ACTIVE').order('display_order', { ascending: true }),
         supabase.from('thieu_nhi').select('*').order('full_name', { ascending: true }),
       ])
 
       const currentTotalWeeks = schoolYearRes.data?.total_weeks || 40
+      const schoolYearId = schoolYearRes.data?.id
       const classesData = classesRes.data || []
       const studentsData = studentsRes.data || []
+
+      // Fetch holidays for current school year
+      let holidays: Holiday[] = []
+      if (schoolYearId) {
+        const { data: holidaysData } = await supabase
+          .from('holidays')
+          .select('*')
+          .eq('school_year_id', schoolYearId)
+        holidays = (holidaysData || []) as Holiday[]
+      }
+
+      // Calculate effective days (total weeks minus holidays)
+      const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
+      const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
+      const effectiveThu5Days = Math.max(1, currentTotalWeeks - thu5Holidays)
+      const effectiveCnDays = Math.max(1, currentTotalWeeks - cnHolidays)
 
       // Build class lookup map for O(1) access instead of O(n) find per student
       const classMap = new Map(classesData.map(c => [c.id, c]))
@@ -206,8 +224,8 @@ export function useStudentsWithDetails() {
         const attendance_cn = student.attendance_cn || 0
 
         const avg_catechism = (score_45_hk1 + score_45_hk2 + score_exam_hk1 * 2 + score_exam_hk2 * 2) / 6
-        const score_thu5 = (attendance_thu5 * 0.4) * (10 / currentTotalWeeks)
-        const score_cn = (attendance_cn * 0.6) * (10 / currentTotalWeeks)
+        const score_thu5 = (attendance_thu5 * 0.4) * (10 / effectiveThu5Days)
+        const score_cn = (attendance_cn * 0.6) * (10 / effectiveCnDays)
         const avg_attendance = score_thu5 + score_cn
         const total_avg = avg_catechism * 0.6 + avg_attendance * 0.4
 
@@ -1036,6 +1054,30 @@ export function useAllNotifications() {
   })
 }
 
+// ============ Holidays ============
+export function useHolidays(schoolYearId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.holidays(schoolYearId || ''),
+    queryFn: async () => {
+      if (!schoolYearId) return [] as Holiday[]
+
+      const { data, error } = await supabase
+        .from('holidays')
+        .select('*')
+        .eq('school_year_id', schoolYearId)
+        .order('holiday_date', { ascending: true })
+
+      if (error) {
+        // If table doesn't exist yet, return empty
+        if (error.code === '42P01') return [] as Holiday[]
+        throw error
+      }
+      return (data || []) as Holiday[]
+    },
+    enabled: !!schoolYearId,
+  })
+}
+
 // ============ Invalidation helpers ============
 export function useInvalidateQueries() {
   const queryClient = useQueryClient()
@@ -1056,6 +1098,7 @@ export function useInvalidateQueries() {
     invalidateDashboardAlerts: () => queryClient.invalidateQueries({ queryKey: ['dashboardAlerts'] }),
     invalidateUserNotes: () => queryClient.invalidateQueries({ queryKey: ['userNotes'] }),
     invalidateNotifications: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    invalidateHolidays: () => queryClient.invalidateQueries({ queryKey: ['holidays'] }),
     invalidateAll: () => queryClient.invalidateQueries(),
   }
 }

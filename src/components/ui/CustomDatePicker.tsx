@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface CustomDatePickerProps {
@@ -20,6 +21,9 @@ const MONTHS_VI = [
   'Tháng Chín', 'Tháng Mười', 'Tháng Mười Một', 'Tháng Mười Hai'
 ]
 
+const CALENDAR_HEIGHT = 380
+const CALENDAR_WIDTH = 297
+
 export default function CustomDatePicker({
   value,
   onChange,
@@ -38,20 +42,66 @@ export default function CustomDatePicker({
     const now = new Date()
     return { year: now.getFullYear(), month: now.getMonth() }
   })
+  const [position, setPosition] = useState<{ top: number; left: number; openUp: boolean }>({
+    top: 0,
+    left: 0,
+    openUp: false,
+  })
 
   const containerRef = useRef<HTMLDivElement>(null)
   const calendarRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+
+  const updatePosition = useCallback(() => {
+    if (!buttonRef.current) return
+    const rect = buttonRef.current.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    const spaceAbove = rect.top
+    const openUp = spaceBelow < CALENDAR_HEIGHT && spaceAbove > spaceBelow
+
+    let left = rect.left
+    // Prevent calendar from going off-screen right
+    if (left + CALENDAR_WIDTH > window.innerWidth) {
+      left = window.innerWidth - CALENDAR_WIDTH - 8
+    }
+    // Prevent calendar from going off-screen left
+    if (left < 8) left = 8
+
+    setPosition({
+      top: openUp ? rect.top - CALENDAR_HEIGHT - 4 : rect.bottom + 4,
+      left,
+      openUp,
+    })
+  }, [])
 
   // Close calendar when clicking outside
   useEffect(() => {
+    if (!isOpen) return
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        calendarRef.current && !calendarRef.current.contains(target)
+      ) {
         setIsOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [isOpen])
+
+  // Update position on scroll/resize
+  useEffect(() => {
+    if (!isOpen) return
+    updatePosition()
+    const handleUpdate = () => updatePosition()
+    window.addEventListener('scroll', handleUpdate, true)
+    window.addEventListener('resize', handleUpdate)
+    return () => {
+      window.removeEventListener('scroll', handleUpdate, true)
+      window.removeEventListener('resize', handleUpdate)
+    }
+  }, [isOpen, updatePosition])
 
   // Update viewDate when value changes
   useEffect(() => {
@@ -101,8 +151,10 @@ export default function CustomDatePicker({
       })
     }
 
-    // Next month days
-    const remainingDays = 42 - days.length // 6 rows x 7 days
+    // Next month days - only add enough to complete the last row
+    const totalSoFar = days.length
+    const rows = Math.ceil(totalSoFar / 7)
+    const remainingDays = rows * 7 - totalSoFar
     for (let i = 1; i <= remainingDays; i++) {
       const nextMonth = month === 11 ? 0 : month + 1
       const nextYear = month === 11 ? year + 1 : year
@@ -192,18 +244,135 @@ export default function CustomDatePicker({
     return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`
   }
 
+  const handleToggle = () => {
+    if (disabled) return
+    if (!isOpen) {
+      updatePosition()
+    }
+    setIsOpen(!isOpen)
+  }
+
   const days = generateCalendarDays()
   const weeks = []
   for (let i = 0; i < days.length; i += 7) {
     weeks.push(days.slice(i, i + 7))
   }
 
+  const calendarDropdown = isOpen ? createPortal(
+    <div
+      ref={calendarRef}
+      className="fixed z-[9999] bg-white dark:bg-[#1a1a1a] rounded-[15px] border border-[#E5E1DC] dark:border-white/10 shadow-[1px_3px_4px_rgba(0,0,0,0.25)]"
+      style={{
+        width: `${CALENDAR_WIDTH}px`,
+        top: `${position.top}px`,
+        left: `${position.left}px`,
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 pt-4 pb-2">
+        <button
+          type="button"
+          onClick={handlePrevMonth}
+          className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5 text-gray-400" />
+        </button>
+        <span className="text-sm font-bold text-gray-900 dark:text-white font-['Inter_Tight']">
+          {MONTHS_VI[viewDate.month]} {viewDate.year}
+        </span>
+        <button
+          type="button"
+          onClick={handleNextMonth}
+          className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+        >
+          <ChevronRight className="w-5 h-5 text-gray-900 dark:text-white" />
+        </button>
+      </div>
+
+      {/* Days header */}
+      <div className="px-3">
+        <div className="flex justify-between">
+          {DAYS_EN.map((day) => (
+            <div
+              key={day}
+              className="w-10 py-2 text-center text-[10px] text-gray-500 dark:text-gray-400 font-['Inter_Tight']"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Calendar grid */}
+      <div className="px-3 pb-2 flex flex-col gap-[5px]">
+        {weeks.map((week, weekIndex) => {
+          // Check if any day in this week is selected
+          const weekHasSelected = week.some(d => isSelected(d.year, d.month, d.day))
+
+          return (
+            <div
+              key={weekIndex}
+              className={`flex justify-between items-center rounded-xl ${
+                weekHasSelected ? 'bg-[#FA865E]/20' : ''
+              }`}
+            >
+              {week.map((dayInfo, dayIndex) => {
+                const selected = isSelected(dayInfo.year, dayInfo.month, dayInfo.day)
+                const today = isToday(dayInfo.year, dayInfo.month, dayInfo.day)
+                const inSelectedWeek = isInSelectedWeek(dayInfo.year, dayInfo.month, dayInfo.day)
+                const dateDisabled = isDateDisabled(dayInfo.year, dayInfo.month, dayInfo.day)
+
+                return (
+                  <button
+                    key={dayIndex}
+                    type="button"
+                    onClick={() => handleDateSelect(dayInfo.year, dayInfo.month, dayInfo.day)}
+                    disabled={dateDisabled}
+                    className={`w-10 py-2 rounded-xl text-center transition-colors font-['Inter_Tight']
+                      ${selected
+                        ? 'bg-[#FA865E] text-white font-medium text-sm'
+                        : today
+                          ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-medium text-sm'
+                          : inSelectedWeek && dayInfo.isCurrentMonth
+                            ? 'text-[#8A8C90] font-medium text-sm hover:bg-[#FA865E]/10'
+                            : dayInfo.isCurrentMonth
+                              ? 'text-[#8A8C90] text-xs hover:bg-gray-100 dark:hover:bg-white/10'
+                              : 'text-[#D1D5DB] text-xs hover:bg-gray-50 dark:hover:bg-white/5'
+                      }
+                      ${dateDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
+                    `}
+                  >
+                    {dayInfo.day}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Confirm button */}
+      <div className="px-3 pb-4">
+        <button
+          type="button"
+          onClick={() => setIsOpen(false)}
+          className="w-full py-2 bg-[#FA865E] text-white text-sm font-bold rounded-[56px]
+            hover:bg-[#e97a54] transition-colors font-['Inter_Tight']"
+        >
+          Chọn lịch
+        </button>
+      </div>
+    </div>,
+    document.body
+  ) : null
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       {/* Input field */}
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={handleToggle}
         disabled={disabled}
         className={`w-full px-3 py-2 text-left border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/10
           ${disabled ? 'bg-gray-100 cursor-not-allowed text-gray-400' : 'hover:border-[#FA865E] focus:border-[#FA865E] focus:ring-2 focus:ring-[#FA865E]/20'}
@@ -214,109 +383,7 @@ export default function CustomDatePicker({
         </span>
       </button>
 
-      {/* Calendar dropdown */}
-      {isOpen && (
-        <div
-          ref={calendarRef}
-          className="absolute z-50 mt-2 bg-white dark:bg-[#1a1a1a] rounded-[15px] border border-[#E5E1DC] dark:border-white/10 shadow-[1px_3px_4px_rgba(0,0,0,0.25)]"
-          style={{ width: '297px' }}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-3 pt-4 pb-2">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5 text-gray-400" />
-            </button>
-            <span className="text-sm font-bold text-gray-900 dark:text-white font-['Inter_Tight']">
-              {MONTHS_VI[viewDate.month]} {viewDate.year}
-            </span>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-            >
-              <ChevronRight className="w-5 h-5 text-gray-900 dark:text-white" />
-            </button>
-          </div>
-
-          {/* Days header */}
-          <div className="px-3">
-            <div className="flex justify-between">
-              {DAYS_EN.map((day) => (
-                <div
-                  key={day}
-                  className="w-10 py-2 text-center text-[10px] text-gray-500 dark:text-gray-400 font-['Inter_Tight']"
-                >
-                  {day}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Calendar grid */}
-          <div className="px-3 pb-2 flex flex-col gap-[5px]">
-            {weeks.map((week, weekIndex) => {
-              // Check if any day in this week is selected
-              const weekHasSelected = week.some(d => isSelected(d.year, d.month, d.day))
-
-              return (
-                <div
-                  key={weekIndex}
-                  className={`flex justify-between items-center rounded-xl ${
-                    weekHasSelected ? 'bg-[#FA865E]/20' : ''
-                  }`}
-                >
-                  {week.map((dayInfo, dayIndex) => {
-                    const selected = isSelected(dayInfo.year, dayInfo.month, dayInfo.day)
-                    const today = isToday(dayInfo.year, dayInfo.month, dayInfo.day)
-                    const inSelectedWeek = isInSelectedWeek(dayInfo.year, dayInfo.month, dayInfo.day)
-                    const isDisabled = isDateDisabled(dayInfo.year, dayInfo.month, dayInfo.day)
-
-                    return (
-                      <button
-                        key={dayIndex}
-                        type="button"
-                        onClick={() => handleDateSelect(dayInfo.year, dayInfo.month, dayInfo.day)}
-                        disabled={isDisabled}
-                        className={`w-10 py-2 rounded-xl text-center transition-colors font-['Inter_Tight']
-                          ${selected
-                            ? 'bg-[#FA865E] text-white font-medium text-sm'
-                            : today
-                              ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-medium text-sm'
-                              : inSelectedWeek && dayInfo.isCurrentMonth
-                                ? 'text-[#8A8C90] font-medium text-sm hover:bg-[#FA865E]/10'
-                                : dayInfo.isCurrentMonth
-                                  ? 'text-[#8A8C90] text-xs hover:bg-gray-100 dark:hover:bg-white/10'
-                                  : 'text-[#D1D5DB] text-xs hover:bg-gray-50 dark:hover:bg-white/5'
-                          }
-                          ${isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
-                        `}
-                      >
-                        {dayInfo.day}
-                      </button>
-                    )
-                  })}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Confirm button */}
-          <div className="px-3 pb-4">
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="w-full py-2 bg-[#FA865E] text-white text-sm font-bold rounded-[56px]
-                hover:bg-[#e97a54] transition-colors font-['Inter_Tight']"
-            >
-              Chọn lịch
-            </button>
-          </div>
-        </div>
-      )}
+      {calendarDropdown}
     </div>
   )
 }

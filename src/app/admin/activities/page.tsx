@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear } from '@/lib/supabase'
+import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear, Holiday } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarDays, Bell, ShieldAlert } from 'lucide-react'
 import Link from 'next/link'
@@ -128,6 +128,10 @@ export default function ActivitiesPage() {
   })
   const [isExportSuccessModalOpen, setIsExportSuccessModalOpen] = useState(false)
   const [exportSuccessMessage, setExportSuccessMessage] = useState('')
+  // Holiday map for report (date string -> holiday info)
+  const [reportHolidayMap, setReportHolidayMap] = useState<Map<string, { name: string; day_type: string }>>(new Map())
+  // Current attendance date holiday warning
+  const [currentDateHoliday, setCurrentDateHoliday] = useState<{ name: string; day_type: string } | null>(null)
 
   // Report dropdown states
   const [isReportClassDropdownOpen, setIsReportClassDropdownOpen] = useState(false)
@@ -495,6 +499,35 @@ export default function ActivitiesPage() {
       fetchStudents()
     }
   }, [selectedClassId, selectedDate, fetchStudents])
+
+  // Check if selected attendance date is a holiday
+  useEffect(() => {
+    if (!schoolYear?.id || !selectedDate) {
+      setCurrentDateHoliday(null)
+      return
+    }
+    const checkHoliday = async () => {
+      const { data } = await supabase
+        .from('holidays')
+        .select('name, day_type')
+        .eq('school_year_id', schoolYear.id)
+        .eq('holiday_date', selectedDate)
+        .limit(1)
+      if (data && data.length > 0) {
+        const h = data[0]
+        const dt = dayType // thu5, cn, or null
+        // Check if this holiday affects the current day type
+        if (h.day_type === 'both' || h.day_type === dt) {
+          setCurrentDateHoliday({ name: h.name, day_type: h.day_type })
+        } else {
+          setCurrentDateHoliday(null)
+        }
+      } else {
+        setCurrentDateHoliday(null)
+      }
+    }
+    checkHoliday()
+  }, [selectedDate, schoolYear?.id, dayType])
 
   // Group classes by branch
   const classesGroupedByBranch = BRANCHES.reduce((acc, branch) => {
@@ -1193,17 +1226,41 @@ export default function ActivitiesPage() {
           toDate = lastDay.toISOString().split('T')[0]
         }
 
-        // Fetch students in the class
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('thieu_nhi')
-          .select('id, student_code, full_name, saint_name, avatar_url')
-          .eq('class_id', reportClassId)
-          .eq('status', 'ACTIVE')
-          .order('full_name', { ascending: true })
+        // Fetch students and holidays in parallel
+        const [studentsResult, holidaysResult] = await Promise.all([
+          supabase
+            .from('thieu_nhi')
+            .select('id, student_code, full_name, saint_name, avatar_url')
+            .eq('class_id', reportClassId)
+            .eq('status', 'ACTIVE')
+            .order('full_name', { ascending: true }),
+          schoolYear?.id
+            ? supabase
+                .from('holidays')
+                .select('*')
+                .eq('school_year_id', schoolYear.id)
+                .gte('holiday_date', fromDate)
+                .lte('holiday_date', toDate)
+            : Promise.resolve({ data: [] as Holiday[], error: null }),
+        ])
+
+        const studentsData = studentsResult.data
+        const studentsError = studentsResult.error
 
         if (studentsError) {
           throw studentsError
         }
+
+        // Build holiday map for this report period
+        const holidayMap = new Map<string, { name: string; day_type: string }>()
+        const fetchedHolidays = (holidaysResult.data || []) as Holiday[]
+        fetchedHolidays.forEach(h => {
+          // Only include holidays that match the report attendance type filter
+          if (reportAttendanceType === 'all' || h.day_type === 'both' || h.day_type === reportAttendanceType) {
+            holidayMap.set(h.holiday_date, { name: h.name, day_type: h.day_type })
+          }
+        })
+        setReportHolidayMap(holidayMap)
 
         // Build query for attendance records
         let query = supabase
@@ -1224,10 +1281,14 @@ export default function ActivitiesPage() {
           console.warn('Attendance fetch error:', attendanceError)
         }
 
-        // Get unique dates from attendance records
+        // Get unique dates from attendance records + holiday dates
         const uniqueDates = new Set<string>()
         attendanceData?.forEach(record => {
           uniqueDates.add(record.attendance_date)
+        })
+        // Add holiday dates so they appear in the report even without attendance
+        holidayMap.forEach((_, date) => {
+          uniqueDates.add(date)
         })
         const sortedDates = Array.from(uniqueDates).sort()
         setReportDates(sortedDates)
@@ -1341,7 +1402,10 @@ export default function ActivitiesPage() {
 
       if (reportType === 'attendance') {
         const header = ['STT', 'Tên thánh', 'Họ đệm', 'Tên']
-        reportDates.forEach(date => header.push(formatShortDate(date)))
+        reportDates.forEach(date => {
+          const holiday = reportHolidayMap.get(date)
+          header.push(holiday ? `${formatShortDate(date)} (Nghỉ ${holiday.name})` : formatShortDate(date))
+        })
 
         const rows = reportStudents.map((student, index) => {
           const nameParts = student.full_name.split(' ')
@@ -1349,8 +1413,12 @@ export default function ActivitiesPage() {
           const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
           const row: (string | number)[] = [index + 1, student.saint_name || '', familyMiddleName, givenName]
           reportDates.forEach(date => {
-            const status = student.attendance[date]
-            row.push(status === 'present' ? 'x' : status === 'absent' ? 'v' : '')
+            if (reportHolidayMap.has(date)) {
+              row.push('Nghỉ')
+            } else {
+              const status = student.attendance[date]
+              row.push(status === 'present' ? 'x' : status === 'absent' ? 'v' : '')
+            }
           })
           return row
         })
@@ -1707,6 +1775,23 @@ export default function ActivitiesPage() {
                 </button>
               </div>
             </div>
+
+            {/* Holiday Warning Banner */}
+            {currentDateHoliday && selectedClassId && (
+              <div className="mx-6 mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <Calendar className="w-4 h-4 text-amber-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-800">
+                    Ngày này là ngày nghỉ: <span className="font-bold">{currentDateHoliday.name}</span>
+                  </p>
+                  <p className="text-xs text-amber-600">
+                    Điểm danh sẽ không được tính vào điểm chuyên cần.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Content Area */}
             <div className="px-6 pb-6">
@@ -2968,11 +3053,17 @@ export default function ActivitiesPage() {
                           {reportDates.length === 0 ? (
                             <th className="text-center px-4 text-[16px] text-[#666d80]">Không có dữ liệu</th>
                           ) : (
-                            reportDates.map((date) => (
-                              <th key={date} className="text-center px-2 text-[14px] font-medium text-[#666d80] whitespace-nowrap min-w-[70px]">
-                                {formatShortDate(date)}
-                              </th>
-                            ))
+                            reportDates.map((date) => {
+                              const holiday = reportHolidayMap.get(date)
+                              return (
+                                <th key={date} className={`text-center px-2 text-[14px] font-medium text-[#666d80] whitespace-nowrap min-w-[70px] ${holiday ? 'bg-amber-50' : ''}`}>
+                                  {formatShortDate(date)}
+                                  {holiday && (
+                                    <div className="text-[10px] font-normal text-amber-600 leading-tight">{holiday.name}</div>
+                                  )}
+                                </th>
+                              )
+                            })
                           )}
                         </tr>
                       </thead>
@@ -3003,7 +3094,16 @@ export default function ActivitiesPage() {
                               </td>
                               <td className="px-2 text-[14px] font-semibold text-[#8A8C90] whitespace-nowrap w-[300px]">{familyMiddleName}</td>
                               <td className="px-2 text-[14px] font-semibold text-black dark:text-white whitespace-nowrap w-[105px]">{givenName}</td>
-                              {reportDates.map((date) => (
+                              {reportDates.map((date) => {
+                                const isHoliday = reportHolidayMap.has(date)
+                                if (isHoliday) {
+                                  return (
+                                    <td key={date} className="text-center border-l border-[#8A8C90] bg-amber-50">
+                                      <span className="text-amber-600 italic text-[12px]">Nghỉ</span>
+                                    </td>
+                                  )
+                                }
+                                return (
                                 <td key={date} className={`text-center border-l border-[#8A8C90] ${student.attendance[date] === 'present' ? 'bg-[#F5D5D5]' : ''}`}>
                                   {student.attendance[date] === 'present' ? (
                                     <span className="text-[#8A8C90] text-[16px]">×</span>
@@ -3015,7 +3115,8 @@ export default function ActivitiesPage() {
                                     <span className="text-[#666d80]">-</span>
                                   )}
                                 </td>
-                              ))}
+                                )
+                              })}
                             </tr>
                             )
                           })
@@ -3149,6 +3250,7 @@ export default function ActivitiesPage() {
             type="attendance"
             students={reportStudents}
             dates={reportDates}
+            holidayMap={reportHolidayMap}
             className={getReportClassName(reportClassId)}
             fromDate={reportTimeFilterMode === 'week' ? reportWeekStart : reportTimeFilterMode === 'month' ? new Date(reportYear, reportMonth, 1).toISOString().split('T')[0] : reportFromDate}
             toDate={reportTimeFilterMode === 'week' ? reportWeekEnd : reportTimeFilterMode === 'month' ? new Date(reportYear, reportMonth + 1, 0).toISOString().split('T')[0] : reportToDate}

@@ -91,6 +91,22 @@ export interface SchoolYear {
   updated_at?: string
 }
 
+// Holiday day type
+export type HolidayDayType = 'thu5' | 'cn' | 'both'
+
+// Holiday record
+export interface Holiday {
+  id: string
+  school_year_id: string
+  holiday_date: string
+  name: string
+  day_type: HolidayDayType
+  notes?: string
+  created_by?: string
+  created_at: string
+  updated_at?: string
+}
+
 // Attendance record for detailed tracking
 export interface AttendanceRecord {
   id: string

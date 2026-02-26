@@ -28,6 +28,7 @@ interface AttendanceReportProps {
   type: 'attendance'
   students: AttendanceReportStudent[]
   dates: string[]
+  holidayMap?: Map<string, { name: string; day_type: string }>
   className: string
   fromDate: string
   toDate: string
@@ -126,7 +127,7 @@ const ReportExportTemplate = forwardRef<HTMLDivElement, ReportExportTemplateProp
 
       {/* Table */}
       {props.type === 'attendance' ? (
-        <AttendanceTable students={props.students} dates={props.dates} />
+        <AttendanceTable students={props.students} dates={props.dates} holidayMap={props.holidayMap} />
       ) : (
         <ScoreTable students={props.students} scoreColumns={props.scoreColumns} />
       )}
@@ -145,7 +146,7 @@ const ReportExportTemplate = forwardRef<HTMLDivElement, ReportExportTemplateProp
 ReportExportTemplate.displayName = 'ReportExportTemplate'
 
 // Attendance Table Component
-function AttendanceTable({ students, dates }: { students: AttendanceReportStudent[], dates: string[] }) {
+function AttendanceTable({ students, dates, holidayMap }: { students: AttendanceReportStudent[], dates: string[], holidayMap?: Map<string, { name: string; day_type: string }> }) {
   return (
     <table className="w-full border-collapse text-sm">
       <thead>
@@ -153,11 +154,17 @@ function AttendanceTable({ students, dates }: { students: AttendanceReportStuden
           <th className="border border-gray-400 px-2 py-2 text-center w-[50px]">STT</th>
           <th className="border border-gray-400 px-2 py-2 text-center w-[120px]">Tên thánh</th>
           <th className="border border-gray-400 px-2 py-2 text-center" colSpan={2}>Họ và tên</th>
-          {dates.map(date => (
-            <th key={date} className="border border-gray-400 px-2 py-2 text-center w-[50px]">
-              {formatShortDate(date)}
-            </th>
-          ))}
+          {dates.map(date => {
+            const holiday = holidayMap?.get(date)
+            return (
+              <th key={date} className={`border border-gray-400 px-2 py-2 text-center w-[50px] ${holiday ? 'bg-amber-100' : ''}`}>
+                {formatShortDate(date)}
+                {holiday && (
+                  <div className="text-[8px] font-normal text-amber-700 leading-tight mt-0.5">{holiday.name}</div>
+                )}
+              </th>
+            )
+          })}
         </tr>
       </thead>
       <tbody>
@@ -172,17 +179,27 @@ function AttendanceTable({ students, dates }: { students: AttendanceReportStuden
               <td className="border border-gray-400 px-2 py-2 text-center">{student.saint_name || ''}</td>
               <td className="border border-gray-400 px-2 py-2">{familyMiddleName}</td>
               <td className="border border-gray-400 px-2 py-2 text-center font-medium">{givenName}</td>
-              {dates.map(date => (
-                <td key={date} className="border border-gray-400 px-2 py-2 text-center">
-                  {student.attendance[date] === 'absent' ? (
-                    <span className="text-red-600 font-bold">x</span>
-                  ) : student.attendance[date] === 'present' ? (
-                    <span className="text-green-600">&#10003;</span>
-                  ) : (
-                    ''
-                  )}
-                </td>
-              ))}
+              {dates.map(date => {
+                const holiday = holidayMap?.get(date)
+                if (holiday) {
+                  return (
+                    <td key={date} className="border border-gray-400 px-2 py-2 text-center bg-amber-50">
+                      <span className="text-amber-600 italic text-xs">Nghỉ</span>
+                    </td>
+                  )
+                }
+                return (
+                  <td key={date} className="border border-gray-400 px-2 py-2 text-center">
+                    {student.attendance[date] === 'absent' ? (
+                      <span className="text-red-600 font-bold">x</span>
+                    ) : student.attendance[date] === 'present' ? (
+                      <span className="text-green-600">&#10003;</span>
+                    ) : (
+                      ''
+                    )}
+                  </td>
+                )
+              })}
             </tr>
           )
         })}

@@ -1,14 +1,14 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
-import { ROLE_LABELS, supabase, SchoolYear } from '@/lib/supabase'
+import { ROLE_LABELS, supabase, SchoolYear, Holiday, HolidayDayType } from '@/lib/supabase'
 import { useEffect, useState, useRef } from 'react'
 import DashboardHeader from '@/components/dashboard/DashboardHeader'
 import { useTheme } from '@/lib/theme-context'
 import Image from 'next/image'
-import { Eye, EyeOff, Check, X } from 'lucide-react'
+import { Eye, EyeOff, Check, X, Plus, Trash2 } from 'lucide-react'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
-import { useCurrentSchoolYear } from '@/lib/queries'
+import { useCurrentSchoolYear, useHolidays, useInvalidateQueries } from '@/lib/queries'
 
 type SettingsTab = 'personal' | 'password' | 'school-year' | 'notifications' | 'system'
 
@@ -131,6 +131,20 @@ export default function SettingsPage() {
     endDate: '',
     parishName: 'Giáo xứ Thiên Ân',
   })
+
+  // Holiday State
+  const { data: holidays = [], isLoading: loadingHolidays } = useHolidays(currentSchoolYear?.id)
+  const { invalidateHolidays, invalidateStudents } = useInvalidateQueries()
+  const [isAddingHoliday, setIsAddingHoliday] = useState(false)
+  const [editingHolidayId, setEditingHolidayId] = useState<string | null>(null)
+  const [holidayForm, setHolidayForm] = useState({
+    date: '',
+    name: '',
+    dayType: 'both' as HolidayDayType,
+    notes: '',
+  })
+  const [savingHoliday, setSavingHoliday] = useState(false)
+  const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(null)
 
   // Auth check handled by AuthProvider centrally
 
@@ -356,6 +370,105 @@ export default function SettingsPage() {
       })
     }
     setIsEditingSchoolYear(false)
+  }
+
+  // Holiday CRUD functions
+  const resetHolidayForm = () => {
+    setHolidayForm({ date: '', name: '', dayType: 'both', notes: '' })
+    setIsAddingHoliday(false)
+    setEditingHolidayId(null)
+  }
+
+  const handleSaveHoliday = async () => {
+    if (!currentSchoolYear || !holidayForm.date || !holidayForm.name) return
+    setSavingHoliday(true)
+    try {
+      if (editingHolidayId) {
+        const { error } = await supabase
+          .from('holidays')
+          .update({
+            holiday_date: holidayForm.date,
+            name: holidayForm.name,
+            day_type: holidayForm.dayType,
+            notes: holidayForm.notes || null,
+          })
+          .eq('id', editingHolidayId)
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('holidays')
+          .insert({
+            school_year_id: currentSchoolYear.id,
+            holiday_date: holidayForm.date,
+            name: holidayForm.name,
+            day_type: holidayForm.dayType,
+            notes: holidayForm.notes || null,
+            created_by: user?.id,
+          })
+        if (error) throw error
+      }
+      await Promise.all([invalidateHolidays(), invalidateStudents()])
+      resetHolidayForm()
+      setSaveMessage({ type: 'success', text: editingHolidayId ? 'Đã cập nhật ngày nghỉ!' : 'Đã thêm ngày nghỉ!' })
+    } catch (error) {
+      console.error('Error saving holiday:', error)
+      setSaveMessage({ type: 'error', text: 'Lỗi khi lưu ngày nghỉ' })
+    } finally {
+      setSavingHoliday(false)
+    }
+  }
+
+  const handleDeleteHoliday = async (holidayId: string) => {
+    if (!confirm('Bạn có chắc muốn xóa ngày nghỉ này?')) return
+    setDeletingHolidayId(holidayId)
+    try {
+      const { error } = await supabase.from('holidays').delete().eq('id', holidayId)
+      if (error) throw error
+      await Promise.all([invalidateHolidays(), invalidateStudents()])
+      setSaveMessage({ type: 'success', text: 'Đã xóa ngày nghỉ!' })
+    } catch (error) {
+      console.error('Error deleting holiday:', error)
+      setSaveMessage({ type: 'error', text: 'Lỗi khi xóa ngày nghỉ' })
+    } finally {
+      setDeletingHolidayId(null)
+    }
+  }
+
+  const startEditHoliday = (holiday: Holiday) => {
+    setEditingHolidayId(holiday.id)
+    setHolidayForm({
+      date: holiday.holiday_date,
+      name: holiday.name,
+      dayType: holiday.day_type,
+      notes: holiday.notes || '',
+    })
+    setIsAddingHoliday(true)
+  }
+
+  // Calculate effective days for holidays summary
+  const getHolidaySummary = () => {
+    const totalWeeks = currentSchoolYear?.total_weeks || 0
+    const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
+    const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
+    return {
+      totalWeeks,
+      effectiveThu5: Math.max(0, totalWeeks - thu5Holidays),
+      effectiveCn: Math.max(0, totalWeeks - cnHolidays),
+      thu5Holidays,
+      cnHolidays,
+    }
+  }
+
+  const DAY_TYPE_LABELS: Record<HolidayDayType, string> = {
+    thu5: 'Thứ 5',
+    cn: 'Chủ nhật',
+    both: 'Cả hai',
+  }
+
+  const DAY_TYPE_COLORS: Record<HolidayDayType, string> = {
+    thu5: 'bg-blue-100 text-blue-700',
+    cn: 'bg-orange-100 text-orange-700',
+    both: 'bg-purple-100 text-purple-700',
   }
 
   const handleSave = async () => {
@@ -834,6 +947,7 @@ export default function SettingsPage() {
     const totalWeeks = startDate && endDate ? calculateTotalWeeks(startDate, endDate) : currentSchoolYear?.total_weeks || 0
 
     return (
+      <>
       <div className="p-6 flex gap-6">
         {/* Section Header */}
         <div className="w-[300px] flex-shrink-0">
@@ -1041,6 +1155,181 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      {/* Holiday Management Section */}
+      {currentSchoolYear && (
+        <div className="p-6 flex gap-6 border-t border-primary-4">
+          {/* Section Header */}
+          <div className="w-[300px] flex-shrink-0">
+            <h2 className="text-lg font-bold text-black mb-2">Ngày nghỉ lễ</h2>
+            <p className="text-xs text-primary-3 leading-relaxed">
+              Xem và quản lý các ngày nghỉ lễ trong năm học. Ngày nghỉ sẽ được trừ khi tính điểm chuyên cần.
+            </p>
+
+            {/* Summary */}
+            {(() => {
+              const summary = getHolidaySummary()
+              return (
+                <div className="mt-4 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-primary-3">Tổng tuần:</span>
+                    <span className="text-xs font-semibold text-black dark:text-white">{summary.totalWeeks}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-blue-600">T5 hiệu lực:</span>
+                    <span className="text-xs font-semibold text-blue-700">{summary.effectiveThu5} <span className="font-normal text-primary-3">(trừ {summary.thu5Holidays})</span></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-orange-600">CN hiệu lực:</span>
+                    <span className="text-xs font-semibold text-orange-700">{summary.effectiveCn} <span className="font-normal text-primary-3">(trừ {summary.cnHolidays})</span></span>
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+
+          {/* Holiday Content */}
+          <div className="flex-1">
+            <div className="bg-white border border-primary-4 rounded-2xl overflow-hidden">
+              {/* Card Header */}
+              <div className="bg-white border-b border-primary-4 p-4 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-black">Danh sách ngày nghỉ ({holidays.length})</h3>
+                {!isAddingHoliday && (
+                  <button
+                    onClick={() => { resetHolidayForm(); setIsAddingHoliday(true) }}
+                    className="h-8 px-3 bg-brand rounded-full text-sm font-medium text-white hover:bg-orange-500 transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Thêm ngày nghỉ
+                  </button>
+                )}
+              </div>
+
+              {/* Add/Edit Form */}
+              {isAddingHoliday && (
+                <div className="p-4 bg-gray-50 border-b border-primary-4">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex gap-3">
+                      <div className="flex-1 flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-primary-3">Ngày nghỉ</label>
+                        <CustomDatePicker
+                          value={holidayForm.date}
+                          onChange={(date) => setHolidayForm(prev => ({ ...prev, date }))}
+                          placeholder="Chọn ngày"
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="flex-1 flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-primary-3">Tên ngày nghỉ</label>
+                        <input
+                          type="text"
+                          value={holidayForm.name}
+                          onChange={(e) => setHolidayForm(prev => ({ ...prev, name: e.target.value }))}
+                          className="h-[38px] px-3 bg-white rounded-xl text-sm text-black border border-primary-4 focus:ring-2 focus:ring-brand/30"
+                          placeholder="VD: Tết Nguyên Đán"
+                        />
+                      </div>
+                      <div className="w-[140px] flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-primary-3">Loại ngày</label>
+                        <select
+                          value={holidayForm.dayType}
+                          onChange={(e) => setHolidayForm(prev => ({ ...prev, dayType: e.target.value as HolidayDayType }))}
+                          className="h-[38px] px-3 bg-white rounded-xl text-sm text-black border border-primary-4 focus:ring-2 focus:ring-brand/30"
+                        >
+                          <option value="both">Cả hai</option>
+                          <option value="thu5">Thứ 5</option>
+                          <option value="cn">Chủ nhật</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium text-primary-3">Ghi chú (tùy chọn)</label>
+                      <input
+                        type="text"
+                        value={holidayForm.notes}
+                        onChange={(e) => setHolidayForm(prev => ({ ...prev, notes: e.target.value }))}
+                        className="h-[38px] px-3 bg-white rounded-xl text-sm text-black border border-primary-4 focus:ring-2 focus:ring-brand/30"
+                        placeholder="Ghi chú thêm..."
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        onClick={resetHolidayForm}
+                        className="h-8 px-3 bg-gray-100 border border-primary-4 rounded-full text-sm font-medium text-primary-3 hover:bg-gray-200 transition-colors"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        onClick={handleSaveHoliday}
+                        disabled={savingHoliday || !holidayForm.date || !holidayForm.name}
+                        className="h-8 px-4 bg-brand rounded-full text-sm font-medium text-white hover:bg-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      >
+                        {savingHoliday ? (
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                        ) : (
+                          <Check className="w-4 h-4" />
+                        )}
+                        {editingHolidayId ? 'Cập nhật' : 'Thêm'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Holiday List */}
+              <div className="p-4">
+                {loadingHolidays ? (
+                  <div className="flex items-center justify-center py-8">
+                    <svg className="animate-spin h-6 w-6 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                ) : holidays.length === 0 ? (
+                  <p className="text-sm text-primary-3 text-center py-6">
+                    Chưa có ngày nghỉ lễ nào. Nhấn &ldquo;Thêm ngày nghỉ&rdquo; để bắt đầu.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {holidays.map((holiday) => {
+                      const holidayDate = new Date(holiday.holiday_date)
+                      const dateFormatted = `${holidayDate.getDate().toString().padStart(2, '0')}/${(holidayDate.getMonth() + 1).toString().padStart(2, '0')}/${holidayDate.getFullYear()}`
+                      return (
+                        <div
+                          key={holiday.id}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group cursor-pointer"
+                          onClick={() => startEditHoliday(holiday)}
+                        >
+                          <div className="w-[90px] text-sm font-medium text-black">{dateFormatted}</div>
+                          <div className="flex-1 text-sm text-black">{holiday.name}</div>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${DAY_TYPE_COLORS[holiday.day_type]}`}>
+                            {DAY_TYPE_LABELS[holiday.day_type]}
+                          </span>
+                          {holiday.notes && (
+                            <span className="text-xs text-primary-3 max-w-[120px] truncate">{holiday.notes}</span>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteHoliday(holiday.id) }}
+                            disabled={deletingHolidayId === holiday.id}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          >
+                            {deletingHolidayId === holiday.id ? (
+                              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
     )
   }
 

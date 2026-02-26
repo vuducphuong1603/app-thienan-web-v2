@@ -1,4 +1,4 @@
-import { supabase, AlertRule, RuleCondition } from './supabase'
+import { supabase, AlertRule, RuleCondition, Holiday } from './supabase'
 
 interface StudentData {
   id: string
@@ -41,17 +41,19 @@ function evaluateCondition(
   condition: RuleCondition,
   studentData: StudentData,
   classData?: ClassData,
-  totalWeeks?: number,
+  effectiveThu5Days?: number,
+  effectiveCnDays?: number,
 ): boolean {
   if (!condition.enabled || condition.value === undefined) return false
 
   const threshold = condition.value
-  const currentTotalWeeks = totalWeeks || 40
+  const effThu5 = effectiveThu5Days || 40
+  const effCn = effectiveCnDays || 40
 
   switch (condition.key) {
     case 'attendance_rate_below': {
       const totalAttendance = studentData.attendance_thu5 + studentData.attendance_cn
-      const maxAttendance = currentTotalWeeks * 2
+      const maxAttendance = effThu5 + effCn
       const rate = maxAttendance > 0 ? (totalAttendance / maxAttendance) * 100 : 0
       return rate < threshold
     }
@@ -97,13 +99,29 @@ export async function runRuleEngine(): Promise<number> {
 
   // 2. Fetch student data
   const [schoolYearRes, classesRes, studentsRes, teachersRes] = await Promise.all([
-    supabase.from('school_years').select('total_weeks').eq('is_current', true).single(),
+    supabase.from('school_years').select('id, total_weeks').eq('is_current', true).single(),
     supabase.from('classes').select('*').eq('status', 'ACTIVE'),
     supabase.from('thieu_nhi').select('*').eq('status', 'ACTIVE'),
     supabase.from('users').select('id, class_id').eq('role', 'giao_ly_vien').eq('status', 'ACTIVE'),
   ])
 
   const totalWeeks = schoolYearRes.data?.total_weeks || 40
+  const schoolYearId = schoolYearRes.data?.id
+
+  // Fetch holidays to calculate effective days
+  let holidays: Holiday[] = []
+  if (schoolYearId) {
+    const { data: holidaysData } = await supabase
+      .from('holidays')
+      .select('*')
+      .eq('school_year_id', schoolYearId)
+    holidays = (holidaysData || []) as Holiday[]
+  }
+
+  const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
+  const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
+  const effectiveThu5Days = Math.max(1, totalWeeks - thu5Holidays)
+  const effectiveCnDays = Math.max(1, totalWeeks - cnHolidays)
   const classes = classesRes.data || []
   const students = studentsRes.data || []
   const teachers = teachersRes.data || []
@@ -142,8 +160,8 @@ export async function runRuleEngine(): Promise<number> {
     const attendance_cn = s.attendance_cn || 0
 
     const avg_catechism = (score_45_hk1 + score_45_hk2 + score_exam_hk1 * 2 + score_exam_hk2 * 2) / 6
-    const score_thu5 = (attendance_thu5 * 0.4) * (10 / totalWeeks)
-    const score_cn = (attendance_cn * 0.6) * (10 / totalWeeks)
+    const score_thu5 = (attendance_thu5 * 0.4) * (10 / effectiveThu5Days)
+    const score_cn = (attendance_cn * 0.6) * (10 / effectiveCnDays)
     const avg_attendance = score_thu5 + score_cn
     const total_avg = avg_catechism * 0.6 + avg_attendance * 0.4
 
@@ -184,7 +202,7 @@ export async function runRuleEngine(): Promise<number> {
       // Evaluate per student
       for (const student of studentDataList) {
         const triggered = enabledConditions.some(cond =>
-          evaluateCondition(cond, student, undefined, totalWeeks)
+          evaluateCondition(cond, student, undefined, effectiveThu5Days, effectiveCnDays)
         )
         if (!triggered) continue
 
@@ -192,7 +210,7 @@ export async function runRuleEngine(): Promise<number> {
         if (existingSet.has(key)) continue
 
         const triggeredCondLabels = enabledConditions
-          .filter(cond => evaluateCondition(cond, student, undefined, totalWeeks))
+          .filter(cond => evaluateCondition(cond, student, undefined, effectiveThu5Days, effectiveCnDays))
           .map(cond => cond.key)
 
         newAlerts.push({
@@ -214,7 +232,7 @@ export async function runRuleEngine(): Promise<number> {
       // Evaluate per class
       for (const [classId, classData] of Array.from(classDataMap.entries())) {
         const triggered = enabledConditions.some(cond =>
-          evaluateCondition(cond, studentDataList[0] || {} as StudentData, classData, totalWeeks)
+          evaluateCondition(cond, studentDataList[0] || {} as StudentData, classData, effectiveThu5Days, effectiveCnDays)
         )
         if (!triggered) continue
 
