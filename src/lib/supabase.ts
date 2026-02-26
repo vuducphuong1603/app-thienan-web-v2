@@ -110,3 +110,35 @@ export interface AttendanceRecord {
   is_compensatory?: boolean // TRUE if this is a make-up attendance for missed Thursday
   compensated_for_date?: string // The Thursday date this attendance compensates for (YYYY-MM-DD)
 }
+
+// Plan category
+export interface PlanCategory {
+  id: string
+  name: string
+  color: string // hex color
+  icon: string // lucide icon name
+  is_default: boolean
+  display_order: number
+  created_at: string
+  updated_at?: string
+}
+
+// Weekly plan
+export interface WeeklyPlan {
+  id: string
+  title: string
+  description?: string
+  category_id?: string
+  plan_date: string // YYYY-MM-DD
+  time_start: string // HH:MM:SS
+  time_end: string // HH:MM:SS
+  location?: string
+  branch?: string
+  class_ids: string[]
+  notes?: string
+  created_by?: string
+  created_at: string
+  updated_at?: string
+  // Joined data
+  plan_categories?: PlanCategory
+}

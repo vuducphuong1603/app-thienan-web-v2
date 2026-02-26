@@ -1,2 +1,5 @@
 export { default as WeeklyPlanCalendar } from './WeeklyPlanCalendar'
 export { default as EventCard } from './EventCard'
+export { default as CategoryBadge } from './CategoryBadge'
+export { default as PlanModal } from './PlanModal'
+export { default as DeletePlanModal } from './DeletePlanModal'

@@ -1,231 +1,148 @@
 'use client'
 
-import EventCard, { type EventData } from './EventCard'
+import { WeeklyPlan, PlanCategory, Class } from '@/lib/supabase'
+import EventCard from './EventCard'
 
-// Avatar image URLs for realistic look
-const avatarImages = [
-  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&crop=face',
-  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=80&h=80&fit=crop&crop=face',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face',
-  'https://images.unsplash.com/photo-1599566150163-29194dcabd9c?w=80&h=80&fit=crop&crop=face',
-]
-
-// Mock data matching the Figma design
-const mockEvents: (EventData & { day: number; timeSlot: number })[] = [
-  // Monday (Thứ 2) - 8 AM: Weekly Stand Up with Join
-  {
-    id: '1',
-    title: 'Weekly Stand Up',
-    timeStart: '8 AM',
-    timeEnd: '9 AM',
-    type: 'meeting',
-    status: 'join',
-    avatars: [
-      { src: avatarImages[0], color: '#FA865E' },
-      { src: avatarImages[1], color: '#4285F4' },
-      { src: avatarImages[2], color: '#34A853' },
-      { src: avatarImages[3], color: '#FBBC04' },
-    ],
-    day: 0,
-    timeSlot: 0,
-  },
-  // Tuesday (Thứ 3) - 1 PM: Weekly Stand Up
-  {
-    id: '2',
-    title: 'Weekly Stand Up',
-    timeStart: '8 AM',
-    timeEnd: '9 AM',
-    type: 'meeting',
-    status: 'join',
-    avatars: [
-      { src: avatarImages[0], color: '#FA865E' },
-      { src: avatarImages[1], color: '#4285F4' },
-      { src: avatarImages[2], color: '#34A853' },
-      { src: avatarImages[3], color: '#FBBC04' },
-    ],
-    day: 1,
-    timeSlot: 1,
-  },
-  // Thursday (Thứ 5) - 8 AM: Weekly Stand Up with Join
-  {
-    id: '3',
-    title: 'Weekly Stand Up',
-    timeStart: '8 AM',
-    timeEnd: '9 AM',
-    type: 'meeting',
-    status: 'join',
-    avatars: [
-      { src: avatarImages[0], color: '#FA865E' },
-      { src: avatarImages[1], color: '#34A853' },
-      { src: avatarImages[2], color: '#FBBC04' },
-    ],
-    day: 3,
-    timeSlot: 0,
-  },
-  // Monday (Thứ 2) - 5 PM: Sprint Planning Upcoming
-  {
-    id: '4',
-    title: 'Sprint Planning',
-    timeStart: '9:30 AM',
-    timeEnd: '10:30 AM',
-    type: 'planning',
-    status: 'upcoming',
-    avatars: [
-      { src: avatarImages[0], color: '#FA865E' },
-      { src: avatarImages[1], color: '#4285F4' },
-    ],
-    day: 0,
-    timeSlot: 2,
-  },
-  // Wednesday (Thứ 4) - 5 PM: Sprint Planning Upcoming
-  {
-    id: '5',
-    title: 'Sprint Planning',
-    timeStart: '9:30 AM',
-    timeEnd: '10:30 AM',
-    type: 'planning',
-    status: 'upcoming',
-    avatars: [
-      { src: avatarImages[0], color: '#FA865E' },
-      { src: avatarImages[1], color: '#4285F4' },
-    ],
-    day: 2,
-    timeSlot: 2,
-  },
-  // Friday (Thứ 6) - 1 PM: Sprint Planning Upcoming
-  {
-    id: '6',
-    title: 'Sprint Planning',
-    timeStart: '9:30 AM',
-    timeEnd: '10:30 AM',
-    type: 'planning',
-    status: 'upcoming',
-    avatars: [
-      { src: avatarImages[0], color: '#FA865E' },
-      { src: avatarImages[1], color: '#4285F4' },
-      { src: avatarImages[2], color: '#34A853' },
-    ],
-    day: 4,
-    timeSlot: 1,
-  },
-  // Saturday (Thứ 7) - 5 PM: Weekly Stand Up with Join
-  {
-    id: '7',
-    title: 'Weekly Stand Up',
-    timeStart: '8 AM',
-    timeEnd: '9 AM',
-    type: 'meeting',
-    status: 'join',
-    avatars: [
-      { src: avatarImages[0], color: '#FA865E' },
-      { src: avatarImages[1], color: '#4285F4' },
-      { src: avatarImages[2], color: '#34A853' },
-    ],
-    day: 5,
-    timeSlot: 2,
-  },
-  // Sunday (Chủ nhật) - 8 AM: Sprint Planning Upcoming
-  {
-    id: '8',
-    title: 'Sprint Planning',
-    timeStart: '9:30 AM',
-    timeEnd: '10:30 AM',
-    type: 'planning',
-    status: 'upcoming',
-    avatars: [
-      { src: avatarImages[0], color: '#FA865E' },
-      { src: avatarImages[1], color: '#4285F4' },
-    ],
-    day: 6,
-    timeSlot: 0,
-  },
-  // Sunday (Chủ nhật) - 5 PM: Weekly Stand Up with Join
-  {
-    id: '9',
-    title: 'Weekly Stand Up',
-    timeStart: '8 AM',
-    timeEnd: '9 AM',
-    type: 'meeting',
-    status: 'join',
-    avatars: [
-      { src: avatarImages[0], color: '#FA865E' },
-      { src: avatarImages[1], color: '#4285F4' },
-      { src: avatarImages[2], color: '#34A853' },
-    ],
-    day: 6,
-    timeSlot: 2,
-  },
-]
-
-const dayHeaders = [
-  { label: 'Thứ 2', date: '06' },
-  { label: 'Thứ 3', date: '07' },
-  { label: 'Thứ 4', date: '08' },
-  { label: 'Thứ 5', date: '09' },
-  { label: 'Thứ 6', date: '10' },
-  { label: 'Thứ 7', date: '11' },
-  { label: 'Chủ nhật', date: '12' },
-]
-
-const timeSlots = ['8 AM', '1 PM', '5 PM']
-
-function getEventsForCell(day: number, timeSlot: number) {
-  return mockEvents.filter((e) => e.day === day && e.timeSlot === timeSlot)
+interface WeeklyPlanCalendarProps {
+  weekStart: Date
+  plans: WeeklyPlan[]
+  categories: PlanCategory[]
+  classes: Class[]
+  onEditPlan: (plan: WeeklyPlan) => void
+  onDeletePlan: (plan: WeeklyPlan) => void
 }
 
-export default function WeeklyPlanCalendar() {
+const DAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN']
+
+function formatDateShort(date: Date) {
+  return String(date.getDate()).padStart(2, '0')
+}
+
+function isSameDay(d1: Date, d2: Date) {
+  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate()
+}
+
+function toDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+export default function WeeklyPlanCalendar({
+  weekStart,
+  plans,
+  categories,
+  classes,
+  onEditPlan,
+  onDeletePlan,
+}: WeeklyPlanCalendarProps) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Generate 7 days from weekStart (Monday to Sunday)
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart)
+    d.setDate(weekStart.getDate() + i)
+    return d
+  })
+
+  // Build category map for quick lookup
+  const categoryMap = new Map(categories.map(c => [c.id, c]))
+
+  // Group plans by date
+  const plansByDate = new Map<string, WeeklyPlan[]>()
+  for (const plan of plans) {
+    const key = plan.plan_date
+    const existing = plansByDate.get(key) || []
+    existing.push(plan)
+    plansByDate.set(key, existing)
+  }
+
+  // Sort each day's plans by time_start
+  plansByDate.forEach((dayPlans, key) => {
+    plansByDate.set(key, dayPlans.sort((a, b) => a.time_start.localeCompare(b.time_start)))
+  })
+
+  const hasAnyPlans = plans.length > 0
+
   return (
     <div className="bg-white dark:bg-white/5 rounded-[20px] border border-[#E5E1DC] dark:border-white/10 overflow-hidden">
       {/* Header Row */}
-      <div className="grid grid-cols-[80px_repeat(7,1fr)]">
-        {/* GMT +7 cell */}
-        <div className="px-3 py-4 border-b border-r border-[#E5E1DC] dark:border-white/10 bg-[#FAFAF8] dark:bg-transparent">
-          <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">GMT +7</span>
-        </div>
-        {/* Day headers */}
-        {dayHeaders.map((day, index) => (
-          <div
-            key={index}
-            className={`px-4 py-4 border-b border-[#E5E1DC] dark:border-white/10 bg-[#FAFAF8] dark:bg-transparent ${
-              index < dayHeaders.length - 1 ? 'border-r' : ''
-            }`}
-          >
-            <span className="text-[13px] font-medium text-gray-800 dark:text-white">
-              {day.label}, <span className="text-gray-400 dark:text-gray-500">{day.date}</span>
-            </span>
-          </div>
-        ))}
+      <div className="grid grid-cols-7">
+        {days.map((day, index) => {
+          const isToday = isSameDay(day, today)
+          return (
+            <div
+              key={index}
+              className={`px-3 py-3 border-b border-[#E5E1DC] dark:border-white/10 ${
+                index < 6 ? 'border-r' : ''
+              } ${isToday ? 'bg-brand/5' : 'bg-[#FAFAF8] dark:bg-transparent'}`}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className={`text-[13px] font-medium ${isToday ? 'text-brand' : 'text-gray-800 dark:text-white'}`}>
+                  {DAY_LABELS[index]}
+                </span>
+                <span className={`text-[13px] ${
+                  isToday
+                    ? 'bg-brand text-white w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold'
+                    : 'text-gray-400 dark:text-gray-500'
+                }`}>
+                  {formatDateShort(day)}
+                </span>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
-      {/* Time Rows */}
-      {timeSlots.map((time, timeIndex) => (
-        <div key={timeIndex} className="grid grid-cols-[80px_repeat(7,1fr)]">
-          {/* Time label */}
-          <div
-            className={`px-4 py-4 border-r border-[#E5E1DC] dark:border-white/10 ${
-              timeIndex < timeSlots.length - 1 ? 'border-b' : ''
-            }`}
-          >
-            <span className="text-[13px] font-semibold text-gray-800 dark:text-white">{time}</span>
-          </div>
-          {/* Day cells */}
-          {dayHeaders.map((_, dayIndex) => {
-            const events = getEventsForCell(dayIndex, timeIndex)
+      {/* Content */}
+      {hasAnyPlans ? (
+        <div className="grid grid-cols-7">
+          {days.map((day, index) => {
+            const isToday = isSameDay(day, today)
+            const dateStr = toDateString(day)
+            const dayPlans = plansByDate.get(dateStr) || []
             return (
               <div
-                key={dayIndex}
-                className={`p-2.5 min-h-[200px] ${
-                  dayIndex < dayHeaders.length - 1 ? 'border-r' : ''
-                } ${timeIndex < timeSlots.length - 1 ? 'border-b' : ''} border-[#E5E1DC] dark:border-white/10`}
+                key={index}
+                className={`p-2 min-h-[200px] ${
+                  index < 6 ? 'border-r' : ''
+                } border-[#E5E1DC] dark:border-white/10 ${
+                  isToday ? 'bg-brand/[0.02]' : ''
+                }`}
               >
-                {events.map((event) => (
-                  <EventCard key={event.id} event={event} />
-                ))}
+                <div className="flex flex-col gap-2">
+                  {dayPlans.map(plan => (
+                    <EventCard
+                      key={plan.id}
+                      plan={plan}
+                      category={categoryMap.get(plan.category_id || '')}
+                      classes={classes}
+                      onEdit={onEditPlan}
+                      onDelete={onDeletePlan}
+                    />
+                  ))}
+                </div>
               </div>
             )
           })}
         </div>
-      ))}
+      ) : (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center mb-4">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="4" width="18" height="18" rx="2" stroke="#9CA3AF" strokeWidth="2"/>
+              <path d="M16 2V6" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M8 2V6" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M3 10H21" stroke="#9CA3AF" strokeWidth="2"/>
+            </svg>
+          </div>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            Chưa có kế hoạch nào trong tuần này
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            Nhấn &quot;Thêm kế hoạch&quot; để bắt đầu
+          </p>
+        </div>
+      )}
     </div>
   )
 }

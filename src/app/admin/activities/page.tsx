@@ -70,6 +70,7 @@ export default function ActivitiesPage() {
   const [classes, setClasses] = useState<Class[]>([])
   const [students, setStudents] = useState<StudentWithAttendance[]>([])
   const [schoolYear, setSchoolYear] = useState<SchoolYear | null>(null)
+  const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([])
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
 
   // Filter states
@@ -133,6 +134,7 @@ export default function ActivitiesPage() {
   const [isReportBranchDropdownOpen, setIsReportBranchDropdownOpen] = useState(false)
   const [isReportTypeDropdownOpen, setIsReportTypeDropdownOpen] = useState(false)
   const [isReportAttendanceTypeDropdownOpen, setIsReportAttendanceTypeDropdownOpen] = useState(false)
+  const [isReportSchoolYearDropdownOpen, setIsReportSchoolYearDropdownOpen] = useState(false)
   const [isReportFromDatePickerOpen, setIsReportFromDatePickerOpen] = useState(false)
   const [isReportToDatePickerOpen, setIsReportToDatePickerOpen] = useState(false)
   const [isReportWeekPickerOpen, setIsReportWeekPickerOpen] = useState(false)
@@ -219,16 +221,17 @@ export default function ActivitiesPage() {
     setTimeout(() => setNotification(null), 3000)
   }
 
-  // Fetch school year
+  // Fetch school years
   const fetchSchoolYear = useCallback(async () => {
-    const { data } = await supabase
+    const { data: allYears } = await supabase
       .from('school_years')
       .select('*')
-      .eq('is_current', true)
-      .single()
+      .order('start_date', { ascending: false })
 
-    if (data) {
-      setSchoolYear(data)
+    if (allYears && allYears.length > 0) {
+      setSchoolYears(allYears)
+      const current = allYears.find(y => y.is_current) || allYears[0]
+      setSchoolYear(current)
     }
   }, [])
 
@@ -1020,6 +1023,20 @@ export default function ActivitiesPage() {
   }
 
   // Close all report dropdowns
+  const closeAllDropdowns = useCallback(() => {
+    setIsClassDropdownOpen(false)
+    setIsDatePickerOpen(false)
+    setIsReportClassDropdownOpen(false)
+    setIsReportBranchDropdownOpen(false)
+    setIsReportTypeDropdownOpen(false)
+    setIsReportAttendanceTypeDropdownOpen(false)
+    setIsReportFromDatePickerOpen(false)
+    setIsReportToDatePickerOpen(false)
+    setIsReportWeekPickerOpen(false)
+    setIsReportMonthDropdownOpen(false)
+    setIsReportSchoolYearDropdownOpen(false)
+  }, [])
+
   const closeAllReportDropdowns = () => {
     setIsReportClassDropdownOpen(false)
     setIsReportBranchDropdownOpen(false)
@@ -1029,7 +1046,20 @@ export default function ActivitiesPage() {
     setIsReportToDatePickerOpen(false)
     setIsReportWeekPickerOpen(false)
     setIsReportMonthDropdownOpen(false)
+    setIsReportSchoolYearDropdownOpen(false)
   }
+
+  // Close all dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-dropdown]')) {
+        closeAllDropdowns()
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [closeAllDropdowns])
 
   // Generate report
   const generateReport = async () => {
@@ -1531,7 +1561,7 @@ export default function ActivitiesPage() {
             <div className="px-6 pb-5">
               <div className="flex items-center gap-4">
                 {/* Class Selector */}
-                <div className="relative flex-1">
+                <div className="relative flex-1" data-dropdown>
                   <button
                     onClick={() => {
                       setIsClassDropdownOpen(!isClassDropdownOpen)
@@ -1583,7 +1613,7 @@ export default function ActivitiesPage() {
                 </div>
 
                 {/* Date Picker */}
-                <div className="relative flex-1">
+                <div className="relative flex-1" data-dropdown>
                   <button
                     onClick={() => {
                       setIsDatePickerOpen(!isDatePickerOpen)
@@ -2267,7 +2297,7 @@ export default function ActivitiesPage() {
                   {/* Từ ngày */}
                   <div className="w-[27%]">
                     <label className="block text-sm font-medium text-[#666d80] mb-2">Từ ngày</label>
-                    <div className="relative">
+                    <div className="relative" data-dropdown>
                       <button
                         onClick={() => {
                           closeAllReportDropdowns()
@@ -2295,7 +2325,7 @@ export default function ActivitiesPage() {
                   {/* Đến ngày */}
                   <div className="w-[27%]">
                     <label className="block text-sm font-medium text-[#666d80] mb-2">Đến ngày</label>
-                    <div className="relative">
+                    <div className="relative" data-dropdown>
                       <button
                         onClick={() => {
                           closeAllReportDropdowns()
@@ -2327,7 +2357,7 @@ export default function ActivitiesPage() {
                   <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn tháng</label>
                   <div className="flex items-center gap-3">
                     {/* Month dropdown */}
-                    <div className="relative flex-1">
+                    <div className="relative flex-1" data-dropdown>
                       <button
                         onClick={() => {
                           closeAllReportDropdowns()
@@ -2386,7 +2416,7 @@ export default function ActivitiesPage() {
                 /* Chọn tuần */
                 <div className="w-[55%]">
                   <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn tuần</label>
-                  <div className="relative">
+                  <div className="relative" data-dropdown>
                     <button
                       onClick={() => {
                         closeAllReportDropdowns()
@@ -2425,7 +2455,7 @@ export default function ActivitiesPage() {
               {/* Loại báo cáo */}
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-2">Loại báo cáo</label>
-                <div className="relative">
+                <div className="relative" data-dropdown>
                   <button
                     onClick={() => {
                       closeAllReportDropdowns()
@@ -2471,7 +2501,7 @@ export default function ActivitiesPage() {
               {/* Ngành (tùy chọn) */}
               <div className="flex-[1.28]">
                 <label className="block text-sm font-medium text-[#666d80] mb-2">Ngành (tùy chọn)</label>
-                <div className="relative">
+                <div className="relative" data-dropdown>
                   <button
                     onClick={() => {
                       closeAllReportDropdowns()
@@ -2517,7 +2547,7 @@ export default function ActivitiesPage() {
               {/* Lớp */}
               <div className="flex-[1.28]">
                 <label className="block text-sm font-medium text-[#666d80] mb-2">Lớp</label>
-                <div className="relative">
+                <div className="relative" data-dropdown>
                   <button
                     onClick={() => {
                       closeAllReportDropdowns()
@@ -2552,11 +2582,35 @@ export default function ActivitiesPage() {
               {/* Năm học */}
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-2">Năm học</label>
-                <div className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full">
-                  <span className="text-sm text-black dark:text-white">{schoolYear?.name || 'Năm học hiện tại'}</span>
-                  <svg className="w-[9px] h-[18px] text-black dark:text-white" viewBox="0 0 9 18" fill="none">
-                    <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
-                  </svg>
+                <div className="relative" data-dropdown>
+                  <button
+                    onClick={() => {
+                      closeAllReportDropdowns()
+                      setIsReportSchoolYearDropdownOpen(!isReportSchoolYearDropdownOpen)
+                    }}
+                    className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
+                  >
+                    <span className="text-sm text-black dark:text-white">{schoolYear?.name || 'Chọn năm học'}</span>
+                    <svg className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isReportSchoolYearDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
+                      <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="currentColor" transform="translate(-4, -2)" />
+                    </svg>
+                  </button>
+                  {isReportSchoolYearDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
+                      {schoolYears.map((sy) => (
+                        <button
+                          key={sy.id}
+                          onClick={() => {
+                            setSchoolYear(sy)
+                            setIsReportSchoolYearDropdownOpen(false)
+                          }}
+                          className={`w-full px-5 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${schoolYear?.id === sy.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
+                        >
+                          {sy.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2564,7 +2618,7 @@ export default function ActivitiesPage() {
               {reportType === 'attendance' && (
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-[#666d80] mb-2">Loại điểm danh</label>
-                  <div className="relative">
+                  <div className="relative" data-dropdown>
                     <button
                       onClick={() => {
                         closeAllReportDropdowns()

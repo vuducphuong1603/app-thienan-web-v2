@@ -311,7 +311,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                   </div>
 
                   {/* Lớp */}
-                  <div className="flex-1 relative">
+                  <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">
                       Lớp <span className="text-[#df1c41]">*</span>
                     </label>
@@ -326,7 +326,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
                       <ChevronLeft className={`w-4 h-4 text-[#8B8685] transition-transform ${isClassDropdownOpen ? 'rotate-90' : '-rotate-90'}`} />
                     </button>
                     {isClassDropdownOpen && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 max-h-[200px] overflow-y-auto">
+                      <div className="mt-1 bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg max-h-[200px] overflow-y-auto">
                         {Object.entries(classesGroupedByBranch).map(([branch, branchClasses]) => (
                           <div key={branch}>
                             <div className="px-4 py-2 text-xs font-semibold text-[#666d80] uppercase bg-gray-50 dark:bg-white/5">
