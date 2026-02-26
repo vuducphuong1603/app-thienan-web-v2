@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS, supabase, SchoolYear } from '@/lib/supabase'
 import { useEffect, useState, useRef } from 'react'
-import { DashboardHeader } from '@/components/dashboard'
+import DashboardHeader from '@/components/dashboard/DashboardHeader'
 import { useTheme } from '@/lib/theme-context'
 import Image from 'next/image'
 import { Eye, EyeOff, Check, X } from 'lucide-react'

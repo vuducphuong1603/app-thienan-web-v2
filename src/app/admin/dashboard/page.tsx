@@ -5,15 +5,13 @@ import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS } from '@/lib/supabase'
 import { Calendar } from 'lucide-react'
 import { useDashboardStats } from '@/lib/queries'
-import {
-  DashboardHeader,
-  StatsCard,
-  WeeklyCalendar,
-  MyNotes,
-  AttendanceChart,
-  AlertsSection,
-  ClassStats,
-} from '@/components/dashboard'
+import DashboardHeader from '@/components/dashboard/DashboardHeader'
+import StatsCard from '@/components/dashboard/StatsCard'
+import WeeklyCalendar from '@/components/dashboard/WeeklyCalendar'
+import MyNotes from '@/components/dashboard/MyNotes'
+import AttendanceChart from '@/components/dashboard/AttendanceChart'
+import AlertsSection from '@/components/dashboard/AlertsSection'
+import ClassStats from '@/components/dashboard/ClassStats'
 import NotificationPopup from '@/components/notifications/NotificationPopup'
 import NotificationListModal from '@/components/notifications/NotificationListModal'
 

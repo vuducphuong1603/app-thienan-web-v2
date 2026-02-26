@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Plus, MoreHorizontal, X, Check } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { Plus, MoreHorizontal, X, Check, Trash2 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { useMyNotesData, useUserNotes, useInvalidateQueries } from '@/lib/queries'
 import { supabase } from '@/lib/supabase'
@@ -176,29 +175,38 @@ export default function MyNotes() {
   const { data: dashData, isLoading: dashLoading } = useMyNotesData(user)
   const { data: notes = [], isLoading: notesLoading } = useUserNotes(user?.id)
   const { invalidateUserNotes } = useInvalidateQueries()
-  const router = useRouter()
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [filter, setFilter] = useState<NoteFilter>('all')
   const [showFilterMenu, setShowFilterMenu] = useState(false)
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false)
+  const [showNotesMenu, setShowNotesMenu] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
+  const headerMenuRef = useRef<HTMLDivElement>(null)
+  const notesMenuRef = useRef<HTMLDivElement>(null)
 
   const isLoading = dashLoading
 
-  // Close filter dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
         setShowFilterMenu(false)
       }
+      if (headerMenuRef.current && !headerMenuRef.current.contains(event.target as Node)) {
+        setShowHeaderMenu(false)
+      }
+      if (notesMenuRef.current && !notesMenuRef.current.contains(event.target as Node)) {
+        setShowNotesMenu(false)
+      }
     }
-    if (showFilterMenu) {
+    if (showFilterMenu || showHeaderMenu || showNotesMenu) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showFilterMenu])
+  }, [showFilterMenu, showHeaderMenu, showNotesMenu])
 
   // Dashboard data
   const classCount = dashData?.classCount ?? 0
@@ -249,32 +257,81 @@ export default function MyNotes() {
     }
   }
 
+  const handleDeleteCompleted = async () => {
+    const completedIds = notes.filter(n => n.is_completed).map(n => n.id)
+    if (completedIds.length === 0) return
+    if (!confirm(`Xóa ${completedIds.length} ghi chú đã hoàn thành?`)) return
+    setShowHeaderMenu(false)
+    setShowNotesMenu(false)
+    const { error } = await supabase.from('user_notes').delete().in('id', completedIds)
+    if (!error) await invalidateUserNotes()
+  }
+
+  const handleDeleteAll = async () => {
+    if (notes.length === 0) return
+    if (!confirm(`Xóa tất cả ${notes.length} ghi chú?`)) return
+    setShowHeaderMenu(false)
+    setShowNotesMenu(false)
+    const ids = notes.map(n => n.id)
+    const { error } = await supabase.from('user_notes').delete().in('id', ids)
+    if (!error) await invalidateUserNotes()
+  }
+
   return (
     <>
       <div className="bg-white dark:bg-white/10 rounded-[15px] p-4 border border-gray-100 dark:border-white/10 h-full flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between h-10 mb-3 flex-shrink-0">
           <h3 className="text-base font-semibold text-black dark:text-white">Ghi chú của tôi</h3>
-          <button
-            onClick={() => router.push('/admin/activities/weekly-plan')}
-            className="w-12 h-12 bg-[#F6F6F6] dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
-          >
-            <MoreHorizontal className="w-[22px] h-[22px] text-black/40 dark:text-white/50" />
-          </button>
+          <div className="relative" ref={headerMenuRef}>
+            <button
+              onClick={() => setShowHeaderMenu(!showHeaderMenu)}
+              className="w-12 h-12 bg-[#F6F6F6] dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+            >
+              <MoreHorizontal className="w-[22px] h-[22px] text-black/40 dark:text-white/50" />
+            </button>
+            {showHeaderMenu && (
+              <div className="absolute right-0 top-12 z-50 bg-white dark:bg-[#2A2A2A] rounded-xl shadow-lg border border-gray-100 dark:border-white/10 py-1 min-w-[180px]">
+                <button
+                  onClick={() => { setShowCreateModal(true); setShowHeaderMenu(false) }}
+                  className="w-full text-left px-3 py-2 text-sm text-black/70 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Tạo ghi chú
+                </button>
+                <button
+                  onClick={handleDeleteCompleted}
+                  disabled={completedNotes === 0}
+                  className="w-full text-left px-3 py-2 text-sm text-black/70 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Xóa đã hoàn thành
+                </button>
+                <button
+                  onClick={handleDeleteAll}
+                  disabled={notes.length === 0}
+                  className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Xóa tất cả
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Cards Row */}
-        <div className="flex gap-2 mb-4 flex-1">
+        <div className="flex gap-2 mb-4 flex-shrink-0">
           {/* Add Note Card */}
           <div
             onClick={() => setShowCreateModal(true)}
-            className="w-[100px] h-full bg-[#F6F6F6] dark:bg-white/5 rounded-2xl flex items-center justify-center border border-dashed border-black/20 dark:border-white/20 hover:border-brand hover:bg-brand/5 cursor-pointer transition-all flex-shrink-0 group"
+            className="w-[100px] min-h-[120px] bg-[#F6F6F6] dark:bg-white/5 rounded-2xl flex items-center justify-center border border-dashed border-black/20 dark:border-white/20 hover:border-brand hover:bg-brand/5 cursor-pointer transition-all flex-shrink-0 group"
           >
             <Plus className="w-5 h-5 text-black/40 dark:text-white/50 group-hover:text-brand transition-colors" />
           </div>
 
           {/* Class Card */}
-          <div className="flex-1 h-full bg-[#F6F6F6] dark:bg-white/5 rounded-[20px] p-3 flex flex-col justify-between">
+          <div className="flex-1 min-h-[120px] bg-[#F6F6F6] dark:bg-white/5 rounded-[20px] p-3 flex flex-col justify-between">
             <div className="w-6 h-6">
               <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
                 <path d="M13 4.875C10.3 4.875 8.125 7.05 8.125 9.75C8.125 12.45 10.3 14.625 13 14.625C15.7 14.625 17.875 12.45 17.875 9.75C17.875 7.05 15.7 4.875 13 4.875Z" fill="#FA865E" />
@@ -300,7 +357,7 @@ export default function MyNotes() {
           </div>
 
           {/* Activity Card */}
-          <div className="flex-1 h-full bg-[#F6F6F6] dark:bg-white/5 rounded-2xl p-3 flex flex-col justify-between">
+          <div className="flex-1 min-h-[120px] bg-[#F6F6F6] dark:bg-white/5 rounded-2xl p-3 flex flex-col justify-between">
             <div className="w-6 h-6">
               <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
                 <path d="M13 22.75L11.3425 21.2475C5.85 16.26 2.16666 12.935 2.16666 8.9375C2.16666 5.6125 4.78749 3.25 8.11249 3.25C9.94583 3.25 11.7 4.095 13 5.4925C14.3 4.095 16.0542 3.25 17.8875 3.25C21.2125 3.25 23.8333 5.6125 23.8333 8.9375C23.8333 12.935 20.15 16.26 14.6575 21.2475L13 22.75Z" fill="#FA865E" />
@@ -405,18 +462,47 @@ export default function MyNotes() {
                 </div>
               )}
             </div>
-            {/* More → weekly plan */}
-            <button
-              onClick={() => router.push('/admin/activities/weekly-plan')}
-              className="hover:opacity-70 transition-opacity"
-            >
-              <MoreHorizontal className="w-[22px] h-[22px] text-black/40 dark:text-white/50" />
-            </button>
+            {/* More menu */}
+            <div className="relative" ref={notesMenuRef}>
+              <button
+                onClick={() => setShowNotesMenu(!showNotesMenu)}
+                className="hover:opacity-70 transition-opacity"
+              >
+                <MoreHorizontal className="w-[22px] h-[22px] text-black/40 dark:text-white/50" />
+              </button>
+              {showNotesMenu && (
+                <div className="absolute right-0 top-8 z-50 bg-white dark:bg-[#2A2A2A] rounded-xl shadow-lg border border-gray-100 dark:border-white/10 py-1 min-w-[180px]">
+                  <button
+                    onClick={() => { setShowCreateModal(true); setShowNotesMenu(false) }}
+                    className="w-full text-left px-3 py-2 text-sm text-black/70 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Tạo ghi chú
+                  </button>
+                  <button
+                    onClick={handleDeleteCompleted}
+                    disabled={completedNotes === 0}
+                    className="w-full text-left px-3 py-2 text-sm text-black/70 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Xóa đã hoàn thành
+                  </button>
+                  <button
+                    onClick={handleDeleteAll}
+                    disabled={notes.length === 0}
+                    className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Xóa tất cả
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Notes List */}
-        <div className="space-y-2 flex-1 overflow-y-auto min-h-0">
+        <div className="space-y-2 overflow-y-auto min-h-0 max-h-[240px] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-black/10 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-black/20 dark:hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
           {notesLoading ? (
             Array.from({ length: 2 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 py-2">

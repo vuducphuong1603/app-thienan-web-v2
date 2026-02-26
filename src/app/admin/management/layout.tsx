@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS } from '@/lib/supabase'
 import { usePathname } from 'next/navigation'
-import { DashboardHeader } from '@/components/dashboard'
+import DashboardHeader from '@/components/dashboard/DashboardHeader'
 import Link from 'next/link'
 
 interface ManagementLayoutProps {

@@ -54,7 +54,7 @@ export default function NotificationPopup() {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl w-[480px] max-h-[70vh] overflow-hidden shadow-xl flex flex-col">
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl w-[860px] max-h-[90vh] overflow-hidden shadow-xl flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#E5E1DC] dark:border-white/10 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center">

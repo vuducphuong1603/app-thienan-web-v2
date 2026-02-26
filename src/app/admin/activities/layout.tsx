@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS } from '@/lib/supabase'
-import { DashboardHeader } from '@/components/dashboard'
+import DashboardHeader from '@/components/dashboard/DashboardHeader'
 
 interface ActivitiesLayoutProps {
   children: React.ReactNode
