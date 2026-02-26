@@ -69,8 +69,20 @@ async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Initialize user from localStorage cache for instant UI render
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const stored = localStorage.getItem('thien_an_user')
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
+  })
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return !localStorage.getItem('thien_an_user')
+  })
   const router = useRouter()
   const pathname = usePathname()
 
@@ -83,45 +95,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [router])
 
+  // Auth initialization - runs ONCE on mount, not on every pathname change
   useEffect(() => {
-    // Initialize: check existing Supabase Auth session
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
 
         if (session?.user) {
-          // Fetch profile from users table
           const profile = await fetchUserProfile(session.user.id)
           if (profile && profile.status === 'ACTIVE') {
             setUser(profile)
             localStorage.setItem('thien_an_user', JSON.stringify(profile))
-            if (pathname === '/login') {
-              redirectBasedOnRole(profile.role)
-            }
           } else {
-            // User inactive or profile not found, sign out
             await supabase.auth.signOut()
+            setUser(null)
             localStorage.removeItem('thien_an_user')
-            if (!publicRoutes.includes(pathname || '')) {
-              router.push('/login')
-            }
           }
         } else {
-          // No session - check localStorage cache for quick load
-          const storedUser = localStorage.getItem('thien_an_user')
-          if (storedUser) {
-            // Cached but no session - clear cache
-            localStorage.removeItem('thien_an_user')
-          }
-          if (!publicRoutes.includes(pathname || '')) {
-            router.push('/login')
-          }
+          setUser(null)
+          localStorage.removeItem('thien_an_user')
         }
       } catch {
+        setUser(null)
         localStorage.removeItem('thien_an_user')
-        if (!publicRoutes.includes(pathname || '')) {
-          router.push('/login')
-        }
       } finally {
         setLoading(false)
       }
@@ -147,7 +143,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [pathname, router, redirectBasedOnRole])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Route protection - separate from auth init, lightweight check
+  useEffect(() => {
+    if (loading) return
+    const isPublic = publicRoutes.includes(pathname || '')
+    if (!user && !isPublic) {
+      router.push('/login')
+    }
+    if (user && pathname === '/login') {
+      redirectBasedOnRole(user.role)
+    }
+  }, [user, loading, pathname, router, redirectBasedOnRole])
 
   const login = async (identifier: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {

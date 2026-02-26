@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
 import { ArrowUpRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
 interface DayData {
@@ -11,85 +11,71 @@ interface DayData {
   absent: number
 }
 
+function getRecentDays() {
+  const today = new Date()
+  let lastThursday: string | null = null
+  let lastSunday: string | null = null
+
+  for (let i = 0; i <= 7; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    const dayIndex = d.getDay()
+    if (dayIndex === 4 && !lastThursday) {
+      lastThursday = d.toISOString().split('T')[0]
+    }
+    if (dayIndex === 0 && !lastSunday) {
+      lastSunday = d.toISOString().split('T')[0]
+    }
+    if (lastThursday && lastSunday) break
+  }
+  return { lastThursday, lastSunday }
+}
+
 export default function AttendanceChart() {
   const router = useRouter()
-  const [data, setData] = useState<DayData[]>([
+
+  const { data = [
     { label: 'Thứ 5', present: 0, absent: 0 },
     { label: 'Chúa nhật', present: 0, absent: 0 },
-  ])
-  const [loading, setLoading] = useState(true)
+  ], isLoading: loading } = useQuery<DayData[]>({
+    queryKey: ['attendanceChart7Days'],
+    queryFn: async () => {
+      const { lastThursday, lastSunday } = getRecentDays()
 
-  const fetchAttendanceData = useCallback(async () => {
-    try {
-      // Get total active students
-      const { count: totalStudents } = await supabase
-        .from('thieu_nhi')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'ACTIVE')
-
-      const total = totalStudents || 0
-
-      // Find the most recent Thursday and Sunday within the last 7 days
-      const today = new Date()
-      const sevenDaysAgo = new Date(today)
-      sevenDaysAgo.setDate(today.getDate() - 7)
-
-      let lastThursday: string | null = null
-      let lastSunday: string | null = null
-
-      for (let i = 0; i <= 7; i++) {
-        const d = new Date(today)
-        d.setDate(today.getDate() - i)
-        const dayIndex = d.getDay()
-        if (dayIndex === 4 && !lastThursday) {
-          lastThursday = d.toISOString().split('T')[0]
-        }
-        if (dayIndex === 0 && !lastSunday) {
-          lastSunday = d.toISOString().split('T')[0]
-        }
-        if (lastThursday && lastSunday) break
-      }
-
-      // Fetch Thursday attendance (present count)
-      let thu5Present = 0
-      if (lastThursday) {
-        const { count } = await supabase
-          .from('attendance_records')
+      // Fetch all counts in parallel
+      const [totalRes, thu5Res, cnRes] = await Promise.all([
+        supabase
+          .from('thieu_nhi')
           .select('*', { count: 'exact', head: true })
-          .eq('attendance_date', lastThursday)
-          .eq('day_type', 'thu5')
-          .eq('status', 'present')
+          .eq('status', 'ACTIVE'),
+        lastThursday
+          ? supabase
+              .from('attendance_records')
+              .select('*', { count: 'exact', head: true })
+              .eq('attendance_date', lastThursday)
+              .eq('day_type', 'thu5')
+              .eq('status', 'present')
+          : Promise.resolve({ count: 0 }),
+        lastSunday
+          ? supabase
+              .from('attendance_records')
+              .select('*', { count: 'exact', head: true })
+              .eq('attendance_date', lastSunday)
+              .eq('day_type', 'cn')
+              .eq('status', 'present')
+          : Promise.resolve({ count: 0 }),
+      ])
 
-        thu5Present = count || 0
-      }
+      const total = totalRes.count || 0
+      const thu5Present = thu5Res.count || 0
+      const cnPresent = cnRes.count || 0
 
-      // Fetch Sunday attendance (present count)
-      let cnPresent = 0
-      if (lastSunday) {
-        const { count } = await supabase
-          .from('attendance_records')
-          .select('*', { count: 'exact', head: true })
-          .eq('attendance_date', lastSunday)
-          .eq('day_type', 'cn')
-          .eq('status', 'present')
-
-        cnPresent = count || 0
-      }
-
-      setData([
+      return [
         { label: 'Thứ 5', present: thu5Present, absent: total - thu5Present },
         { label: 'Chúa nhật', present: cnPresent, absent: total - cnPresent },
-      ])
-    } catch (error) {
-      console.error('Error fetching attendance data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchAttendanceData()
-  }, [fetchAttendanceData])
+      ]
+    },
+  })
 
   // Calculate max value for scaling bars
   const maxValue = Math.max(...data.flatMap(d => [d.present, d.absent]), 1)

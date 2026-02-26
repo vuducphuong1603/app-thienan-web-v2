@@ -23,19 +23,17 @@ export function useDashboardStats(enabled = true) {
   return useQuery({
     queryKey: queryKeys.dashboardStats,
     queryFn: async () => {
-      const [usersRes, thieuNhiRes, classesRes] = await Promise.all([
-        supabase.from('users').select('role'),
+      const [glvRes, thieuNhiRes, classesRes] = await Promise.all([
+        supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'giao_ly_vien'),
         supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }),
         supabase.from('classes').select('*', { count: 'exact', head: true }),
       ])
-
-      const totalGiaoLyVien = usersRes.data?.filter(u => u.role === 'giao_ly_vien').length || 0
 
       return {
         totalBranches: 4,
         totalClasses: classesRes.count || 0,
         totalThieuNhi: thieuNhiRes.count || 0,
-        totalGiaoLyVien,
+        totalGiaoLyVien: glvRes.count || 0,
       }
     },
     enabled,
@@ -184,8 +182,11 @@ export function useStudentsWithDetails() {
       const classesData = classesRes.data || []
       const studentsData = studentsRes.data || []
 
+      // Build class lookup map for O(1) access instead of O(n) find per student
+      const classMap = new Map(classesData.map(c => [c.id, c]))
+
       const studentsWithDetails = studentsData.map((student) => {
-        const studentClass = classesData.find((c) => c.id === student.class_id)
+        const studentClass = student.class_id ? classMap.get(student.class_id) : undefined
         const birthDate = student.date_of_birth ? new Date(student.date_of_birth) : null
         const age = birthDate ? Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : undefined
 
@@ -223,51 +224,48 @@ export function useClassesWithDetails() {
   return useQuery({
     queryKey: ['classes', 'withDetails'],
     queryFn: async () => {
-      const [classesRes, usersRes] = await Promise.all([
+      const [classesRes, usersRes, studentsRes] = await Promise.all([
         supabase.from('classes').select('*').order('display_order', { ascending: true }),
         supabase.from('users').select('id, full_name, saint_name, class_id, class_name').eq('role', 'giao_ly_vien'),
+        supabase.from('thieu_nhi').select('id, class_id'),
       ])
 
       if (classesRes.error) throw classesRes.error
 
-      // Fetch all students with pagination
-      const allStudents: { id: string; class_id: string | null }[] = []
-      const pageSize = 1000
-      let page = 0
-      let hasMore = true
-
-      while (hasMore) {
-        const from = page * pageSize
-        const to = from + pageSize - 1
-        const { data: pageData } = await supabase
-          .from('thieu_nhi')
-          .select('id, class_id')
-          .range(from, to)
-
-        if (pageData && pageData.length > 0) {
-          allStudents.push(...pageData)
-          page++
-          hasMore = pageData.length === pageSize
-        } else {
-          hasMore = false
-        }
-      }
-
+      // Build student count map - O(n) instead of sequential pagination
       const studentCountByClass: Record<string, number> = {}
-      allStudents.forEach((student) => {
+      ;(studentsRes.data || []).forEach((student) => {
         if (student.class_id) {
           studentCountByClass[student.class_id] = (studentCountByClass[student.class_id] || 0) + 1
         }
       })
 
+      // Build teacher lookup map for O(1) access
+      const teachersByClassId = new Map<string, string[]>()
+      const teachersByClassName = new Map<string, string[]>()
+      ;(usersRes.data || []).forEach((user) => {
+        const name = `${user.saint_name || ''} ${user.full_name}`.trim()
+        if (user.class_id) {
+          const arr = teachersByClassId.get(user.class_id) || []
+          arr.push(name)
+          teachersByClassId.set(user.class_id, arr)
+        }
+        if (user.class_name) {
+          const arr = teachersByClassName.get(user.class_name) || []
+          arr.push(name)
+          teachersByClassName.set(user.class_name, arr)
+        }
+      })
+
       const classesWithDetails = (classesRes.data || []).map((cls) => {
-        const classTeachers = (usersRes.data || [])
-          .filter((user) => user.class_id === cls.id || user.class_name === cls.name)
-          .map((user) => `${user.saint_name || ''} ${user.full_name}`.trim())
+        // Merge teachers by id and name, deduplicate
+        const byId = teachersByClassId.get(cls.id) || []
+        const byName = teachersByClassName.get(cls.name) || []
+        const teachers = Array.from(new Set([...byId, ...byName]))
 
         return {
           ...cls,
-          teachers: classTeachers,
+          teachers,
           student_count: studentCountByClass[cls.id] || 0,
         }
       })

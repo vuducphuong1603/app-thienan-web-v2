@@ -2,7 +2,6 @@
 
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS, Branch, BRANCHES } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { usePerformanceTrendData, useClassAttendanceData } from '@/lib/queries'
 import Link from 'next/link'
@@ -755,7 +754,6 @@ const branchDisplayNames: Record<Branch, string> = {
 
 export default function PerformancePage() {
   const { user, loading, isAdmin, logout } = useAuth()
-  const router = useRouter()
 
   const [activeView, setActiveView] = useState<ViewType>('trend')
   const [chartType, setChartType] = useState<ChartType>('sunday')
@@ -810,18 +808,11 @@ export default function PerformancePage() {
   const classStats = classData?.classStats || { totalClasses: 0, totalStudents: 0, presentCount: 0, averageRate: 0 }
   const classAttendanceData = classData?.classAttendanceData || []
 
-  // Auth check
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login')
-    }
-    if (!loading && user && !isAdmin) {
-      router.push('/dashboard')
-    }
-  }, [user, loading, isAdmin, router])
+  if (!user && !loading) {
+    return null
+  }
 
-
-  if (loading) {
+  if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -849,10 +840,6 @@ export default function PerformancePage() {
         </div>
       </div>
     )
-  }
-
-  if (!user || !isAdmin) {
-    return null
   }
 
   // Get user info
