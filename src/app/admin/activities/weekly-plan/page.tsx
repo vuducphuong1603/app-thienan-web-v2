@@ -1,45 +1,12 @@
 'use client'
 
-import { useAuth } from '@/lib/auth-context'
-import { ROLE_LABELS } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { ChevronLeft, Calendar, Plus } from 'lucide-react'
+import { useState } from 'react'
+import { Calendar, Plus, List, FileText, CalendarDays } from 'lucide-react'
 import Link from 'next/link'
-import { DashboardHeader } from '@/components/dashboard'
 import { WeeklyPlanCalendar } from '@/components/weekly-plan'
 
 export default function WeeklyPlanPage() {
-  const { user, loading, isAdmin, logout } = useAuth()
-  const router = useRouter()
   const [currentDate] = useState(new Date())
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login')
-    }
-    if (!loading && user && !isAdmin) {
-      router.push('/dashboard')
-    }
-  }, [user, loading, isAdmin, router])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <svg className="animate-spin h-8 w-8 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <p className="text-gray-500 text-sm">Đang tải...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user || !isAdmin) {
-    return null
-  }
 
   // Format current date in Vietnamese
   const dayOfWeek = currentDate.toLocaleDateString('vi-VN', { weekday: 'long' })
@@ -56,31 +23,51 @@ export default function WeeklyPlanPage() {
 
   const weekRange = `${startOfWeek.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} - ${endOfWeek.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
 
-  const firstName = user.full_name?.split(' ').pop() || user.full_name
-
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <DashboardHeader
-        userName={firstName || 'Admin'}
-        userRole={ROLE_LABELS[user.role]}
-        userEmail={user.email || ''}
-        activeTab="overview"
-        onLogout={logout}
-        userAvatar={user.avatar_url}
-      />
-
-      {/* Main Content */}
-      <main className="px-6 pb-6">
-        {/* Back Button */}
+    <div className="flex gap-5">
+      {/* Left Sidebar - Tab Navigation */}
+      <div className="w-[208px] flex flex-col gap-2">
+        {/* Điểm danh Tab */}
         <Link
-          href="/admin/dashboard"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors mb-4"
+          href="/admin/activities"
+          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
         >
-          <ChevronLeft className="w-4 h-4" />
-          <span>Quay trở lại</span>
+          <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
+            <List className="w-5 h-5 text-brand" />
+          </div>
+          <span className="text-base font-semibold text-black dark:text-white opacity-80">
+            Điểm danh
+          </span>
         </Link>
 
+        {/* Báo cáo Tab */}
+        <Link
+          href="/admin/activities"
+          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
+        >
+          <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
+            <FileText className="w-5 h-5 text-brand" />
+          </div>
+          <span className="text-base font-semibold text-black dark:text-white opacity-80">
+            Báo cáo
+          </span>
+        </Link>
+
+        {/* Kế hoạch Tab - Active */}
+        <div
+          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] bg-brand"
+        >
+          <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-white/20">
+            <CalendarDays className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-base font-semibold text-white">
+            Kế hoạch
+          </span>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 min-w-0">
         {/* Title */}
         <h1 className="text-[40px] font-bold italic text-gray-900 dark:text-white mb-5 leading-tight">
           Kế hoạch tuần này
@@ -123,7 +110,7 @@ export default function WeeklyPlanPage() {
 
         {/* Weekly Calendar Grid */}
         <WeeklyPlanCalendar />
-      </main>
+      </div>
     </div>
   )
 }
