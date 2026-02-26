@@ -53,23 +53,28 @@ export default function NotificationPopup() {
   if (!isOpen || !unreadNotifications || unreadNotifications.length === 0) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl w-[860px] max-h-[90vh] overflow-hidden shadow-xl flex flex-col">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-3xl w-[880px] max-h-[88vh] overflow-hidden shadow-2xl flex flex-col border border-gray-200/50 dark:border-white/10">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-[#E5E1DC] dark:border-white/10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center">
-            <Bell className="w-5 h-5 text-brand" />
+        <div className="px-7 py-5 border-b border-gray-200 dark:border-white/10 flex items-center gap-4 bg-gradient-to-r from-brand/5 to-transparent dark:from-brand/10">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-2xl bg-brand/15 flex items-center justify-center">
+              <Bell className="w-6 h-6 text-brand" />
+            </div>
+            <div className="absolute -top-1 -right-1 w-5 h-5 bg-brand text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white dark:ring-[#1a1a1a]">
+              {unreadNotifications.length}
+            </div>
           </div>
           <div>
-            <h2 className="text-lg font-bold text-black dark:text-white">Thông báo mới</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Bạn có {unreadNotifications.length} thông báo chưa đọc
+            <h2 className="text-xl font-bold text-black dark:text-white">Thông báo mới</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              Bạn có <span className="text-brand font-bold">{unreadNotifications.length}</span> thông báo chưa đọc
             </p>
           </div>
         </div>
 
         {/* Body */}
-        <div className="px-6 py-4 overflow-y-auto flex-1 space-y-2">
+        <div className="px-7 py-5 overflow-y-auto flex-1 space-y-3">
           {unreadNotifications.map(notification => (
             <NotificationItem
               key={notification.id}
@@ -80,11 +85,11 @@ export default function NotificationPopup() {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-[#E5E1DC] dark:border-white/10">
+        <div className="px-7 py-4 border-t border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]">
           <button
             onClick={handleClose}
             disabled={isMarking}
-            className="w-full h-[44px] bg-brand rounded-xl text-sm font-medium text-white hover:bg-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full h-12 bg-brand rounded-xl text-sm font-bold text-white hover:bg-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-brand/25"
           >
             {isMarking && (
               <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -92,7 +97,7 @@ export default function NotificationPopup() {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             )}
-            {isMarking ? 'Đang đánh dấu...' : 'Đóng'}
+            {isMarking ? 'Đang đánh dấu đã đọc...' : 'Đánh dấu đã đọc & Đóng'}
           </button>
         </div>
       </div>

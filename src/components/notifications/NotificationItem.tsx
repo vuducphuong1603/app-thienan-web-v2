@@ -21,16 +21,16 @@ function formatTimeAgo(dateStr: string): string {
 
 function PriorityBadge({ priority }: { priority: NotificationPriority }) {
   const config = {
-    high: { label: 'Cao', icon: ArrowUp, className: 'text-red-600 bg-red-50 dark:bg-red-900/20' },
-    normal: { label: 'Bình thường', icon: Minus, className: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' },
-    low: { label: 'Thấp', icon: ArrowDown, className: 'text-gray-600 bg-gray-100 dark:bg-white/10' },
+    high: { label: 'Ưu tiên cao', icon: ArrowUp, className: 'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30 ring-1 ring-red-200 dark:ring-red-800/40' },
+    normal: { label: 'Bình thường', icon: Minus, className: 'text-blue-700 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30 ring-1 ring-blue-200 dark:ring-blue-800/40' },
+    low: { label: 'Thấp', icon: ArrowDown, className: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-white/10 ring-1 ring-gray-200 dark:ring-white/10' },
   }
   const { label, icon: Icon, className } = config[priority]
 
   return (
-    <div className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 ${className}`}>
-      <Icon className="w-3 h-3" />
-      <span className="text-[10px] font-medium">{label}</span>
+    <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${className}`}>
+      <Icon className="w-3.5 h-3.5" />
+      <span className="text-xs font-semibold">{label}</span>
     </div>
   )
 }
@@ -43,24 +43,33 @@ interface NotificationItemProps {
 
 export default function NotificationItem({ notification, showReadStatus = true, compact = false }: NotificationItemProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const isUnread = !notification.is_read && showReadStatus
 
   return (
     <div
-      className={`bg-[#f6f6f6] dark:bg-white/5 rounded-[15px] p-3 cursor-pointer hover:bg-[#efefef] dark:hover:bg-white/8 transition-colors ${
-        !notification.is_read && showReadStatus ? 'ring-1 ring-brand/30' : ''
+      className={`relative rounded-2xl p-4 cursor-pointer transition-all duration-200 ${
+        isUnread
+          ? 'bg-brand/5 dark:bg-brand/10 ring-2 ring-brand/40 hover:ring-brand/60 hover:bg-brand/8 dark:hover:bg-brand/15'
+          : 'bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eeeeee] dark:hover:bg-white/8'
       }`}
       onClick={() => setIsExpanded(!isExpanded)}
     >
+      {/* Unread accent bar */}
+      {isUnread && (
+        <div className="absolute left-0 top-4 bottom-4 w-1 bg-brand rounded-full" />
+      )}
+
       {/* Top Row - Badges */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2.5">
           {showReadStatus && (
-            <div className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 ${
+            <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${
               notification.is_read
-                ? 'bg-[#e5e1dc] dark:bg-white/10'
-                : 'bg-brand/10 text-brand'
+                ? 'bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-gray-400'
+                : 'bg-brand text-white'
             }`}>
-              <span className="text-[10px] font-medium">
+              <div className={`w-2 h-2 rounded-full ${notification.is_read ? 'bg-gray-400' : 'bg-white animate-pulse'}`} />
+              <span className="text-xs">
                 {notification.is_read ? 'Đã đọc' : 'Chưa đọc'}
               </span>
             </div>
@@ -68,20 +77,25 @@ export default function NotificationItem({ notification, showReadStatus = true, 
           <PriorityBadge priority={notification.priority} />
         </div>
         {!compact && (
-          isExpanded
-            ? <ChevronUp className="w-4 h-4 text-[#8a8c90]" />
-            : <ChevronDown className="w-4 h-4 text-[#8a8c90]" />
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+            isExpanded ? 'bg-brand/10 dark:bg-brand/20' : 'bg-gray-100 dark:bg-white/10'
+          }`}>
+            {isExpanded
+              ? <ChevronUp className="w-4 h-4 text-brand" />
+              : <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            }
+          </div>
         )}
       </div>
 
       {/* Title */}
-      <p className={`text-black dark:text-white font-medium mb-1 ${compact ? 'text-xs' : 'text-sm'}`}>
+      <h3 className={`text-black dark:text-white font-bold mb-1.5 leading-snug ${compact ? 'text-sm' : 'text-base'}`}>
         {notification.title}
-      </p>
+      </h3>
 
       {/* Content */}
       {!compact && (
-        <p className={`text-xs text-black/50 dark:text-white/50 mb-2 whitespace-pre-wrap ${
+        <p className={`text-sm text-gray-600 dark:text-gray-300 mb-3 whitespace-pre-wrap leading-relaxed ${
           isExpanded ? '' : 'line-clamp-2'
         }`}>
           {notification.content}
@@ -89,19 +103,22 @@ export default function NotificationItem({ notification, showReadStatus = true, 
       )}
 
       {/* Divider */}
-      <div className="w-full h-px bg-gray-200 dark:bg-white/10 mb-1.5" />
+      <div className="w-full h-px bg-gray-200 dark:bg-white/10 mb-2.5" />
 
       {/* Meta Info */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1.5">
-          <Clock className="w-3 h-3 text-[#8a8c90]" />
-          <span className="text-[10px] text-[#8a8c90]">{formatTimeAgo(notification.created_at)}</span>
+          <Clock className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{formatTimeAgo(notification.created_at)}</span>
         </div>
         {notification.creator_name && (
-          <div className="flex items-center gap-1.5">
-            <User className="w-3 h-3 text-[#8a8c90]" />
-            <span className="text-[10px] text-[#8a8c90]">{notification.creator_name}</span>
-          </div>
+          <>
+            <div className="w-px h-4 bg-gray-300 dark:bg-white/15" />
+            <div className="flex items-center gap-1.5">
+              <User className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{notification.creator_name}</span>
+            </div>
+          </>
         )}
       </div>
     </div>
