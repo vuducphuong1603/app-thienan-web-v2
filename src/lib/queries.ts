@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, UserProfile, Class } from './supabase'
+import { supabase, UserProfile, Class, Branch } from './supabase'
 
 // ============ Query Keys ============
 export const queryKeys = {
@@ -13,6 +13,8 @@ export const queryKeys = {
   classStats: ['classStats'] as const,
   planCategories: ['planCategories'] as const,
   weeklyPlans: (weekStart: string) => ['weeklyPlans', weekStart] as const,
+  performanceTrend: (chartType: string) => ['performanceTrend', chartType] as const,
+  classAttendance: (branch: string, date: string, dayType: string) => ['classAttendance', branch, date, dayType] as const,
 }
 
 // ============ Dashboard Stats ============
@@ -355,6 +357,206 @@ export function useWeeklyPlans(weekStart: Date) {
       if (error) throw error
       return data || []
     },
+  })
+}
+
+// ============ Performance Trend Data (3 weeks) ============
+function getLast3Weeks(dayType: 'thu5' | 'cn') {
+  const weeks: { date: string; displayDate: string; fullDisplayDate: string }[] = []
+  const today = new Date()
+  const targetDay = dayType === 'cn' ? 0 : 4
+  const dayLabel = dayType === 'cn' ? 'CN' : 'T5'
+  const fullDayLabel = dayType === 'cn' ? 'Chủ nhật' : 'Thứ năm'
+
+  const current = new Date(today)
+  const currentDay = current.getDay()
+  let daysBack = currentDay - targetDay
+  if (daysBack < 0) daysBack += 7
+  current.setDate(current.getDate() - daysBack)
+
+  for (let i = 0; i < 3; i++) {
+    const weekDate = new Date(current)
+    weekDate.setDate(weekDate.getDate() - (i * 7))
+    const dateStr = weekDate.toISOString().split('T')[0]
+    const day = weekDate.getDate()
+    const month = weekDate.getMonth() + 1
+    weeks.push({
+      date: dateStr,
+      displayDate: `${dayLabel} ${day}/${month}`,
+      fullDisplayDate: `${fullDayLabel} ${day}/${month}`,
+    })
+  }
+  return weeks.reverse()
+}
+
+const branchDisplayNames: Record<Branch, string> = {
+  'Chiên Con': 'Chiên con',
+  'Ấu Nhi': 'Ấu nhi',
+  'Thiếu Nhi': 'Thiếu nhi',
+  'Nghĩa Sĩ': 'Nghĩa sĩ',
+}
+
+export function usePerformanceTrendData(chartType: 'sunday' | 'thursday', enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.performanceTrend(chartType),
+    queryFn: async () => {
+      const dayType: 'thu5' | 'cn' = chartType === 'sunday' ? 'cn' : 'thu5'
+      const weeks = getLast3Weeks(dayType)
+
+      const [classesRes, studentsRes] = await Promise.all([
+        supabase.from('classes').select('id, name, branch').eq('status', 'ACTIVE'),
+        supabase.from('thieu_nhi').select('id, class_id').eq('status', 'ACTIVE'),
+      ])
+
+      if (classesRes.error) throw classesRes.error
+      if (studentsRes.error) throw studentsRes.error
+
+      const classToBranch: Record<string, Branch> = {}
+      classesRes.data?.forEach(cls => {
+        classToBranch[cls.id] = cls.branch as Branch
+      })
+
+      const studentCountByBranch: Record<string, number> = {
+        'Chiên Con': 0, 'Ấu Nhi': 0, 'Thiếu Nhi': 0, 'Nghĩa Sĩ': 0,
+      }
+      studentsRes.data?.forEach(student => {
+        if (student.class_id && classToBranch[student.class_id]) {
+          const branch = classToBranch[student.class_id]
+          studentCountByBranch[branch] = (studentCountByBranch[branch] || 0) + 1
+        }
+      })
+
+      const startDate = weeks[0].date
+      const endDate = weeks[weeks.length - 1].date
+
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('attendance_records')
+        .select('id, student_id, class_id, attendance_date, day_type, status')
+        .eq('day_type', dayType)
+        .eq('status', 'present')
+        .gte('attendance_date', startDate)
+        .lte('attendance_date', endDate)
+
+      if (attendanceError) throw attendanceError
+
+      const chartData = weeks.map(week => {
+        const weekAttendance = attendanceData?.filter(r => r.attendance_date === week.date) || []
+        const countByBranch: Record<string, number> = {
+          'Chiên Con': 0, 'Ấu Nhi': 0, 'Thiếu Nhi': 0, 'Nghĩa Sĩ': 0,
+        }
+        weekAttendance.forEach(record => {
+          if (record.class_id && classToBranch[record.class_id]) {
+            const branch = classToBranch[record.class_id]
+            countByBranch[branch] = (countByBranch[branch] || 0) + 1
+          }
+        })
+        return {
+          date: week.displayDate,
+          chienCon: countByBranch['Chiên Con'],
+          auNhi: countByBranch['Ấu Nhi'],
+          thieuNhi: countByBranch['Thiếu Nhi'],
+          nghiaSi: countByBranch['Nghĩa Sĩ'],
+        }
+      })
+
+      const statsTypes: ('line' | 'bar' | 'progress')[] = ['line', 'bar', 'progress']
+      const statsData = weeks.map((week, index) => {
+        const weekAttendance = attendanceData?.filter(r => r.attendance_date === week.date) || []
+        return { date: week.fullDisplayDate, value: weekAttendance.length, type: statsTypes[index] }
+      })
+
+      const mostRecentWeek = weeks[weeks.length - 1]
+      const recentAttendance = attendanceData?.filter(r => r.attendance_date === mostRecentWeek.date) || []
+      const countByBranch: Record<string, number> = {
+        'Chiên Con': 0, 'Ấu Nhi': 0, 'Thiếu Nhi': 0, 'Nghĩa Sĩ': 0,
+      }
+      recentAttendance.forEach(record => {
+        if (record.class_id && classToBranch[record.class_id]) {
+          const branch = classToBranch[record.class_id]
+          countByBranch[branch] = (countByBranch[branch] || 0) + 1
+        }
+      })
+
+      const branchOrder: Branch[] = ['Nghĩa Sĩ', 'Thiếu Nhi', 'Ấu Nhi', 'Chiên Con']
+      const branchStats = branchOrder.map((branch, index) => ({
+        name: branchDisplayNames[branch],
+        value: countByBranch[branch],
+        total: studentCountByBranch[branch],
+        color: (index === 0 ? 'primary' : 'default') as 'primary' | 'default',
+      }))
+
+      return { chartData, statsData, branchStats }
+    },
+    enabled,
+  })
+}
+
+// ============ Class Attendance Data (by branch + date) ============
+export function useClassAttendanceData(branch: Branch, date: string, dayType: 'cn' | 'thu5', enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.classAttendance(branch, date, dayType),
+    queryFn: async () => {
+      const { data: classesData, error: classesError } = await supabase
+        .from('classes')
+        .select('id, name, branch')
+        .eq('branch', branch)
+        .eq('status', 'ACTIVE')
+        .order('display_order', { ascending: true })
+
+      if (classesError) throw classesError
+
+      if (!classesData || classesData.length === 0) {
+        return {
+          classStats: { totalClasses: 0, totalStudents: 0, presentCount: 0, averageRate: 0 },
+          classAttendanceData: [],
+        }
+      }
+
+      const classIds = classesData.map(c => c.id)
+
+      const [studentsRes, attendanceRes] = await Promise.all([
+        supabase.from('thieu_nhi').select('id, class_id').in('class_id', classIds).eq('status', 'ACTIVE'),
+        supabase.from('attendance_records').select('id, student_id, class_id, status')
+          .in('class_id', classIds).eq('attendance_date', date).eq('day_type', dayType).eq('status', 'present'),
+      ])
+
+      if (studentsRes.error) throw studentsRes.error
+      if (attendanceRes.error) throw attendanceRes.error
+
+      const studentsByClass: Record<string, number> = {}
+      classIds.forEach(id => { studentsByClass[id] = 0 })
+      studentsRes.data?.forEach(student => {
+        if (student.class_id) {
+          studentsByClass[student.class_id] = (studentsByClass[student.class_id] || 0) + 1
+        }
+      })
+
+      const attendanceByClass: Record<string, number> = {}
+      classIds.forEach(id => { attendanceByClass[id] = 0 })
+      attendanceRes.data?.forEach(record => {
+        if (record.class_id) {
+          attendanceByClass[record.class_id] = (attendanceByClass[record.class_id] || 0) + 1
+        }
+      })
+
+      const classAttendanceData = classesData.map(cls => ({
+        classId: cls.id,
+        className: cls.name,
+        totalStudents: studentsByClass[cls.id] || 0,
+        presentCount: attendanceByClass[cls.id] || 0,
+      }))
+
+      const totalClasses = classesData.length
+      const totalStudents = Object.values(studentsByClass).reduce((a, b) => a + b, 0)
+      const presentCount = Object.values(attendanceByClass).reduce((a, b) => a + b, 0)
+      const averageRate = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 1000) / 10 : 0
+
+      return {
+        classStats: { totalClasses, totalStudents, presentCount, averageRate },
+        classAttendanceData,
+      }
+    },
+    enabled: enabled && !!date && !!branch,
   })
 }
 

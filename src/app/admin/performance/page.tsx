@@ -1,9 +1,10 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
-import { ROLE_LABELS, supabase, Branch, BRANCHES } from '@/lib/supabase'
+import { ROLE_LABELS, Branch, BRANCHES } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
+import { usePerformanceTrendData, useClassAttendanceData } from '@/lib/queries'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -19,12 +20,6 @@ type ChartType = 'sunday' | 'thursday'
 type ViewType = 'trend' | 'class'
 type DayType = 'cn' | 'thu5'
 
-interface WeekData {
-  date: string // YYYY-MM-DD
-  displayDate: string // e.g., "CN 16/11" or "T5 14/11"
-  fullDisplayDate: string // e.g., "Chủ nhật 16/11" or "Thứ năm 14/11"
-}
-
 interface ChartDataItem {
   date: string
   chienCon: number
@@ -33,27 +28,7 @@ interface ChartDataItem {
   auNhi: number
 }
 
-interface StatsDataItem {
-  date: string
-  value: number
-  type: 'line' | 'bar' | 'progress'
-}
-
-interface BranchStatsItem {
-  name: string
-  value: number
-  total: number
-  color: 'primary' | 'default'
-}
-
 // Types for class view
-interface ClassStats {
-  totalClasses: number
-  totalStudents: number
-  presentCount: number
-  averageRate: number
-}
-
 interface ClassAttendanceData {
   classId: string
   className: string
@@ -770,46 +745,6 @@ function BarChart({ data, chartType }: { data: ChartDataItem[], chartType: Chart
   )
 }
 
-// Helper function to get the last 3 weeks' dates for Thursday or Sunday
-function getLast3Weeks(dayType: 'thu5' | 'cn'): WeekData[] {
-  const weeks: WeekData[] = []
-  const today = new Date()
-
-  // Target day: 0=Sunday, 4=Thursday
-  const targetDay = dayType === 'cn' ? 0 : 4
-  const dayLabel = dayType === 'cn' ? 'CN' : 'T5'
-  const fullDayLabel = dayType === 'cn' ? 'Chủ nhật' : 'Thứ năm'
-
-  // Find the most recent target day (including today if it matches)
-  const current = new Date(today)
-  const currentDay = current.getDay()
-
-  // Calculate days to go back to reach target day
-  let daysBack = currentDay - targetDay
-  if (daysBack < 0) daysBack += 7
-
-  current.setDate(current.getDate() - daysBack)
-
-  // Get 3 weeks
-  for (let i = 0; i < 3; i++) {
-    const weekDate = new Date(current)
-    weekDate.setDate(weekDate.getDate() - (i * 7))
-
-    const dateStr = weekDate.toISOString().split('T')[0]
-    const day = weekDate.getDate()
-    const month = weekDate.getMonth() + 1
-
-    weeks.push({
-      date: dateStr,
-      displayDate: `${dayLabel} ${day}/${month}`,
-      fullDisplayDate: `${fullDayLabel} ${day}/${month}`,
-    })
-  }
-
-  // Reverse to get oldest first
-  return weeks.reverse()
-}
-
 // Map branch name to display name
 const branchDisplayNames: Record<Branch, string> = {
   'Chiên Con': 'Chiên con',
@@ -824,317 +759,56 @@ export default function PerformancePage() {
 
   const [activeView, setActiveView] = useState<ViewType>('trend')
   const [chartType, setChartType] = useState<ChartType>('sunday')
-  const [dataLoading, setDataLoading] = useState(true)
-
-  // Data states for trend view
-  const [chartData, setChartData] = useState<ChartDataItem[]>([])
-  const [statsData, setStatsData] = useState<StatsDataItem[]>([])
-  const [branchStats, setBranchStats] = useState<BranchStatsItem[]>([])
 
   // States for class view
   const [selectedBranch, setSelectedBranch] = useState<Branch>('Ấu Nhi')
   const [selectedDayType, setSelectedDayType] = useState<DayType>('cn')
   const [selectedDate, setSelectedDate] = useState<string>('')
-  const [availableDates, setAvailableDates] = useState<DateOption[]>([])
-  const [classStats, setClassStats] = useState<ClassStats>({
-    totalClasses: 0,
-    totalStudents: 0,
-    presentCount: 0,
-    averageRate: 0,
-  })
-  const [classAttendanceData, setClassAttendanceData] = useState<ClassAttendanceData[]>([])
-  const [classDataLoading, setClassDataLoading] = useState(false)
 
-  // Fetch attendance data from Supabase
-  const fetchAttendanceData = useCallback(async () => {
-    setDataLoading(true)
-    try {
-      const dayType: 'thu5' | 'cn' = chartType === 'sunday' ? 'cn' : 'thu5'
-      const weeks = getLast3Weeks(dayType)
-
-      // Fetch all classes to get branch info
-      const { data: classesData, error: classesError } = await supabase
-        .from('classes')
-        .select('id, name, branch')
-        .eq('status', 'ACTIVE')
-
-      if (classesError) throw classesError
-
-      // Create class to branch mapping
-      const classToBranch: Record<string, Branch> = {}
-      classesData?.forEach(cls => {
-        classToBranch[cls.id] = cls.branch as Branch
-      })
-
-      // Fetch total active students per branch
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('thieu_nhi')
-        .select('id, class_id')
-        .eq('status', 'ACTIVE')
-
-      if (studentsError) throw studentsError
-
-      // Count students by branch
-      const studentCountByBranch: Record<string, number> = {
-        'Chiên Con': 0,
-        'Ấu Nhi': 0,
-        'Thiếu Nhi': 0,
-        'Nghĩa Sĩ': 0,
-      }
-
-      studentsData?.forEach(student => {
-        if (student.class_id && classToBranch[student.class_id]) {
-          const branch = classToBranch[student.class_id]
-          studentCountByBranch[branch] = (studentCountByBranch[branch] || 0) + 1
-        }
-      })
-
-      // Fetch attendance records for the 3 weeks
-      const startDate = weeks[0].date
-      const endDate = weeks[weeks.length - 1].date
-
-      const { data: attendanceData, error: attendanceError } = await supabase
-        .from('attendance_records')
-        .select('id, student_id, class_id, attendance_date, day_type, status')
-        .eq('day_type', dayType)
-        .eq('status', 'present')
-        .gte('attendance_date', startDate)
-        .lte('attendance_date', endDate)
-
-      if (attendanceError) throw attendanceError
-
-      // Process data for chart
-      const chartDataItems: ChartDataItem[] = weeks.map(week => {
-        const weekAttendance = attendanceData?.filter(
-          record => record.attendance_date === week.date
-        ) || []
-
-        // Count by branch
-        const countByBranch: Record<string, number> = {
-          'Chiên Con': 0,
-          'Ấu Nhi': 0,
-          'Thiếu Nhi': 0,
-          'Nghĩa Sĩ': 0,
-        }
-
-        weekAttendance.forEach(record => {
-          if (record.class_id && classToBranch[record.class_id]) {
-            const branch = classToBranch[record.class_id]
-            countByBranch[branch] = (countByBranch[branch] || 0) + 1
-          }
-        })
-
-        return {
-          date: week.displayDate,
-          chienCon: countByBranch['Chiên Con'],
-          auNhi: countByBranch['Ấu Nhi'],
-          thieuNhi: countByBranch['Thiếu Nhi'],
-          nghiaSi: countByBranch['Nghĩa Sĩ'],
-        }
-      })
-
-      setChartData(chartDataItems)
-
-      // Process stats data (total attendance per week)
-      const statsTypes: ('line' | 'bar' | 'progress')[] = ['line', 'bar', 'progress']
-      const statsDataItems: StatsDataItem[] = weeks.map((week, index) => {
-        const weekAttendance = attendanceData?.filter(
-          record => record.attendance_date === week.date
-        ) || []
-
-        return {
-          date: week.fullDisplayDate,
-          value: weekAttendance.length,
-          type: statsTypes[index],
-        }
-      })
-
-      setStatsData(statsDataItems)
-
-      // Process branch stats (most recent week)
-      const mostRecentWeek = weeks[weeks.length - 1]
-      const recentAttendance = attendanceData?.filter(
-        record => record.attendance_date === mostRecentWeek.date
-      ) || []
-
-      const countByBranch: Record<string, number> = {
-        'Chiên Con': 0,
-        'Ấu Nhi': 0,
-        'Thiếu Nhi': 0,
-        'Nghĩa Sĩ': 0,
-      }
-
-      recentAttendance.forEach(record => {
-        if (record.class_id && classToBranch[record.class_id]) {
-          const branch = classToBranch[record.class_id]
-          countByBranch[branch] = (countByBranch[branch] || 0) + 1
-        }
-      })
-
-      // Order: Nghĩa Sĩ (primary), Thiếu Nhi, Ấu Nhi, Chiên Con
-      const branchOrder: Branch[] = ['Nghĩa Sĩ', 'Thiếu Nhi', 'Ấu Nhi', 'Chiên Con']
-      const branchStatsItems: BranchStatsItem[] = branchOrder.map((branch, index) => ({
-        name: branchDisplayNames[branch],
-        value: countByBranch[branch],
-        total: studentCountByBranch[branch],
-        color: index === 0 ? 'primary' : 'default',
-      }))
-
-      setBranchStats(branchStatsItems)
-
-    } catch (error) {
-      console.error('Error fetching attendance data:', error)
-    } finally {
-      setDataLoading(false)
-    }
-  }, [chartType])
-
-  // Fetch available dates for selected day type
-  const fetchAvailableDates = useCallback(async () => {
+  // Compute available dates (pure JS, no DB call)
+  const availableDates = (() => {
     const weeks: DateOption[] = []
     const today = new Date()
-
-    // Target day: 0=Sunday, 4=Thursday
     const targetDay = selectedDayType === 'cn' ? 0 : 4
     const dayPrefix = selectedDayType === 'cn' ? 'CN' : 'T5'
-
-    // Find the most recent target day
     const current = new Date(today)
     const currentDay = current.getDay()
     let daysBack = currentDay - targetDay
     if (daysBack < 0) daysBack += 7
     current.setDate(current.getDate() - daysBack)
-
-    // Get last 8 weeks
     for (let i = 0; i < 8; i++) {
       const weekDate = new Date(current)
       weekDate.setDate(weekDate.getDate() - (i * 7))
-
       const dateStr = weekDate.toISOString().split('T')[0]
       const day = weekDate.getDate()
       const month = weekDate.getMonth() + 1
       const year = weekDate.getFullYear()
-
-      weeks.push({
-        value: dateStr,
-        label: `${dayPrefix} ${day}/${month}/${year}`,
-      })
+      weeks.push({ value: dateStr, label: `${dayPrefix} ${day}/${month}/${year}` })
     }
+    return weeks
+  })()
 
-    setAvailableDates(weeks)
-    if (weeks.length > 0 && !selectedDate) {
-      setSelectedDate(weeks[0].value)
-    }
-  }, [selectedDayType, selectedDate])
-
-  // Fetch class-level attendance data
-  const fetchClassAttendanceData = useCallback(async () => {
-    if (!selectedDate || !selectedBranch) return
-
-    setClassDataLoading(true)
-    try {
-      // Fetch all classes for the selected branch
-      const { data: classesData, error: classesError } = await supabase
-        .from('classes')
-        .select('id, name, branch')
-        .eq('branch', selectedBranch)
-        .eq('status', 'ACTIVE')
-        .order('display_order', { ascending: true })
-
-      if (classesError) throw classesError
-
-      if (!classesData || classesData.length === 0) {
-        setClassStats({
-          totalClasses: 0,
-          totalStudents: 0,
-          presentCount: 0,
-          averageRate: 0,
-        })
-        setClassAttendanceData([])
-        return
-      }
-
-      const classIds = classesData.map(c => c.id)
-
-      // Fetch all students for these classes
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('thieu_nhi')
-        .select('id, class_id')
-        .in('class_id', classIds)
-        .eq('status', 'ACTIVE')
-
-      if (studentsError) throw studentsError
-
-      // Count students by class
-      const studentsByClass: Record<string, number> = {}
-      classIds.forEach(id => { studentsByClass[id] = 0 })
-      studentsData?.forEach(student => {
-        if (student.class_id) {
-          studentsByClass[student.class_id] = (studentsByClass[student.class_id] || 0) + 1
-        }
-      })
-
-      // Fetch attendance records for the selected date
-      const { data: attendanceData, error: attendanceError } = await supabase
-        .from('attendance_records')
-        .select('id, student_id, class_id, status')
-        .in('class_id', classIds)
-        .eq('attendance_date', selectedDate)
-        .eq('day_type', selectedDayType)
-        .eq('status', 'present')
-
-      if (attendanceError) throw attendanceError
-
-      // Count attendance by class
-      const attendanceByClass: Record<string, number> = {}
-      classIds.forEach(id => { attendanceByClass[id] = 0 })
-      attendanceData?.forEach(record => {
-        if (record.class_id) {
-          attendanceByClass[record.class_id] = (attendanceByClass[record.class_id] || 0) + 1
-        }
-      })
-
-      // Build class attendance data
-      const classData: ClassAttendanceData[] = classesData.map(cls => ({
-        classId: cls.id,
-        className: cls.name,
-        totalStudents: studentsByClass[cls.id] || 0,
-        presentCount: attendanceByClass[cls.id] || 0,
-      }))
-
-      setClassAttendanceData(classData)
-
-      // Calculate stats
-      const totalClasses = classesData.length
-      const totalStudents = Object.values(studentsByClass).reduce((a, b) => a + b, 0)
-      const presentCount = Object.values(attendanceByClass).reduce((a, b) => a + b, 0)
-      const averageRate = totalStudents > 0 ? (presentCount / totalStudents) * 100 : 0
-
-      setClassStats({
-        totalClasses,
-        totalStudents,
-        presentCount,
-        averageRate: Math.round(averageRate * 10) / 10,
-      })
-
-    } catch (error) {
-      console.error('Error fetching class attendance data:', error)
-    } finally {
-      setClassDataLoading(false)
-    }
-  }, [selectedBranch, selectedDate, selectedDayType])
-
-  // Update available dates when day type changes
+  // Auto-select first date when day type changes
   useEffect(() => {
-    fetchAvailableDates()
-  }, [selectedDayType, fetchAvailableDates])
-
-  // Fetch class data when branch, date, or day type changes
-  useEffect(() => {
-    if (activeView === 'class' && selectedDate) {
-      fetchClassAttendanceData()
+    if (availableDates.length > 0 && !availableDates.find(d => d.value === selectedDate)) {
+      setSelectedDate(availableDates[0].value)
     }
-  }, [activeView, selectedBranch, selectedDate, selectedDayType, fetchClassAttendanceData])
+  }, [selectedDayType]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // React Query hooks
+  const { data: trendData, isLoading: dataLoading } = usePerformanceTrendData(
+    chartType, !!user && isAdmin
+  )
+  const chartData = trendData?.chartData || []
+  const statsData = trendData?.statsData || []
+  const branchStats = trendData?.branchStats || []
+
+  const { data: classData, isLoading: classDataLoading } = useClassAttendanceData(
+    selectedBranch, selectedDate, selectedDayType,
+    activeView === 'class' && !!selectedDate && !!user && isAdmin
+  )
+  const classStats = classData?.classStats || { totalClasses: 0, totalStudents: 0, presentCount: 0, averageRate: 0 }
+  const classAttendanceData = classData?.classAttendanceData || []
 
   // Auth check
   useEffect(() => {
@@ -1146,12 +820,6 @@ export default function PerformancePage() {
     }
   }, [user, loading, isAdmin, router])
 
-  // Fetch data when chartType changes
-  useEffect(() => {
-    if (user && isAdmin) {
-      fetchAttendanceData()
-    }
-  }, [user, isAdmin, chartType, fetchAttendanceData])
 
   if (loading) {
     return (

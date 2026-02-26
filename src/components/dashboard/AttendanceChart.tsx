@@ -109,7 +109,7 @@ export default function AttendanceChart() {
           <p className="text-xl font-medium text-gray-900 dark:text-white leading-tight">7 ngày qua</p>
         </div>
         <button
-          onClick={() => router.push('/admin/performance')}
+          onClick={() => router.push('/admin/activities')}
           className="w-8 h-8 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
           title="Xem so sánh hiệu suất"
         >

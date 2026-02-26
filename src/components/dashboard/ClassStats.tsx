@@ -267,7 +267,10 @@ export default function ClassStats() {
           <SparkleIcon className="w-6 h-6 text-black dark:text-white" />
           <h3 className="text-base font-semibold text-black dark:text-white">Thống kê lớp</h3>
         </div>
-        <button className="w-[48px] h-[48px] bg-[#F6F6F6] dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+        <button
+          onClick={() => router.push('/admin/performance')}
+          className="w-[48px] h-[48px] bg-[#F6F6F6] dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+        >
           <ArrowIcon className="text-black dark:text-white" />
         </button>
       </div>
