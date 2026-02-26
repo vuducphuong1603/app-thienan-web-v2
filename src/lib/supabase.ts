@@ -222,3 +222,47 @@ export interface WeeklyPlan {
   // Joined data
   plan_categories?: PlanCategory
 }
+
+// User note (personal notes per account)
+export interface UserNote {
+  id: string
+  user_id: string
+  title: string
+  description?: string
+  is_completed: boolean
+  color: string
+  created_at: string
+  updated_at?: string
+}
+
+// Notification types
+export type NotificationTargetType = 'all' | 'role' | 'branch' | 'class' | 'student'
+export type NotificationPriority = 'low' | 'normal' | 'high'
+
+export interface Notification {
+  id: string
+  title: string
+  content: string
+  target_type: NotificationTargetType
+  target_values: string[]
+  priority: NotificationPriority
+  created_by?: string
+  created_at: string
+  updated_at?: string
+}
+
+export interface NotificationRecipient {
+  id: string
+  notification_id: string
+  user_id: string
+  is_read: boolean
+  read_at?: string
+  created_at: string
+}
+
+export interface NotificationWithStatus extends Notification {
+  is_read: boolean
+  read_at?: string
+  recipient_id: string
+  creator_name?: string
+}

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord } from './supabase'
+import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord, NotificationWithStatus, Notification, UserNote } from './supabase'
 
 // ============ Query Keys ============
 export const queryKeys = {
@@ -20,6 +20,10 @@ export const queryKeys = {
   alerts: (filters: Record<string, string>) => ['alerts', filters] as const,
   alertStats: ['alertStats'] as const,
   alertHistory: ['alertHistory'] as const,
+  userNotes: (userId: string) => ['userNotes', userId] as const,
+  notifications: ['notifications'] as const,
+  unreadNotifications: ['notifications', 'unread'] as const,
+  allNotifications: ['notifications', 'all'] as const,
 }
 
 // ============ Dashboard Stats ============
@@ -849,6 +853,188 @@ export function useDashboardAlerts() {
     },
   })
 }
+// ============ User Notes (personal notes) ============
+export function useUserNotes(userId?: string) {
+  return useQuery({
+    queryKey: queryKeys.userNotes(userId || ''),
+    queryFn: async () => {
+      if (!userId) return []
+      const { data, error } = await supabase
+        .from('user_notes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return (data || []) as UserNote[]
+    },
+    enabled: !!userId,
+  })
+}
+
+// ============ My Notifications (all for user) ============
+export function useMyNotifications(userId?: string) {
+  return useQuery({
+    queryKey: [...queryKeys.notifications, userId],
+    queryFn: async () => {
+      if (!userId) return []
+
+      const { data, error } = await supabase
+        .from('notification_recipients')
+        .select(`
+          id,
+          is_read,
+          read_at,
+          notification_id,
+          notifications (
+            id,
+            title,
+            content,
+            target_type,
+            target_values,
+            priority,
+            created_by,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      // Fetch creator names for all unique created_by ids
+      const notifications = (data || [])
+        .filter((r: Record<string, unknown>) => r.notifications)
+        .map((r: Record<string, unknown>) => {
+          const n = r.notifications as Record<string, unknown>
+          return {
+            id: n.id as string,
+            title: n.title as string,
+            content: n.content as string,
+            target_type: n.target_type as string,
+            target_values: n.target_values as string[],
+            priority: n.priority as string,
+            created_by: n.created_by as string | undefined,
+            created_at: n.created_at as string,
+            updated_at: n.updated_at as string | undefined,
+            is_read: r.is_read as boolean,
+            read_at: r.read_at as string | undefined,
+            recipient_id: r.id as string,
+          } as NotificationWithStatus
+        })
+
+      // Get creator names
+      const creatorIds = Array.from(new Set(notifications.map(n => n.created_by).filter(Boolean)))
+      if (creatorIds.length > 0) {
+        const { data: creators } = await supabase
+          .from('users')
+          .select('id, full_name, saint_name')
+          .in('id', creatorIds as string[])
+
+        const creatorMap = new Map(
+          (creators || []).map(c => [c.id, `${c.saint_name || ''} ${c.full_name}`.trim()])
+        )
+        notifications.forEach(n => {
+          if (n.created_by) n.creator_name = creatorMap.get(n.created_by)
+        })
+      }
+
+      return notifications
+    },
+    enabled: !!userId,
+  })
+}
+
+// ============ Unread Notifications (for auto-popup) ============
+export function useUnreadNotifications(userId?: string) {
+  return useQuery({
+    queryKey: [...queryKeys.unreadNotifications, userId],
+    queryFn: async () => {
+      if (!userId) return []
+
+      const { data, error } = await supabase
+        .from('notification_recipients')
+        .select(`
+          id,
+          is_read,
+          read_at,
+          notification_id,
+          notifications (
+            id,
+            title,
+            content,
+            target_type,
+            target_values,
+            priority,
+            created_by,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('is_read', false)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      return (data || [])
+        .filter((r: Record<string, unknown>) => r.notifications)
+        .map((r: Record<string, unknown>) => {
+          const n = r.notifications as Record<string, unknown>
+          return {
+            id: n.id as string,
+            title: n.title as string,
+            content: n.content as string,
+            target_type: n.target_type as string,
+            target_values: n.target_values as string[],
+            priority: n.priority as string,
+            created_by: n.created_by as string | undefined,
+            created_at: n.created_at as string,
+            updated_at: n.updated_at as string | undefined,
+            is_read: false,
+            read_at: undefined,
+            recipient_id: r.id as string,
+          } as NotificationWithStatus
+        })
+    },
+    enabled: !!userId,
+  })
+}
+
+// ============ All Notifications (admin management) ============
+export function useAllNotifications() {
+  return useQuery({
+    queryKey: queryKeys.allNotifications,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      // Get creator names
+      const notifications = (data || []) as Notification[]
+      const creatorIds = Array.from(new Set(notifications.map(n => n.created_by).filter(Boolean)))
+      if (creatorIds.length > 0) {
+        const { data: creators } = await supabase
+          .from('users')
+          .select('id, full_name, saint_name')
+          .in('id', creatorIds as string[])
+
+        const creatorMap = new Map(
+          (creators || []).map(c => [c.id, `${c.saint_name || ''} ${c.full_name}`.trim()])
+        )
+        return notifications.map(n => ({
+          ...n,
+          creator_name: n.created_by ? creatorMap.get(n.created_by) : undefined,
+        }))
+      }
+
+      return notifications.map(n => ({ ...n, creator_name: undefined }))
+    },
+  })
+}
 
 // ============ Invalidation helpers ============
 export function useInvalidateQueries() {
@@ -868,6 +1054,8 @@ export function useInvalidateQueries() {
     invalidateAlertStats: () => queryClient.invalidateQueries({ queryKey: queryKeys.alertStats }),
     invalidateAlertHistory: () => queryClient.invalidateQueries({ queryKey: queryKeys.alertHistory }),
     invalidateDashboardAlerts: () => queryClient.invalidateQueries({ queryKey: ['dashboardAlerts'] }),
+    invalidateUserNotes: () => queryClient.invalidateQueries({ queryKey: ['userNotes'] }),
+    invalidateNotifications: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
     invalidateAll: () => queryClient.invalidateQueries(),
   }
 }

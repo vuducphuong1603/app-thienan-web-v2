@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS } from '@/lib/supabase'
 import { Calendar } from 'lucide-react'
@@ -13,9 +14,12 @@ import {
   AlertsSection,
   ClassStats,
 } from '@/components/dashboard'
+import NotificationPopup from '@/components/notifications/NotificationPopup'
+import NotificationListModal from '@/components/notifications/NotificationListModal'
 
 export default function AdminDashboard() {
   const { user, loading, isAdmin, logout } = useAuth()
+  const [isNotificationListOpen, setIsNotificationListOpen] = useState(false)
 
   const { data: stats, isLoading: loadingStats } = useDashboardStats(!!user && isAdmin)
 
@@ -76,7 +80,10 @@ export default function AdminDashboard() {
               {/* Separator */}
               <div className="w-px h-[34px] bg-black dark:bg-white/40" />
               {/* Notification Button */}
-              <button className="flex items-center gap-2 px-8 py-3.5 bg-[#FA865E] text-white rounded-full hover:bg-[#e8764f] transition-colors shadow-[0px_0px_14px_rgba(110,98,229,0.04)]">
+              <button
+                onClick={() => setIsNotificationListOpen(true)}
+                className="flex items-center gap-2 px-8 py-3.5 bg-[#FA865E] text-white rounded-full hover:bg-[#e8764f] transition-colors shadow-[0px_0px_14px_rgba(110,98,229,0.04)]"
+              >
                 <span className="text-base font-medium">Xem thông báo</span>
               </button>
               {/* Calendar Button */}
@@ -137,6 +144,15 @@ export default function AdminDashboard() {
           </div>
         </div>
       </main>
+
+      {/* Notification Popup (auto-show unread) */}
+      <NotificationPopup />
+
+      {/* Notification List Modal */}
+      <NotificationListModal
+        isOpen={isNotificationListOpen}
+        onClose={() => setIsNotificationListOpen(false)}
+      />
     </div>
   )
 }
