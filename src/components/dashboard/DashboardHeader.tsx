@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Search, Plus } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'

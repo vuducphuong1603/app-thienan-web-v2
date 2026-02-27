@@ -27,6 +27,8 @@ export const queryKeys = {
   unreadNotifications: ['notifications', 'unread'] as const,
   allNotifications: ['notifications', 'all'] as const,
   holidays: (schoolYearId: string) => ['holidays', schoolYearId] as const,
+  glvClassTrend: (classId: string) => ['glvClassTrend', classId] as const,
+  glvPerStudentStats: (classId: string) => ['glvPerStudentStats', classId] as const,
 }
 
 // ============ Dashboard Stats ============
@@ -104,6 +106,162 @@ export function useGLVDashboardStats(user: UserProfile | null) {
       return { branchName, className, studentCount, thu5Rate, cnRate }
     },
     enabled: !!user?.class_id,
+  })
+}
+
+// ============ GLV Class Trend (3 weeks T5 + CN) ============
+interface GLVWeekData {
+  date: string
+  displayDate: string
+  presentCount: number
+  rate: number
+}
+
+interface GLVClassTrendResult {
+  totalStudents: number
+  thu5Weeks: GLVWeekData[]
+  cnWeeks: GLVWeekData[]
+}
+
+export function useGLVClassTrend(classId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.glvClassTrend(classId || ''),
+    queryFn: async (): Promise<GLVClassTrendResult> => {
+      if (!classId) throw new Error('No classId')
+
+      const thu5Weeks = getLast3Weeks('thu5')
+      const cnWeeks = getLast3Weeks('cn')
+
+      // Get student count + attendance for all 6 dates
+      const allDates = [...thu5Weeks.map(w => w.date), ...cnWeeks.map(w => w.date)]
+      const startDate = allDates.reduce((a, b) => (a < b ? a : b))
+      const endDate = allDates.reduce((a, b) => (a > b ? a : b))
+
+      const [studentCountRes, attendanceRes] = await Promise.all([
+        supabase.from('thieu_nhi').select('*', { count: 'exact', head: true })
+          .eq('class_id', classId).eq('status', 'ACTIVE'),
+        supabase.from('attendance_records').select('attendance_date, day_type, student_id')
+          .eq('class_id', classId).eq('status', 'present')
+          .gte('attendance_date', startDate).lte('attendance_date', endDate),
+      ])
+
+      const totalStudents = studentCountRes.count || 0
+      const records = attendanceRes.data || []
+
+      const countByDate = new Map<string, number>()
+      records.forEach(r => {
+        countByDate.set(r.attendance_date, (countByDate.get(r.attendance_date) || 0) + 1)
+      })
+
+      const mapWeek = (weeks: typeof thu5Weeks): GLVWeekData[] =>
+        weeks.map(w => {
+          const presentCount = countByDate.get(w.date) || 0
+          return {
+            date: w.date,
+            displayDate: w.displayDate,
+            presentCount,
+            rate: totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0,
+          }
+        })
+
+      return {
+        totalStudents,
+        thu5Weeks: mapWeek(thu5Weeks),
+        cnWeeks: mapWeek(cnWeeks),
+      }
+    },
+    enabled: enabled && !!classId,
+  })
+}
+
+// ============ GLV Per-Student Stats ============
+interface GLVStudentStat {
+  id: string
+  full_name: string
+  saint_name?: string
+  thu5Count: number
+  cnCount: number
+  thu5Rate: number
+  cnRate: number
+  overallRate: number
+  totalAbsent: number
+}
+
+interface GLVPerStudentResult {
+  students: GLVStudentStat[]
+  effectiveThu5Days: number
+  effectiveCnDays: number
+}
+
+export function useGLVPerStudentStats(classId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.glvPerStudentStats(classId || ''),
+    queryFn: async (): Promise<GLVPerStudentResult> => {
+      if (!classId) throw new Error('No classId')
+
+      // Get school year for holiday calculation
+      const { data: schoolYear } = await supabase
+        .from('school_years').select('id, total_weeks').eq('is_current', true).single()
+
+      const totalWeeks = schoolYear?.total_weeks || 40
+      const schoolYearId = schoolYear?.id
+
+      // Get holidays, students, and all attendance records in parallel
+      const [holidaysRes, studentsRes, attendanceRes] = await Promise.all([
+        schoolYearId
+          ? supabase.from('holidays').select('*').eq('school_year_id', schoolYearId)
+          : Promise.resolve({ data: [] }),
+        supabase.from('thieu_nhi').select('id, full_name, saint_name')
+          .eq('class_id', classId).eq('status', 'ACTIVE').order('full_name'),
+        supabase.from('attendance_records').select('student_id, day_type')
+          .eq('class_id', classId).eq('status', 'present'),
+      ])
+
+      const holidays = (holidaysRes.data || []) as Holiday[]
+      const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
+      const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
+      const effectiveThu5Days = Math.max(1, totalWeeks - thu5Holidays)
+      const effectiveCnDays = Math.max(1, totalWeeks - cnHolidays)
+
+      const students = studentsRes.data || []
+      const records = attendanceRes.data || []
+
+      // Build per-student attendance counts
+      const thu5Map = new Map<string, number>()
+      const cnMap = new Map<string, number>()
+      records.forEach(r => {
+        if (r.day_type === 'thu5') {
+          thu5Map.set(r.student_id, (thu5Map.get(r.student_id) || 0) + 1)
+        } else if (r.day_type === 'cn') {
+          cnMap.set(r.student_id, (cnMap.get(r.student_id) || 0) + 1)
+        }
+      })
+
+      const studentStats: GLVStudentStat[] = students.map(s => {
+        const thu5Count = thu5Map.get(s.id) || 0
+        const cnCount = cnMap.get(s.id) || 0
+        const thu5Rate = Math.round((thu5Count / effectiveThu5Days) * 100)
+        const cnRate = Math.round((cnCount / effectiveCnDays) * 100)
+        const totalDays = effectiveThu5Days + effectiveCnDays
+        const overallRate = totalDays > 0 ? Math.round(((thu5Count + cnCount) / totalDays) * 100) : 0
+        const totalAbsent = (effectiveThu5Days - thu5Count) + (effectiveCnDays - cnCount)
+
+        return {
+          id: s.id,
+          full_name: s.full_name,
+          saint_name: s.saint_name,
+          thu5Count,
+          cnCount,
+          thu5Rate,
+          cnRate,
+          overallRate,
+          totalAbsent: Math.max(0, totalAbsent),
+        }
+      })
+
+      return { students: studentStats, effectiveThu5Days, effectiveCnDays }
+    },
+    enabled: enabled && !!classId,
   })
 }
 
@@ -1209,6 +1367,8 @@ export function useInvalidateQueries() {
     invalidateUserNotes: () => queryClient.invalidateQueries({ queryKey: ['userNotes'] }),
     invalidateNotifications: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
     invalidateHolidays: () => queryClient.invalidateQueries({ queryKey: ['holidays'] }),
+    invalidateGLVClassTrend: () => queryClient.invalidateQueries({ queryKey: ['glvClassTrend'] }),
+    invalidateGLVPerStudentStats: () => queryClient.invalidateQueries({ queryKey: ['glvPerStudentStats'] }),
     invalidateAll: () => queryClient.invalidateQueries(),
   }
 }

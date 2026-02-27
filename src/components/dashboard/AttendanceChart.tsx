@@ -98,8 +98,8 @@ export default function AttendanceChart({ classId }: AttendanceChartProps) {
           <p className="text-xl font-medium text-gray-900 dark:text-white leading-tight">7 ngày qua</p>
         </div>
         <button
-          onClick={() => !classId && router.push('/admin/activities')}
-          className={`w-8 h-8 bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center transition-colors ${classId ? 'opacity-50 cursor-default' : 'hover:bg-gray-200 dark:hover:bg-white/20'}`}
+          onClick={() => router.push(classId ? '/dashboard/performance' : '/admin/activities')}
+          className="w-8 h-8 bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center transition-colors hover:bg-gray-200 dark:hover:bg-white/20"
           title="Xem so sánh hiệu suất"
         >
           <ArrowUpRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />

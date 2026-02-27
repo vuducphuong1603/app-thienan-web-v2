@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAbsentStudents } from '@/lib/queries'
 
 // Avatar color palette based on name initial
@@ -46,6 +47,7 @@ interface AbsentStudentsListProps {
 }
 
 export default function AbsentStudentsList({ classId, className: clsName }: AbsentStudentsListProps) {
+  const router = useRouter()
   const [dayType, setDayType] = useState<'cn' | 'thu5'>('cn')
   const { data, isLoading } = useAbsentStudents(classId, dayType)
 
@@ -72,7 +74,11 @@ export default function AbsentStudentsList({ classId, className: clsName }: Abse
             Danh sách các em vắng đi lễ<br />và học giáo lý
           </h3>
         </div>
-        <button className="w-[48px] h-[48px] bg-[#F6F6F6] dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors flex-shrink-0">
+        <button
+          onClick={() => router.push('/dashboard/performance')}
+          className="w-[48px] h-[48px] bg-[#F6F6F6] dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors flex-shrink-0"
+          title="Xem hiệu suất lớp"
+        >
           <ArrowIcon className="text-black dark:text-white" />
         </button>
       </div>
