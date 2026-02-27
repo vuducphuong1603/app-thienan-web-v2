@@ -68,7 +68,7 @@ export default function AbsentStudentsList({ classId, className: clsName }: Abse
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <SparkleIcon className="w-6 h-6 text-black dark:text-white flex-shrink-0" />
-          <h3 className="text-base font-semibold text-black dark:text-white leading-snug">
+          <h3 className="text-lg font-semibold text-black dark:text-white leading-snug">
             Danh sách các em vắng đi lễ<br />và học giáo lý
           </h3>
         </div>

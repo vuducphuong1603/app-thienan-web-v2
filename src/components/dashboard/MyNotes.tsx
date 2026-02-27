@@ -282,7 +282,7 @@ export default function MyNotes() {
       <div className="bg-white dark:bg-white/10 rounded-[15px] p-4 border border-gray-100 dark:border-white/10 h-full flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between h-10 mb-3 flex-shrink-0">
-          <h3 className="text-base font-semibold text-black dark:text-white">Ghi chú của tôi</h3>
+          <h3 className="text-lg font-semibold text-black dark:text-white">Ghi chú của tôi</h3>
           <div className="relative" ref={headerMenuRef}>
             <button
               onClick={() => setShowHeaderMenu(!showHeaderMenu)}

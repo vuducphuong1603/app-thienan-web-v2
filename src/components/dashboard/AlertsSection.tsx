@@ -29,7 +29,7 @@ export default function AlertsSection() {
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-          <h3 className="text-sm font-semibold text-black dark:text-white">Hệ thống cảnh báo</h3>
+          <h3 className="text-lg font-semibold text-black dark:text-white">Hệ thống cảnh báo</h3>
         </div>
         <Link
           href="/admin/alerts"
