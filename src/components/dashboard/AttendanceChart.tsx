@@ -31,38 +31,41 @@ function getRecentDays() {
   return { lastThursday, lastSunday }
 }
 
-export default function AttendanceChart() {
+interface AttendanceChartProps {
+  classId?: string
+}
+
+export default function AttendanceChart({ classId }: AttendanceChartProps) {
   const router = useRouter()
 
   const { data = [
     { label: 'Thứ 5', present: 0, absent: 0 },
     { label: 'Chúa nhật', present: 0, absent: 0 },
   ], isLoading: loading } = useQuery<DayData[]>({
-    queryKey: ['attendanceChart7Days'],
+    queryKey: ['attendanceChart7Days', classId || 'all'],
     queryFn: async () => {
       const { lastThursday, lastSunday } = getRecentDays()
 
+      // Build total students query (optionally filtered by class)
+      let totalQuery = supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE')
+      if (classId) totalQuery = totalQuery.eq('class_id', classId)
+
+      // Build attendance queries (optionally filtered by class)
+      const buildAttendanceQuery = (date: string, dayType: string) => {
+        let q = supabase.from('attendance_records').select('*', { count: 'exact', head: true })
+          .eq('attendance_date', date).eq('day_type', dayType).eq('status', 'present')
+        if (classId) q = q.eq('class_id', classId)
+        return q
+      }
+
       // Fetch all counts in parallel
       const [totalRes, thu5Res, cnRes] = await Promise.all([
-        supabase
-          .from('thieu_nhi')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'ACTIVE'),
+        totalQuery,
         lastThursday
-          ? supabase
-              .from('attendance_records')
-              .select('*', { count: 'exact', head: true })
-              .eq('attendance_date', lastThursday)
-              .eq('day_type', 'thu5')
-              .eq('status', 'present')
+          ? buildAttendanceQuery(lastThursday, 'thu5')
           : Promise.resolve({ count: 0 }),
         lastSunday
-          ? supabase
-              .from('attendance_records')
-              .select('*', { count: 'exact', head: true })
-              .eq('attendance_date', lastSunday)
-              .eq('day_type', 'cn')
-              .eq('status', 'present')
+          ? buildAttendanceQuery(lastSunday, 'cn')
           : Promise.resolve({ count: 0 }),
       ])
 
@@ -95,8 +98,8 @@ export default function AttendanceChart() {
           <p className="text-xl font-medium text-gray-900 dark:text-white leading-tight">7 ngày qua</p>
         </div>
         <button
-          onClick={() => router.push('/admin/activities')}
-          className="w-8 h-8 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+          onClick={() => !classId && router.push('/admin/activities')}
+          className={`w-8 h-8 bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center transition-colors ${classId ? 'opacity-50 cursor-default' : 'hover:bg-gray-200 dark:hover:bg-white/20'}`}
           title="Xem so sánh hiệu suất"
         >
           <ArrowUpRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />

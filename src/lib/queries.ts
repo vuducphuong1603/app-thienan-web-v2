@@ -10,6 +10,8 @@ export const queryKeys = {
   branches: ['branches'] as const,
   schoolYear: ['schoolYear', 'current'] as const,
   dashboardStats: ['dashboardStats'] as const,
+  glvDashboardStats: (classId: string) => ['glvDashboardStats', classId] as const,
+  absentStudents: (classId: string, dayType: string) => ['absentStudents', classId, dayType] as const,
   classStats: ['classStats'] as const,
   planCategories: ['planCategories'] as const,
   weeklyPlans: (weekStart: string) => ['weeklyPlans', weekStart] as const,
@@ -46,6 +48,114 @@ export function useDashboardStats(enabled = true) {
       }
     },
     enabled,
+  })
+}
+
+// ============ GLV Dashboard Stats ============
+function getRecentDay(dayType: 'cn' | 'thu5'): string | null {
+  const today = new Date()
+  const targetDay = dayType === 'cn' ? 0 : 4
+  for (let i = 0; i <= 7; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    if (d.getDay() === targetDay) {
+      return d.toISOString().split('T')[0]
+    }
+  }
+  return null
+}
+
+export function useGLVDashboardStats(user: UserProfile | null) {
+  const classId = user?.class_id || ''
+  return useQuery({
+    queryKey: queryKeys.glvDashboardStats(classId),
+    queryFn: async () => {
+      if (!user?.class_id) throw new Error('No class_id')
+
+      // Get class info (for branch name) and student count in parallel
+      const [classRes, studentCountRes] = await Promise.all([
+        supabase.from('classes').select('id, name, branch').eq('id', user.class_id).single(),
+        supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('class_id', user.class_id).eq('status', 'ACTIVE'),
+      ])
+
+      const className = classRes.data?.name || ''
+      const branchName = classRes.data?.branch || user.branch || ''
+      const studentCount = studentCountRes.count || 0
+
+      // Get recent Thursday and Sunday dates
+      const lastThu5 = getRecentDay('thu5')
+      const lastCN = getRecentDay('cn')
+
+      // Fetch attendance for both days
+      const [thu5Res, cnRes] = await Promise.all([
+        lastThu5
+          ? supabase.from('attendance_records').select('*', { count: 'exact', head: true })
+              .eq('class_id', user.class_id).eq('attendance_date', lastThu5).eq('day_type', 'thu5').eq('status', 'present')
+          : Promise.resolve({ count: 0 }),
+        lastCN
+          ? supabase.from('attendance_records').select('*', { count: 'exact', head: true })
+              .eq('class_id', user.class_id).eq('attendance_date', lastCN).eq('day_type', 'cn').eq('status', 'present')
+          : Promise.resolve({ count: 0 }),
+      ])
+
+      const thu5Rate = studentCount > 0 ? Math.round(((thu5Res.count || 0) / studentCount) * 100) : 0
+      const cnRate = studentCount > 0 ? Math.round(((cnRes.count || 0) / studentCount) * 100) : 0
+
+      return { branchName, className, studentCount, thu5Rate, cnRate }
+    },
+    enabled: !!user?.class_id,
+  })
+}
+
+// ============ Absent Students (for GLV dashboard) ============
+interface AbsentStudent {
+  id: string
+  full_name: string
+  saint_name?: string
+  student_code?: string
+  date_of_birth?: string
+  avatar_url?: string
+}
+
+interface AbsentStudentsResult {
+  totalStudents: number
+  presentCount: number
+  absentCount: number
+  absentStudents: AbsentStudent[]
+  date: string | null
+}
+
+export function useAbsentStudents(classId: string | undefined, dayType: 'cn' | 'thu5' = 'cn') {
+  return useQuery({
+    queryKey: queryKeys.absentStudents(classId || '', dayType),
+    queryFn: async (): Promise<AbsentStudentsResult> => {
+      if (!classId) throw new Error('No classId')
+
+      const date = getRecentDay(dayType)
+      if (!date) return { totalStudents: 0, presentCount: 0, absentCount: 0, absentStudents: [], date: null }
+
+      // Fetch all active students in class and attendance records in parallel
+      const [studentsRes, attendanceRes] = await Promise.all([
+        supabase.from('thieu_nhi').select('id, full_name, saint_name, student_code, date_of_birth, avatar_url')
+          .eq('class_id', classId).eq('status', 'ACTIVE').order('full_name'),
+        supabase.from('attendance_records').select('student_id')
+          .eq('class_id', classId).eq('attendance_date', date).eq('day_type', dayType).eq('status', 'present'),
+      ])
+
+      const students = (studentsRes.data || []) as AbsentStudent[]
+      const presentIds = new Set((attendanceRes.data || []).map(r => r.student_id))
+
+      const absentStudents = students.filter(s => !presentIds.has(s.id))
+
+      return {
+        totalStudents: students.length,
+        presentCount: presentIds.size,
+        absentCount: absentStudents.length,
+        absentStudents,
+        date,
+      }
+    },
+    enabled: !!classId,
   })
 }
 

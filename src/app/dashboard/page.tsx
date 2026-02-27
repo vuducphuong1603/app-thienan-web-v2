@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS } from '@/lib/supabase'
+import { useGLVDashboardStats } from '@/lib/queries'
 import { Calendar } from 'lucide-react'
 import DashboardHeader from '@/components/dashboard/DashboardHeader'
 import StatsCard from '@/components/dashboard/StatsCard'
@@ -10,13 +11,14 @@ import WeeklyCalendar from '@/components/dashboard/WeeklyCalendar'
 import MyNotes from '@/components/dashboard/MyNotes'
 import AttendanceChart from '@/components/dashboard/AttendanceChart'
 import AlertsSection from '@/components/dashboard/AlertsSection'
-import ClassStats from '@/components/dashboard/ClassStats'
+import AbsentStudentsList from '@/components/dashboard/AbsentStudentsList'
 import NotificationPopup from '@/components/notifications/NotificationPopup'
 import NotificationListModal from '@/components/notifications/NotificationListModal'
 
 export default function UserDashboard() {
   const { user, logout } = useAuth()
   const [isNotificationListOpen, setIsNotificationListOpen] = useState(false)
+  const { data: glvStats } = useGLVDashboardStats(user)
 
   if (!user) {
     return null
@@ -83,27 +85,27 @@ export default function UserDashboard() {
           {/* Stats Cards */}
           <div className="grid grid-cols-4 gap-3">
             <StatsCard
-              title="Tổng số ngành"
-              value={4}
+              title="Ngành"
+              value={glvStats?.branchName || '...'}
               icon="branch"
               variant="primary"
               chart="line"
             />
             <StatsCard
-              title="Tổng số lớp"
-              value={42}
-              icon="class"
-              chart="bar"
-            />
-            <StatsCard
               title="Tổng thiếu nhi"
-              value={1364}
+              value={glvStats?.studentCount ?? '...'}
               icon="student"
               chart="people"
             />
             <StatsCard
-              title="Giáo lý viên"
-              value={87}
+              title="Tỉ lệ đi lễ thứ 5"
+              value={glvStats ? `${glvStats.thu5Rate}%` : '...'}
+              icon="class"
+              chart="bar"
+            />
+            <StatsCard
+              title="Tỉ lệ đi lễ chủ nhật"
+              value={glvStats ? `${glvStats.cnRate}%` : '...'}
               icon="teacher"
               chart="wave"
             />
@@ -114,12 +116,15 @@ export default function UserDashboard() {
             {/* Row 1: MyNotes, WeeklyCalendar */}
             <MyNotes />
             <WeeklyCalendar currentWeek={3} activitiesCount={3} />
-            {/* ClassStats spans 2 rows */}
+            {/* AbsentStudentsList spans 2 rows */}
             <div className="row-span-2">
-              <ClassStats />
+              <AbsentStudentsList
+                classId={user.class_id}
+                className={glvStats?.className}
+              />
             </div>
             {/* Row 2: AttendanceChart, AlertsSection */}
-            <AttendanceChart />
+            <AttendanceChart classId={user.class_id} />
             <AlertsSection />
           </div>
         </div>
