@@ -137,11 +137,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(profile)
           localStorage.setItem('thien_an_user', JSON.stringify(profile))
         }
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        // Token was auto-refreshed — session is still alive, no action needed
       }
     })
 
+    // Session recovery when tab becomes visible after idle
+    let lastHiddenAt = 0
+    const IDLE_THRESHOLD = 5 * 60 * 1000 // 5 minutes
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'hidden') {
+        lastHiddenAt = Date.now()
+        return
+      }
+
+      // Only check session if tab was hidden for >5 minutes
+      if (lastHiddenAt === 0 || Date.now() - lastHiddenAt < IDLE_THRESHOLD) return
+
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession()
+        if (!currentSession) {
+          // Session gone — try to refresh
+          const { error } = await supabase.auth.refreshSession()
+          if (error) {
+            // Refresh failed — force logout
+            setUser(null)
+            localStorage.removeItem('thien_an_user')
+            router.push('/login')
+          }
+        }
+      } catch {
+        // Network error or other issue — don't force logout, let next interaction handle it
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     return () => {
       subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

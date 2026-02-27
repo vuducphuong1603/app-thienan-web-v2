@@ -3,6 +3,23 @@
 import { useState } from 'react'
 import { useAbsentStudents } from '@/lib/queries'
 
+// Avatar color palette based on name initial
+const avatarPalette: [string, string][] = [
+  ['#FEE2E2', '#DC2626'], // rose
+  ['#DBEAFE', '#2563EB'], // blue
+  ['#D1FAE5', '#059669'], // emerald
+  ['#EDE9FE', '#7C3AED'], // violet
+  ['#FEF3C7', '#D97706'], // amber
+  ['#CFFAFE', '#0891B2'], // cyan
+  ['#FCE7F3', '#DB2777'], // pink
+  ['#E0E7FF', '#4F46E5'], // indigo
+]
+
+function getAvatarColor(name: string): [string, string] {
+  const code = name?.charCodeAt(0) || 0
+  return avatarPalette[code % avatarPalette.length]
+}
+
 // Sparkle Icon (reused from ClassStats pattern)
 function SparkleIcon({ className }: { className?: string }) {
   return (
@@ -39,37 +56,28 @@ export default function AbsentStudentsList({ classId, className: clsName }: Abse
   const presentPct = totalStudents > 0 ? (presentCount / totalStudents) * 100 : 0
   const absentPct = totalStudents > 0 ? (absentCount / totalStudents) * 100 : 0
 
-  const formatDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return ''
-    const d = new Date(dateStr)
-    return `${d.getDate()}/${d.getMonth() + 1}`
-  }
-
   const getAge = (dob?: string) => {
     if (!dob) return null
     const birthDate = new Date(dob)
     return Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
   }
 
-  const dayLabel = dayType === 'cn' ? 'Chủ nhật' : 'Thứ 5'
-
   return (
-    <div className="bg-white dark:bg-white/10 rounded-[15px] p-4 border border-gray-100 dark:border-white/10 flex flex-col h-full">
+    <div className="bg-white dark:bg-white/10 rounded-[15px] p-4 border border-gray-100 dark:border-white/10 flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <SparkleIcon className="w-6 h-6 text-black dark:text-white" />
-          <div>
-            <h3 className="text-sm font-semibold text-black dark:text-white leading-tight">Danh sách các em vắng đi lễ</h3>
-            <h3 className="text-sm font-semibold text-black dark:text-white leading-tight">và học giáo lý</h3>
-          </div>
+          <SparkleIcon className="w-6 h-6 text-black dark:text-white flex-shrink-0" />
+          <h3 className="text-base font-semibold text-black dark:text-white leading-snug">
+            Danh sách các em vắng đi lễ<br />và học giáo lý
+          </h3>
         </div>
-        <button className="w-[48px] h-[48px] bg-[#F6F6F6] dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+        <button className="w-[48px] h-[48px] bg-[#F6F6F6] dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full flex items-center justify-center transition-colors flex-shrink-0">
           <ArrowIcon className="text-black dark:text-white" />
         </button>
       </div>
 
-      {/* Class name display + Day toggle */}
+      {/* Class name + Day toggle */}
       <div className="flex items-center justify-between mb-3 flex-shrink-0">
         {clsName && (
           <div className="bg-[#F6F6F6] dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg px-3 py-1.5">
@@ -107,40 +115,38 @@ export default function AbsentStudentsList({ classId, className: clsName }: Abse
       ) : (
         <>
           {/* Stats summary */}
-          <div className="space-y-2 mb-3 flex-shrink-0">
+          <div className="space-y-1.5 mb-3 flex-shrink-0">
             {/* Total */}
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-[#666D80] dark:text-gray-400">Tổng số ({dayLabel} {formatDate(data?.date)})</span>
-              <span className="text-[10px] font-medium text-gray-900 dark:text-white">{totalStudents}</span>
+              <span className="text-[11px] text-[#666D80] dark:text-gray-400">Tổng số</span>
+              <span className="text-[11px] font-medium text-gray-900 dark:text-white">{totalStudents}</span>
             </div>
 
             {/* Present bar */}
-            <div>
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-[10px] text-[#666D80] dark:text-gray-400">Có mặt</span>
-                <span className="text-[10px] font-medium text-gray-900 dark:text-white">{presentCount}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-[#666D80] dark:text-gray-400 w-12 flex-shrink-0">Có mặt</span>
+              <div className="flex-1 h-[8px] bg-[#E5E1DC] dark:bg-white/10 rounded-full overflow-hidden">
+                {presentPct > 0 && (
+                  <div className="h-full bg-[#FA865E] rounded-full" style={{ width: `${presentPct}%` }} />
+                )}
               </div>
-              <div className="flex h-[9px] rounded-full overflow-hidden">
-                <div className="bg-[#FA865E] rounded-l-[5px]" style={{ width: `${Math.max(presentPct, 2)}%` }} />
-                <div className="bg-[#E5E1DC] dark:bg-white/20 rounded-r-[5px] flex-1" />
-              </div>
+              <span className="text-[11px] font-medium text-gray-900 dark:text-white w-6 text-right flex-shrink-0">{presentCount}</span>
             </div>
 
             {/* Absent bar */}
-            <div>
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-[10px] text-[#666D80] dark:text-gray-400">Vắng</span>
-                <span className="text-[10px] font-medium text-gray-900 dark:text-white">{absentCount}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-[#666D80] dark:text-gray-400 w-12 flex-shrink-0">Vắng</span>
+              <div className="flex-1 h-[8px] bg-[#E5E1DC] dark:bg-white/10 rounded-full overflow-hidden">
+                {absentPct > 0 && (
+                  <div className="h-full bg-[#3B82F6] rounded-full" style={{ width: `${absentPct}%` }} />
+                )}
               </div>
-              <div className="flex h-[9px] rounded-full overflow-hidden">
-                <div className="bg-[#9CA3AF] rounded-l-[5px]" style={{ width: `${Math.max(absentPct, 2)}%` }} />
-                <div className="bg-[#E5E1DC] dark:bg-white/20 rounded-r-[5px] flex-1" />
-              </div>
+              <span className="text-[11px] font-medium text-gray-900 dark:text-white w-6 text-right flex-shrink-0">{absentCount}</span>
             </div>
           </div>
 
-          {/* Absent students list */}
-          <div className="flex-1 overflow-auto space-y-0 min-h-0">
+          {/* Absent students list - scrollable */}
+          <div className="flex-1 overflow-y-scroll min-h-0 -mx-4 px-4">
             {absentStudents.length === 0 ? (
               <div className="flex items-center justify-center h-20 text-xs text-gray-400 dark:text-gray-500">
                 Không có em nào vắng
@@ -148,18 +154,21 @@ export default function AbsentStudentsList({ classId, className: clsName }: Abse
             ) : (
               absentStudents.map((student, index) => {
                 const age = getAge(student.date_of_birth)
+                const initial = student.full_name?.charAt(0) || '?'
+                const [bgColor, textColor] = getAvatarColor(student.full_name || '')
                 return (
                   <div key={student.id}>
                     {index > 0 && <div className="border-t border-gray-100 dark:border-white/10" />}
                     <div className="flex items-center gap-3 py-2.5">
-                      {/* Avatar */}
-                      <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-white/20 flex-shrink-0 overflow-hidden">
+                      {/* Colored Avatar */}
+                      <div
+                        className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-semibold"
+                        style={{ backgroundColor: bgColor, color: textColor }}
+                      >
                         {student.avatar_url ? (
-                          <img src={student.avatar_url} alt="" className="w-full h-full object-cover" />
+                          <img src={student.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xs font-medium text-gray-500 dark:text-gray-400">
-                            {student.full_name?.charAt(0) || '?'}
-                          </div>
+                          initial
                         )}
                       </div>
 
@@ -175,7 +184,7 @@ export default function AbsentStudentsList({ classId, className: clsName }: Abse
 
                       {/* Age badge */}
                       {age && (
-                        <span className="bg-brand/10 text-brand text-[10px] font-medium px-1.5 py-0.5 rounded-md flex-shrink-0">
+                        <span className="bg-brand/10 text-brand text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0">
                           {age}t
                         </span>
                       )}

@@ -83,7 +83,7 @@ export default function UserDashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-4">
             <StatsCard
               title="Ngành"
               value={glvStats?.branchName || '...'}
@@ -111,20 +111,24 @@ export default function UserDashboard() {
             />
           </div>
 
-          {/* Middle & Bottom Section */}
-          <div className="grid grid-cols-[1fr_1fr_320px] grid-rows-[310px_auto] gap-3">
-            {/* Row 1: MyNotes, WeeklyCalendar */}
-            <MyNotes />
+          {/* Middle & Bottom Section - 3 columns, 2 rows layout (same as admin) */}
+          <div className="grid grid-cols-3 grid-rows-[1.4fr_1fr] gap-4 h-[calc(100vh-310px)]">
+            {/* Row 1, Col 1 - Notes */}
+            <div className="space-y-4">
+              <MyNotes />
+            </div>
+            {/* Row 1, Col 2 - Weekly Calendar */}
             <WeeklyCalendar currentWeek={3} activitiesCount={3} />
-            {/* AbsentStudentsList spans 2 rows */}
-            <div className="row-span-2">
+            {/* Row 1-2, Col 3 - AbsentStudentsList spans 2 rows, overflow hidden so list scrolls internally */}
+            <div className="row-span-2 min-h-0 overflow-hidden">
               <AbsentStudentsList
                 classId={user.class_id}
                 className={glvStats?.className}
               />
             </div>
-            {/* Row 2: AttendanceChart, AlertsSection */}
+            {/* Row 2, Col 1 - Attendance Chart */}
             <AttendanceChart classId={user.class_id} />
+            {/* Row 2, Col 2 - Alerts Section */}
             <AlertsSection />
           </div>
         </div>
