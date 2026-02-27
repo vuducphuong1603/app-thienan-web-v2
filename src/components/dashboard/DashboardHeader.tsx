@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Search, Plus } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import UserDropdown from './UserDropdown'
+import { useAuth } from '@/lib/auth-context'
 
 interface DashboardHeaderProps {
   userName: string
@@ -15,8 +16,15 @@ interface DashboardHeaderProps {
   onLogout?: () => void
 }
 
-const navTabs = [
+const adminNavTabs = [
   { id: 'overview', label: 'Tổng quan', href: '/admin/dashboard' },
+  { id: 'management', label: 'Quản lý', href: '/admin/management/users' },
+  { id: 'activities', label: 'Hoạt động', href: '/admin/activities' },
+  { id: 'system', label: 'Hệ thống', href: '/admin/settings' },
+]
+
+const glvNavTabs = [
+  { id: 'overview', label: 'Tổng quan', href: '/dashboard' },
   { id: 'management', label: 'Quản lý', href: '/admin/management/users' },
   { id: 'activities', label: 'Hoạt động', href: '/admin/activities' },
   { id: 'system', label: 'Hệ thống', href: '/admin/settings' },
@@ -30,7 +38,11 @@ export default function DashboardHeader({
   userEmail = '',
   onLogout = () => {},
 }: DashboardHeaderProps) {
+  const { user } = useAuth()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const isAdmin = user?.role === 'admin'
+  const navTabs = isAdmin ? adminNavTabs : glvNavTabs
+  const homeHref = isAdmin ? '/admin/dashboard' : '/dashboard'
 
   const handleAvatarClick = () => {
     setIsDropdownOpen(!isDropdownOpen)
@@ -42,7 +54,7 @@ export default function DashboardHeader({
         {/* Left: Logo + Navigation */}
         <div className="flex items-center gap-20">
           {/* Logo */}
-          <Link href="/admin/dashboard" className="w-[52px] h-[52px] rounded-full overflow-hidden flex-shrink-0">
+          <Link href={homeHref} className="w-[52px] h-[52px] rounded-full overflow-hidden flex-shrink-0">
             <Image
               src="/logo.png"
               alt="Giáo Xứ Thiên Ân"
