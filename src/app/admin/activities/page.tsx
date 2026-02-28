@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear, Holiday } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarDays, Bell, ShieldAlert } from 'lucide-react'
@@ -11,6 +11,8 @@ import AttendanceConfirmModal from '@/components/AttendanceConfirmModal'
 import ImportExcelModal from '@/components/ImportExcelModal'
 import ExportSuccessModal from '@/components/ExportSuccessModal'
 import ReportExportTemplate from '@/components/ReportExportTemplate'
+import PriestReportTemplate from '@/components/PriestReportTemplate'
+import type { PriestReportData, PriestReportBranchData, PriestReportClassData } from '@/components/PriestReportTemplate'
 import html2canvas from 'html2canvas'
 
 // Report related interfaces
@@ -44,6 +46,8 @@ interface ReportStudentScore {
 type TimeFilterMode = 'week' | 'dateRange' | 'month'
 type ReportType = 'attendance' | 'score'
 type AttendanceTypeFilter = 'all' | 'thu5' | 'cn'
+type ReportStyleType = 'parent' | 'priest'
+type PriestTimeFilterMode = 'week' | 'month' | 'year'
 
 interface StudentWithAttendance extends ThieuNhiProfile {
   class_name?: string
@@ -132,6 +136,24 @@ export default function ActivitiesPage() {
   const [reportHolidayMap, setReportHolidayMap] = useState<Map<string, { name: string; day_type: string }>>(new Map())
   // Current attendance date holiday warning
   const [currentDateHoliday, setCurrentDateHoliday] = useState<{ name: string; day_type: string } | null>(null)
+
+  // Priest report states
+  const priestReportExportRef = useRef<HTMLDivElement>(null)
+  const [reportStyle, setReportStyle] = useState<ReportStyleType>('parent')
+  const [priestTimeFilterMode, setPriestTimeFilterMode] = useState<PriestTimeFilterMode>('month')
+  const [priestMonth, setPriestMonth] = useState<number>(new Date().getMonth())
+  const [priestYear, setPriestYear] = useState<number>(new Date().getFullYear())
+  const [priestWeekStart, setPriestWeekStart] = useState<string>('')
+  const [priestWeekEnd, setPriestWeekEnd] = useState<string>('')
+  const [priestSchoolYearId, setPriestSchoolYearId] = useState<string>('')
+  const [priestAttendanceType, setPriestAttendanceType] = useState<AttendanceTypeFilter>('all')
+  const [priestReportData, setPriestReportData] = useState<PriestReportData | null>(null)
+  const [priestReportLoading, setPriestReportLoading] = useState(false)
+  const [isPriestReportGenerated, setIsPriestReportGenerated] = useState(false)
+  const [isPriestMonthDropdownOpen, setIsPriestMonthDropdownOpen] = useState(false)
+  const [isPriestWeekPickerOpen, setIsPriestWeekPickerOpen] = useState(false)
+  const [isPriestSchoolYearDropdownOpen, setIsPriestSchoolYearDropdownOpen] = useState(false)
+  const [isPriestAttendanceTypeDropdownOpen, setIsPriestAttendanceTypeDropdownOpen] = useState(false)
 
   // Report dropdown states
   const [isReportClassDropdownOpen, setIsReportClassDropdownOpen] = useState(false)
@@ -236,6 +258,7 @@ export default function ActivitiesPage() {
       setSchoolYears(allYears)
       const current = allYears.find(y => y.is_current) || allYears[0]
       setSchoolYear(current)
+      setPriestSchoolYearId(current.id)
     }
   }, [])
 
@@ -1068,6 +1091,10 @@ export default function ActivitiesPage() {
     setIsReportWeekPickerOpen(false)
     setIsReportMonthDropdownOpen(false)
     setIsReportSchoolYearDropdownOpen(false)
+    setIsPriestMonthDropdownOpen(false)
+    setIsPriestWeekPickerOpen(false)
+    setIsPriestSchoolYearDropdownOpen(false)
+    setIsPriestAttendanceTypeDropdownOpen(false)
   }, [])
 
   const closeAllReportDropdowns = () => {
@@ -1080,6 +1107,10 @@ export default function ActivitiesPage() {
     setIsReportWeekPickerOpen(false)
     setIsReportMonthDropdownOpen(false)
     setIsReportSchoolYearDropdownOpen(false)
+    setIsPriestMonthDropdownOpen(false)
+    setIsPriestWeekPickerOpen(false)
+    setIsPriestSchoolYearDropdownOpen(false)
+    setIsPriestAttendanceTypeDropdownOpen(false)
   }
 
   // Close all dropdowns when clicking outside
@@ -1512,6 +1543,309 @@ export default function ActivitiesPage() {
     }
   }
 
+  // Generate priest report
+  const generatePriestReport = async () => {
+    setPriestReportLoading(true)
+    try {
+      // 1. Determine date range
+      let fromDate: string
+      let toDate: string
+      let timeLabel: string
+
+      if (priestTimeFilterMode === 'week') {
+        if (!priestWeekStart || !priestWeekEnd) {
+          showNotification('error', 'Vui lòng chọn tuần')
+          setPriestReportLoading(false)
+          return
+        }
+        fromDate = priestWeekStart
+        toDate = priestWeekEnd
+        timeLabel = `Tuần: ${formatDisplayDate(fromDate)} - ${formatDisplayDate(toDate)}`
+      } else if (priestTimeFilterMode === 'month') {
+        const firstDay = new Date(priestYear, priestMonth, 1)
+        const lastDay = new Date(priestYear, priestMonth + 1, 0)
+        fromDate = firstDay.toISOString().split('T')[0]
+        toDate = lastDay.toISOString().split('T')[0]
+        timeLabel = `Tháng ${priestMonth + 1}/${priestYear}`
+      } else {
+        // year mode - use school year dates
+        const selectedSY = schoolYears.find(sy => sy.id === priestSchoolYearId)
+        if (!selectedSY) {
+          showNotification('error', 'Vui lòng chọn năm học')
+          setPriestReportLoading(false)
+          return
+        }
+        fromDate = selectedSY.start_date
+        toDate = selectedSY.end_date
+        timeLabel = `Năm học: ${selectedSY.name}`
+      }
+
+      // 2. Fetch all active classes
+      const { data: allClasses, error: classError } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('status', 'ACTIVE')
+        .order('display_order', { ascending: true })
+
+      if (classError || !allClasses) {
+        throw classError || new Error('No classes found')
+      }
+
+      // 3. Count students per class
+      const classStudentCounts = new Map<string, number>()
+      for (const cls of allClasses) {
+        const { count } = await supabase
+          .from('thieu_nhi')
+          .select('*', { count: 'exact', head: true })
+          .eq('class_id', cls.id)
+          .eq('status', 'ACTIVE')
+        classStudentCounts.set(cls.id, count || 0)
+      }
+
+      // 4. Count attendance dates (thu5/cn) in the range, excluding holidays
+      const schoolYearForHolidays = priestTimeFilterMode === 'year'
+        ? schoolYears.find(sy => sy.id === priestSchoolYearId)
+        : schoolYear
+
+      const holidayDates = new Set<string>()
+      if (schoolYearForHolidays?.id) {
+        const { data: holidays } = await supabase
+          .from('holidays')
+          .select('holiday_date, day_type')
+          .eq('school_year_id', schoolYearForHolidays.id)
+          .gte('holiday_date', fromDate)
+          .lte('holiday_date', toDate)
+
+        if (holidays) {
+          holidays.forEach(h => {
+            if (priestAttendanceType === 'all' || h.day_type === 'both' || h.day_type === priestAttendanceType) {
+              holidayDates.add(h.holiday_date)
+            }
+          })
+        }
+      }
+
+      // Count valid attendance days in range
+      const countAttendanceDays = () => {
+        let count = 0
+        const current = new Date(fromDate)
+        const end = new Date(toDate)
+        while (current <= end) {
+          const dateStr = current.toISOString().split('T')[0]
+          const dayIndex = current.getDay()
+          const isThu5 = dayIndex === 4
+          const isCN = dayIndex === 0
+
+          if (!holidayDates.has(dateStr)) {
+            if (priestAttendanceType === 'all' && (isThu5 || isCN)) count++
+            else if (priestAttendanceType === 'thu5' && isThu5) count++
+            else if (priestAttendanceType === 'cn' && isCN) count++
+          }
+          current.setDate(current.getDate() + 1)
+        }
+        return count
+      }
+      const attendanceDayCount = countAttendanceDays()
+
+      // 5. Fetch attendance records for all classes in date range
+      const classIds = allClasses.map(c => c.id)
+      let attendanceQuery = supabase
+        .from('attendance_records')
+        .select('class_id, status, day_type')
+        .in('class_id', classIds)
+        .gte('attendance_date', fromDate)
+        .lte('attendance_date', toDate)
+        .eq('status', 'present')
+
+      if (priestAttendanceType !== 'all') {
+        attendanceQuery = attendanceQuery.eq('day_type', priestAttendanceType)
+      }
+
+      const { data: attendanceRecords } = await attendanceQuery
+
+      // 6. Count present per class
+      const classPresentCounts = new Map<string, number>()
+      attendanceRecords?.forEach(record => {
+        const current = classPresentCounts.get(record.class_id) || 0
+        classPresentCounts.set(record.class_id, current + 1)
+      })
+
+      // 7. Group by branch
+      const branchesData: PriestReportBranchData[] = []
+      let grandTotalStudents = 0
+      let grandTotalSlots = 0
+      let grandTotalPresent = 0
+      let grandTotalAbsent = 0
+
+      for (const branchName of BRANCHES) {
+        const branchClasses = allClasses.filter(c => c.branch === branchName)
+        if (branchClasses.length === 0) continue
+
+        const classesData: PriestReportClassData[] = branchClasses.map(cls => {
+          const studentCount = classStudentCounts.get(cls.id) || 0
+          const totalSlots = studentCount * attendanceDayCount
+          const presentCount = classPresentCounts.get(cls.id) || 0
+          const absentCount = totalSlots - presentCount
+          const rate = totalSlots > 0 ? (presentCount / totalSlots) * 100 : 0
+
+          return {
+            classId: cls.id,
+            className: cls.name,
+            branch: branchName,
+            studentCount,
+            totalSlots,
+            presentCount,
+            absentCount: Math.max(0, absentCount),
+            rate,
+          }
+        })
+
+        const branchTotalStudents = classesData.reduce((sum, c) => sum + c.studentCount, 0)
+        const branchTotalSlots = classesData.reduce((sum, c) => sum + c.totalSlots, 0)
+        const branchTotalPresent = classesData.reduce((sum, c) => sum + c.presentCount, 0)
+        const branchTotalAbsent = classesData.reduce((sum, c) => sum + Math.max(0, c.absentCount), 0)
+        const branchRate = branchTotalSlots > 0 ? (branchTotalPresent / branchTotalSlots) * 100 : 0
+
+        branchesData.push({
+          branch: branchName,
+          classes: classesData,
+          totalStudents: branchTotalStudents,
+          totalSlots: branchTotalSlots,
+          totalPresent: branchTotalPresent,
+          totalAbsent: branchTotalAbsent,
+          rate: branchRate,
+        })
+
+        grandTotalStudents += branchTotalStudents
+        grandTotalSlots += branchTotalSlots
+        grandTotalPresent += branchTotalPresent
+        grandTotalAbsent += branchTotalAbsent
+      }
+
+      const grandRate = grandTotalSlots > 0 ? (grandTotalPresent / grandTotalSlots) * 100 : 0
+
+      const reportData: PriestReportData = {
+        branches: branchesData,
+        grandTotalStudents,
+        grandTotalSlots,
+        grandTotalPresent,
+        grandTotalAbsent,
+        grandRate,
+        fromDate,
+        toDate,
+        timeLabel,
+      }
+
+      setPriestReportData(reportData)
+      setIsPriestReportGenerated(true)
+      showNotification('success', 'Đã tạo báo cáo tổng hợp thành công')
+    } catch (error) {
+      console.error('Error generating priest report:', error)
+      showNotification('error', 'Không thể tạo báo cáo tổng hợp')
+    } finally {
+      setPriestReportLoading(false)
+    }
+  }
+
+  // Priest report - export image
+  const handlePriestExportImage = async () => {
+    if (!priestReportExportRef.current) {
+      showNotification('error', 'Không thể xuất ảnh')
+      return
+    }
+    try {
+      const canvas = await html2canvas(priestReportExportRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+      })
+      const link = document.createElement('a')
+      const today = new Date().toISOString().split('T')[0]
+      link.download = `bao_cao_tong_hop_${today}.png`
+      link.href = canvas.toDataURL('image/png')
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      setExportSuccessMessage('Đã xuất ảnh thành công!')
+      setIsExportSuccessModalOpen(true)
+      setTimeout(() => setIsExportSuccessModalOpen(false), 2000)
+    } catch (error) {
+      console.error('Error exporting image:', error)
+      showNotification('error', 'Lỗi khi xuất ảnh')
+    }
+  }
+
+  // Priest report - export Excel
+  const handlePriestExportExcel = async () => {
+    if (!priestReportData) return
+    try {
+      const XLSX = await import('xlsx')
+      const wb = XLSX.utils.book_new()
+      const today = new Date().toISOString().split('T')[0]
+
+      const header = ['STT', 'Ngành / Lớp', 'Sĩ số', 'Đi', 'Nghỉ', 'Tỉ lệ (%)']
+      const rows: (string | number)[][] = []
+      let globalIndex = 0
+
+      priestReportData.branches.forEach(branch => {
+        branch.classes.forEach(cls => {
+          globalIndex++
+          rows.push([
+            globalIndex,
+            cls.className,
+            cls.studentCount,
+            cls.presentCount,
+            cls.absentCount,
+            cls.totalSlots > 0 ? Number(cls.rate.toFixed(1)) : 0,
+          ])
+        })
+        // Branch subtotal
+        rows.push([
+          '',
+          `Cộng ngành ${branch.branch}`,
+          branch.totalStudents,
+          branch.totalPresent,
+          branch.totalAbsent,
+          branch.totalSlots > 0 ? Number(branch.rate.toFixed(1)) : 0,
+        ])
+      })
+
+      // Grand total
+      rows.push([
+        '',
+        'TỔNG CỘNG',
+        priestReportData.grandTotalStudents,
+        priestReportData.grandTotalPresent,
+        priestReportData.grandTotalAbsent,
+        priestReportData.grandTotalSlots > 0 ? Number(priestReportData.grandRate.toFixed(1)) : 0,
+      ])
+
+      const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
+      ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }]
+      XLSX.utils.book_append_sheet(wb, ws, 'Tong hop')
+
+      const fileName = `bao_cao_tong_hop_${today}.xlsx`
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      setExportSuccessMessage('Đã xuất Excel thành công!')
+      setIsExportSuccessModalOpen(true)
+      setTimeout(() => setIsExportSuccessModalOpen(false), 2000)
+    } catch (error) {
+      console.error('Error exporting Excel:', error)
+      showNotification('error', 'Lỗi khi xuất Excel')
+    }
+  }
+
   // Set week dates (get current week by default)
   useEffect(() => {
     const today = new Date()
@@ -1524,6 +1858,8 @@ export default function ActivitiesPage() {
 
     setReportWeekStart(monday.toISOString().split('T')[0])
     setReportWeekEnd(sunday.toISOString().split('T')[0])
+    setPriestWeekStart(monday.toISOString().split('T')[0])
+    setPriestWeekEnd(sunday.toISOString().split('T')[0])
   }, [])
 
   return (
@@ -2336,6 +2672,40 @@ export default function ActivitiesPage() {
         ) : (
           /* Reports Tab */
           <div className="p-6">
+            {/* Report Style Selector */}
+            <div className="flex items-center gap-6 mb-6">
+              <span className="text-base font-semibold text-black dark:text-white">Kiểu báo cáo</span>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => { setReportStyle('parent'); setIsPriestReportGenerated(false) }}
+                  className="flex items-center gap-2"
+                >
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    reportStyle === 'parent' ? 'border-brand' : 'border-gray-300 dark:border-white/30'
+                  }`}>
+                    {reportStyle === 'parent' && <div className="w-2 h-2 rounded-full bg-brand" />}
+                  </div>
+                  <span className="text-sm font-medium text-black dark:text-white">Cho Phụ huynh</span>
+                </button>
+                <button
+                  onClick={() => { setReportStyle('priest'); setIsReportGenerated(false) }}
+                  className="flex items-center gap-2"
+                >
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    reportStyle === 'priest' ? 'border-brand' : 'border-gray-300 dark:border-white/30'
+                  }`}>
+                    {reportStyle === 'priest' && <div className="w-2 h-2 rounded-full bg-brand" />}
+                  </div>
+                  <span className="text-sm font-medium text-black dark:text-white">Cho Cha</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-[#e5e1dc] mb-6" />
+
+            {reportStyle === 'parent' ? (
+            <>
             {/* Header Section */}
             <div className="flex items-start gap-6 mb-6">
               {/* Title */}
@@ -3238,6 +3608,369 @@ export default function ActivitiesPage() {
                 )}
               </div>
             )}
+            </>
+            ) : (
+            /* Priest Report */
+            <>
+              {/* Header Section */}
+              <div className="flex items-start gap-6 mb-6">
+                <div className="w-[300px]">
+                  <h1 className="text-[26px] font-semibold text-black dark:text-white">Báo cáo tổng hợp</h1>
+                  <p className="text-sm font-medium text-[#666d80] mt-1">Báo cáo cho Cha - tổng hợp tất cả các lớp</p>
+                </div>
+
+                {/* Priest Time Filter Mode Selector */}
+                <div className="flex-1 bg-white dark:bg-white/10 border border-[#e5e1dc] rounded-2xl overflow-hidden">
+                  <div className="flex items-center h-12 px-4">
+                    <span className="flex-1 text-base font-semibold text-black dark:text-white">Chọn thời gian</span>
+                    <div className="flex items-center gap-4">
+                      <button onClick={() => setPriestTimeFilterMode('month')} className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${priestTimeFilterMode === 'month' ? 'border-brand' : 'border-gray-300 dark:border-white/30'}`}>
+                          {priestTimeFilterMode === 'month' && <div className="w-2 h-2 rounded-full bg-brand" />}
+                        </div>
+                        <span className="text-sm font-medium text-black dark:text-white">Tháng</span>
+                      </button>
+                      <button onClick={() => setPriestTimeFilterMode('week')} className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${priestTimeFilterMode === 'week' ? 'border-brand' : 'border-gray-300 dark:border-white/30'}`}>
+                          {priestTimeFilterMode === 'week' && <div className="w-2 h-2 rounded-full bg-brand" />}
+                        </div>
+                        <span className="text-sm font-medium text-black dark:text-white">Tuần</span>
+                      </button>
+                      <button onClick={() => setPriestTimeFilterMode('year')} className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${priestTimeFilterMode === 'year' ? 'border-brand' : 'border-gray-300 dark:border-white/30'}`}>
+                          {priestTimeFilterMode === 'year' && <div className="w-2 h-2 rounded-full bg-brand" />}
+                        </div>
+                        <span className="text-sm font-medium text-black dark:text-white">Năm học</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="h-px bg-[#e5e1dc] mb-6" />
+
+              {/* Priest Report Form */}
+              <div className="flex items-start gap-3 mb-6">
+                {priestTimeFilterMode === 'month' ? (
+                  <div className="w-[40%]">
+                    <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn tháng</label>
+                    <div className="relative" data-dropdown>
+                      <button
+                        onClick={() => { closeAllReportDropdowns(); setIsPriestMonthDropdownOpen(!isPriestMonthDropdownOpen) }}
+                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
+                      >
+                        <span className="text-sm text-black dark:text-white">Tháng {priestMonth + 1} / {priestYear}</span>
+                        <Calendar className="w-5 h-5 text-[#8A8C90]" />
+                      </button>
+                      {isPriestMonthDropdownOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-2 border-b border-[#E5E1DC] dark:border-white/10">
+                            <button onClick={() => setPriestYear(prev => prev - 1)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-white/10">
+                              <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M7 1L1 7L7 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </button>
+                            <span className="text-sm font-semibold text-black dark:text-white">{priestYear}</span>
+                            <button onClick={() => setPriestYear(prev => prev + 1)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-white/10">
+                              <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1L7 7L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1 p-2">
+                            {Array.from({ length: 12 }, (_, i) => (
+                              <button
+                                key={i}
+                                onClick={() => { setPriestMonth(i); setIsPriestMonthDropdownOpen(false) }}
+                                className={`py-2 px-3 rounded-lg text-sm ${priestMonth === i ? 'bg-brand text-white' : 'hover:bg-gray-100 dark:hover:bg-white/10 text-black dark:text-white'}`}
+                              >
+                                Tháng {i + 1}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : priestTimeFilterMode === 'week' ? (
+                  <div className="w-[40%]">
+                    <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn tuần</label>
+                    <div className="relative" data-dropdown>
+                      <button
+                        onClick={() => { closeAllReportDropdowns(); setIsPriestWeekPickerOpen(!isPriestWeekPickerOpen) }}
+                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
+                      >
+                        <span className="text-sm text-black dark:text-white">
+                          {priestWeekStart && priestWeekEnd
+                            ? `${formatDisplayDate(priestWeekStart)} - ${formatDisplayDate(priestWeekEnd)}`
+                            : 'Chọn tuần'}
+                        </span>
+                        <Calendar className="w-5 h-5 text-[#8A8C90]" />
+                      </button>
+                      {isPriestWeekPickerOpen && (
+                        <div className="absolute top-full right-0 mt-1 z-20">
+                          <CustomCalendar
+                            value={priestWeekStart || new Date().toISOString().split('T')[0]}
+                            onChange={(date) => {
+                              const d = new Date(date)
+                              const dayIdx = d.getDay()
+                              const mondayOff = dayIdx === 0 ? -6 : 1 - dayIdx
+                              const mon = new Date(d)
+                              mon.setDate(d.getDate() + mondayOff)
+                              const sun = new Date(mon)
+                              sun.setDate(mon.getDate() + 6)
+                              setPriestWeekStart(mon.toISOString().split('T')[0])
+                              setPriestWeekEnd(sun.toISOString().split('T')[0])
+                              setIsPriestWeekPickerOpen(false)
+                            }}
+                            onClose={() => setIsPriestWeekPickerOpen(false)}
+                            showConfirmButton={false}
+                            highlightWeek={true}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-[40%]">
+                    <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn năm học</label>
+                    <div className="relative" data-dropdown>
+                      <button
+                        onClick={() => { closeAllReportDropdowns(); setIsPriestSchoolYearDropdownOpen(!isPriestSchoolYearDropdownOpen) }}
+                        className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
+                      >
+                        <span className="text-sm text-black dark:text-white">
+                          {schoolYears.find(sy => sy.id === priestSchoolYearId)?.name || 'Chọn năm học'}
+                        </span>
+                        <Calendar className="w-5 h-5 text-[#8A8C90]" />
+                      </button>
+                      {isPriestSchoolYearDropdownOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden max-h-[250px] overflow-y-auto">
+                          {schoolYears.map(sy => (
+                            <button
+                              key={sy.id}
+                              onClick={() => { setPriestSchoolYearId(sy.id); setIsPriestSchoolYearDropdownOpen(false) }}
+                              className={`w-full px-5 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${
+                                priestSchoolYearId === sy.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'
+                              }`}
+                            >
+                              {sy.name} {sy.is_current ? '(Hiện tại)' : ''}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Day type filter */}
+                <div className="w-[30%]">
+                  <label className="block text-sm font-medium text-[#666d80] mb-2">Loại buổi</label>
+                  <div className="relative" data-dropdown>
+                    <button
+                      onClick={() => { closeAllReportDropdowns(); setIsPriestAttendanceTypeDropdownOpen(!isPriestAttendanceTypeDropdownOpen) }}
+                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
+                    >
+                      <span className="text-sm text-black dark:text-white">
+                        {priestAttendanceType === 'all' ? 'Tất cả' : priestAttendanceType === 'thu5' ? 'Thứ 5' : 'Chủ nhật'}
+                      </span>
+                      <svg className="w-[9px] h-[18px] text-black dark:text-white" viewBox="0 0 9 18" fill="none">
+                        <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="currentColor" transform="translate(-4, -2)" />
+                      </svg>
+                    </button>
+                    {isPriestAttendanceTypeDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden">
+                        {[
+                          { value: 'all' as const, label: 'Tất cả' },
+                          { value: 'thu5' as const, label: 'Thứ 5' },
+                          { value: 'cn' as const, label: 'Chủ nhật' },
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            onClick={() => { setPriestAttendanceType(opt.value); setIsPriestAttendanceTypeDropdownOpen(false) }}
+                            className={`w-full px-5 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${
+                              priestAttendanceType === opt.value ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="h-px bg-[#e5e1dc] mb-6" />
+
+              {/* Action Button */}
+              <div className="flex justify-end mb-6">
+                <button
+                  onClick={generatePriestReport}
+                  disabled={priestReportLoading}
+                  className="h-[49px] px-6 bg-brand border border-white/60 rounded-full flex items-center gap-1 text-lg text-white hover:bg-orange-500 transition-colors disabled:opacity-50"
+                >
+                  {priestReportLoading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <>
+                      <Plus className="w-6 h-6" />
+                      <span>Tạo báo cáo</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Priest Report Result Section */}
+              {isPriestReportGenerated && priestReportData && (
+                <div className="bg-white dark:bg-white/10 rounded-[24px] p-6 overflow-hidden">
+                  {/* Report Preview Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12.0001 12C15.0793 12 18.0179 13.8185 20.1133 17.1592C20.8187 18.2839 20.8187 19.7161 20.1133 20.8408C18.0179 24.1815 15.0793 26 12.0001 26C8.92077 26 5.98224 24.1815 3.88678 20.8408C3.18144 19.7161 3.18144 18.2839 3.88678 17.1592C5.98224 13.8185 8.92077 12 12.0001 12ZM12.0001 14C9.77455 14 7.40822 15.3088 5.58112 18.2217C5.28324 18.6966 5.28324 19.3034 5.58112 19.7783C7.40822 22.6912 9.77455 24 12.0001 24C14.2256 24 16.5919 22.6912 18.419 19.7783C18.7169 19.3034 18.7169 18.6966 18.419 18.2217C16.5919 15.3088 14.2256 14 12.0001 14ZM12.0001 15C14.2092 15 16.0001 16.7909 16.0001 19C16.0001 21.2091 14.2092 23 12.0001 23C9.79092 23 8.00006 21.2091 8.00006 19C8.00006 16.7909 9.79092 15 12.0001 15ZM11.9141 17.0039C11.9687 17.1594 12.0001 17.3259 12.0001 17.5C12.0001 18.3284 11.3285 19 10.5001 19C10.326 19 10.1594 18.9686 10.004 18.9141C10.0028 18.9426 10.0001 18.9712 10.0001 19C10.0001 20.1046 10.8955 21 12.0001 21C13.1046 21 14.0001 20.1045 14.0001 19C14.0001 17.8955 13.1046 17 12.0001 17C11.9713 17 11.9426 17.0027 11.9141 17.0039Z" fill="#8A8C90" transform="translate(0, -7)"/>
+                      </svg>
+                      <span className="text-sm text-[#666D80]">
+                        Xem trước báo cáo: <span className="font-medium text-black dark:text-white">Tổng hợp điểm danh</span>
+                      </span>
+                      <span className="h-[26px] px-4 bg-[#8A8C90] rounded-[13px] text-xs font-medium text-white uppercase flex items-center">
+                        {priestReportData.timeLabel}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handlePriestExportImage}
+                        className="h-[38px] px-4 border border-brand rounded-[19px] flex items-center gap-2 text-sm text-brand hover:bg-brand/5 transition-colors"
+                      >
+                        <svg width="18" height="17" viewBox="0 0 18 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path fillRule="evenodd" clipRule="evenodd" d="M18 0V17H0V4H2V15H16V2H12V0H18ZM5 0C7.68925 0 9.88225 2.1223 9.99625 4.78305L10 5L10 8.5852L12.293 6.2929L13.707 7.7071L9 12.4142L4.293 7.707L5.707 6.2928L8 8.5852V5C8 3.4023 6.75075 2.0963 5.176 2.0051L5 2H-1V0H5Z" fill="#FA865E"/>
+                        </svg>
+                        Xuất ảnh
+                      </button>
+                      <button
+                        onClick={handlePriestExportExcel}
+                        className="h-[38px] px-4 border border-brand rounded-[19px] flex items-center gap-2 text-sm text-brand hover:bg-brand/5 transition-colors"
+                      >
+                        <svg width="18" height="17" viewBox="0 0 18 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path fillRule="evenodd" clipRule="evenodd" d="M18 0V17H0V4H2V15H16V2H12V0H18ZM5 0C7.68925 0 9.88225 2.1223 9.99625 4.78305L10 5L10 8.5852L12.293 6.2929L13.707 7.7071L9 12.4142L4.293 7.707L5.707 6.2928L8 8.5852V5C8 3.4023 6.75075 2.0963 5.176 2.0051L5 2H-1V0H5Z" fill="#FA865E"/>
+                        </svg>
+                        Xuất Excel
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Stats Cards */}
+                  <div className="flex items-stretch gap-[3px] mb-6">
+                    {/* Tổng sĩ số */}
+                    <div className="flex-1 h-[130px] bg-brand rounded-[15px] px-4 py-4 flex flex-col justify-between relative overflow-hidden">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-white/80">Tổng sĩ số</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="white" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+                      </div>
+                      <span className="text-[40px] font-bold text-white leading-none">{priestReportData.grandTotalStudents}</span>
+                    </div>
+
+                    {/* Tổng lượt đi */}
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-black/80 dark:text-white/80">Tổng lượt đi</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+                      </div>
+                      <span className="text-[40px] font-bold text-black dark:text-white leading-none">{priestReportData.grandTotalPresent}</span>
+                    </div>
+
+                    {/* Tổng lượt nghỉ */}
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-black/80 dark:text-white/80">Tổng lượt nghỉ</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+                      </div>
+                      <span className="text-[40px] font-bold text-black dark:text-white leading-none">{priestReportData.grandTotalAbsent}</span>
+                    </div>
+
+                    {/* Tỉ lệ chung */}
+                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-black/80 dark:text-white/80">Tỉ lệ chung</span>
+                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
+                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+                      </div>
+                      <span className="text-[40px] font-bold text-black dark:text-white leading-none">{priestReportData.grandRate.toFixed(1)}%</span>
+                    </div>
+                  </div>
+
+                  {/* Summary Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#e5e1dc]">
+                          <th className="text-left py-3 px-2 text-[#666d80] font-medium w-[50px]">STT</th>
+                          <th className="text-left py-3 px-2 text-[#666d80] font-medium">Ngành / Lớp</th>
+                          <th className="text-center py-3 px-2 text-[#666d80] font-medium w-[80px]">Sĩ số</th>
+                          <th className="text-center py-3 px-2 text-[#666d80] font-medium w-[80px]">Đi</th>
+                          <th className="text-center py-3 px-2 text-[#666d80] font-medium w-[80px]">Nghỉ</th>
+                          <th className="text-center py-3 px-2 text-[#666d80] font-medium w-[90px]">Tỉ lệ (%)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          let idx = 0
+                          return priestReportData.branches.map(branch => (
+                            <React.Fragment key={branch.branch}>
+                              {branch.classes.map(cls => {
+                                idx++
+                                return (
+                                  <tr key={cls.classId} className="border-b border-[#f0f0f0] hover:bg-gray-50 dark:hover:bg-white/5">
+                                    <td className="py-3 px-2 text-[14px] text-[#666d80]">{idx}</td>
+                                    <td className="py-3 px-2 text-[14px] text-black dark:text-white">{cls.className}</td>
+                                    <td className="py-3 px-2 text-[14px] text-center text-black dark:text-white">{cls.studentCount}</td>
+                                    <td className="py-3 px-2 text-[14px] text-center text-green-600 font-medium">{cls.presentCount}</td>
+                                    <td className="py-3 px-2 text-[14px] text-center text-red-500 font-medium">{cls.absentCount}</td>
+                                    <td className="py-3 px-2 text-[14px] text-center text-black dark:text-white font-medium">
+                                      {cls.totalSlots > 0 ? cls.rate.toFixed(1) : '-'}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                              {/* Branch subtotal */}
+                              <tr className="border-b border-[#e5e1dc] bg-[#fff3cd]/50">
+                                <td className="py-3 px-2" colSpan={2}>
+                                  <span className="text-[14px] font-semibold text-black dark:text-white">Cộng ngành {branch.branch}</span>
+                                </td>
+                                <td className="py-3 px-2 text-[14px] text-center font-semibold text-black dark:text-white">{branch.totalStudents}</td>
+                                <td className="py-3 px-2 text-[14px] text-center font-semibold text-green-600">{branch.totalPresent}</td>
+                                <td className="py-3 px-2 text-[14px] text-center font-semibold text-red-500">{branch.totalAbsent}</td>
+                                <td className="py-3 px-2 text-[14px] text-center font-semibold text-black dark:text-white">
+                                  {branch.totalSlots > 0 ? branch.rate.toFixed(1) : '-'}
+                                </td>
+                              </tr>
+                            </React.Fragment>
+                          ))
+                        })()}
+                        {/* Grand total */}
+                        <tr className="bg-[#d4edda]/50">
+                          <td className="py-3 px-2" colSpan={2}>
+                            <span className="text-[14px] font-bold text-black dark:text-white">TỔNG CỘNG</span>
+                          </td>
+                          <td className="py-3 px-2 text-[14px] text-center font-bold text-black dark:text-white">{priestReportData.grandTotalStudents}</td>
+                          <td className="py-3 px-2 text-[14px] text-center font-bold text-green-600">{priestReportData.grandTotalPresent}</td>
+                          <td className="py-3 px-2 text-[14px] text-center font-bold text-red-500">{priestReportData.grandTotalAbsent}</td>
+                          <td className="py-3 px-2 text-[14px] text-center font-bold text-black dark:text-white">
+                            {priestReportData.grandTotalSlots > 0 ? priestReportData.grandRate.toFixed(1) : '-'}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+            )}
           </div>
         )}
       </div>
@@ -3264,6 +3997,12 @@ export default function ActivitiesPage() {
             className={getReportClassName(reportClassId)}
             schoolYear={schoolYear?.name || ''}
             scoreColumns={scoreColumns}
+          />
+        )}
+        {isPriestReportGenerated && priestReportData && (
+          <PriestReportTemplate
+            ref={priestReportExportRef}
+            data={priestReportData}
           />
         )}
       </div>
