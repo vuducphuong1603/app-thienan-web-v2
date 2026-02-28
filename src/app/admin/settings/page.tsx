@@ -8,7 +8,8 @@ import { useTheme } from '@/lib/theme-context'
 import Image from 'next/image'
 import { Eye, EyeOff, Check, X, Plus, Trash2 } from 'lucide-react'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
-import { useCurrentSchoolYear, useHolidays, useInvalidateQueries, countWeekdays } from '@/lib/queries'
+import { useCurrentSchoolYear, useHolidays, useInvalidateQueries, countWeekdays, queryKeys } from '@/lib/queries'
+import { useQueryClient } from '@tanstack/react-query'
 
 type SettingsTab = 'personal' | 'password' | 'school-year' | 'notifications' | 'system'
 
@@ -72,6 +73,7 @@ interface SchoolYearFormData {
 export default function SettingsPage() {
   const { user, isAdmin, logout, updateProfile, changePassword, uploadAvatar, deleteAvatar } = useAuth()
   const { isDarkMode, toggleDarkMode } = useTheme()
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<SettingsTab>('personal')
   const [formData, setFormData] = useState<FormData>({
     saintName: '',
@@ -144,7 +146,6 @@ export default function SettingsPage() {
     notes: '',
   })
   const [savingHoliday, setSavingHoliday] = useState(false)
-  const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(null)
 
   // Auth check handled by AuthProvider centrally
 
@@ -420,17 +421,26 @@ export default function SettingsPage() {
 
   const handleDeleteHoliday = async (holidayId: string) => {
     if (!confirm('Bạn có chắc muốn xóa ngày nghỉ này?')) return
-    setDeletingHolidayId(holidayId)
+
+    // Optimistic update: remove from cache immediately
+    const holidayQueryKey = queryKeys.holidays(currentSchoolYear?.id || '')
+    const previousHolidays = queryClient.getQueryData<Holiday[]>(holidayQueryKey)
+    queryClient.setQueryData<Holiday[]>(holidayQueryKey, (old) =>
+      old ? old.filter((h) => h.id !== holidayId) : []
+    )
+
     try {
       const { error } = await supabase.from('holidays').delete().eq('id', holidayId)
       if (error) throw error
-      await Promise.all([invalidateHolidays(), invalidateStudents()])
+      // Invalidate in background to sync
+      invalidateHolidays()
+      invalidateStudents()
       setSaveMessage({ type: 'success', text: 'Đã xóa ngày nghỉ!' })
     } catch (error) {
+      // Rollback on error
+      queryClient.setQueryData(holidayQueryKey, previousHolidays)
       console.error('Error deleting holiday:', error)
       setSaveMessage({ type: 'error', text: 'Lỗi khi xóa ngày nghỉ' })
-    } finally {
-      setDeletingHolidayId(null)
     }
   }
 
@@ -1316,14 +1326,9 @@ export default function SettingsPage() {
                           )}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDeleteHoliday(holiday.id) }}
-                            disabled={deletingHolidayId === holiday.id}
                             className="opacity-0 group-hover:opacity-100 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                           >
-                            {deletingHolidayId === holiday.id ? (
-                              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       )
