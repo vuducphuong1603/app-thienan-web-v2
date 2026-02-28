@@ -530,27 +530,42 @@ export default function ActivitiesPage() {
       return
     }
     const checkHoliday = async () => {
+      const date = new Date(selectedDate)
+      const dayIndex = date.getDay()
+
+      let queryDate: string
+      let dayTypes: string[]
+
+      if (dayIndex === 0) {
+        // Sunday: check holidays for this Sunday with day_type cn or both
+        queryDate = selectedDate
+        dayTypes = ['cn', 'both']
+      } else if (dayIndex === 4) {
+        // Thursday: check holidays for this Thursday with day_type thu5 or both
+        queryDate = selectedDate
+        dayTypes = ['thu5', 'both']
+      } else {
+        // Compensatory days (Mon, Tue, Wed, Fri, Sat): check Thursday of this week
+        queryDate = getThursdayOfWeek(selectedDate)
+        dayTypes = ['thu5', 'both']
+      }
+
       const { data } = await supabase
         .from('holidays')
         .select('name, day_type')
         .eq('school_year_id', schoolYear.id)
-        .eq('holiday_date', selectedDate)
+        .eq('holiday_date', queryDate)
+        .in('day_type', dayTypes)
         .limit(1)
+
       if (data && data.length > 0) {
-        const h = data[0]
-        const dt = dayType // thu5, cn, or null
-        // Check if this holiday affects the current day type
-        if (h.day_type === 'both' || h.day_type === dt) {
-          setCurrentDateHoliday({ name: h.name, day_type: h.day_type })
-        } else {
-          setCurrentDateHoliday(null)
-        }
+        setCurrentDateHoliday({ name: data[0].name, day_type: data[0].day_type })
       } else {
         setCurrentDateHoliday(null)
       }
     }
     checkHoliday()
-  }, [selectedDate, schoolYear?.id, dayType])
+  }, [selectedDate, schoolYear?.id])
 
   // Group classes by branch
   const classesGroupedByBranch = BRANCHES.reduce((acc, branch) => {
@@ -611,6 +626,11 @@ export default function ActivitiesPage() {
   const markAttendance = async (studentId: string, status: 'present' | 'absent') => {
     if (!dayType) {
       showNotification('error', 'Chỉ điểm danh vào Thứ 5 hoặc Chủ nhật')
+      return
+    }
+
+    if (currentDateHoliday) {
+      showNotification('error', `Ngày nghỉ lễ: ${currentDateHoliday.name}. Không thể điểm danh.`)
       return
     }
 
@@ -711,6 +731,11 @@ export default function ActivitiesPage() {
   const markAllPresent = async () => {
     if (!dayType) {
       showNotification('error', 'Chỉ điểm danh vào Thứ 5 hoặc Chủ nhật')
+      return
+    }
+
+    if (currentDateHoliday) {
+      showNotification('error', `Ngày nghỉ lễ: ${currentDateHoliday.name}. Không thể điểm danh.`)
       return
     }
 
@@ -823,6 +848,11 @@ export default function ActivitiesPage() {
   const markCompensatoryAttendance = async (studentId: string) => {
     if (!isCompensatoryMode) {
       showNotification('error', 'Chỉ bổ sung điểm danh vào Thứ 2, 3, 4, 6, 7')
+      return
+    }
+
+    if (currentDateHoliday) {
+      showNotification('error', `Ngày nghỉ lễ: ${currentDateHoliday.name}. Không thể điểm danh.`)
       return
     }
 
@@ -2114,16 +2144,22 @@ export default function ActivitiesPage() {
 
             {/* Holiday Warning Banner */}
             {currentDateHoliday && selectedClassId && (
-              <div className="mx-6 mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                  <Calendar className="w-4 h-4 text-amber-600" />
+              <div className="mx-6 mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <Calendar className="w-4 h-4 text-red-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-amber-800">
-                    Ngày này là ngày nghỉ: <span className="font-bold">{currentDateHoliday.name}</span>
+                  <p className="text-sm font-medium text-red-800">
+                    {isCompensatoryMode
+                      ? <>Thứ 5 ngày {formatDate(getThursdayOfWeek(selectedDate))} là ngày nghỉ lễ: <span className="font-bold">{currentDateHoliday.name}</span></>
+                      : <>Ngày nghỉ lễ: <span className="font-bold">{currentDateHoliday.name}</span></>
+                    }
                   </p>
-                  <p className="text-xs text-amber-600">
-                    Điểm danh sẽ không được tính vào điểm chuyên cần.
+                  <p className="text-xs text-red-600">
+                    {isCompensatoryMode
+                      ? 'Không thể điểm danh hoặc bổ sung điểm danh trong tuần này.'
+                      : 'Không thể điểm danh trong ngày nghỉ lễ này.'
+                    }
                   </p>
                 </div>
               </div>
@@ -2304,7 +2340,7 @@ export default function ActivitiesPage() {
                             {/* Mark All Present Checkbox */}
                             <button
                               onClick={markAllPresent}
-                              disabled={saving === 'all' || !dayType}
+                              disabled={saving === 'all' || !dayType || !!currentDateHoliday}
                               className="h-[60px] w-full bg-white dark:bg-white/10 border border-white/60 rounded-[18px] flex items-center gap-4 px-5 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {saving === 'all' ? (
@@ -2320,7 +2356,7 @@ export default function ActivitiesPage() {
                             {/* Import Excel Button */}
                             <button
                               onClick={openImportExcelModal}
-                              disabled={!dayType}
+                              disabled={!dayType || !!currentDateHoliday}
                               className="h-[60px] w-full bg-[#E5E1DC] border border-white/60 rounded-[18px] flex items-center gap-4 px-5 hover:bg-[#d9d5d0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <span className="text-sm text-black/80 dark:text-white/80">Import Excel</span>
@@ -2426,7 +2462,7 @@ export default function ActivitiesPage() {
                               ) : (
                                 <button
                                   onClick={() => markCompensatoryAttendance(student.id)}
-                                  disabled={saving === student.id}
+                                  disabled={saving === student.id || !!currentDateHoliday}
                                   className="h-[34px] px-4 bg-[rgba(250,134,94,0.15)] rounded-full flex items-center gap-2 hover:bg-[rgba(250,134,94,0.25)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   <Plus className="w-4 h-4 text-brand" strokeWidth={2.5} />
@@ -2477,7 +2513,7 @@ export default function ActivitiesPage() {
                               ) : !student.has_thursday_attendance && (
                                 <button
                                   onClick={() => openQRModal(student, true)}
-                                  disabled={saving === student.id}
+                                  disabled={saving === student.id || !!currentDateHoliday}
                                   className="flex items-center justify-center hover:opacity-70 transition-opacity disabled:opacity-50"
                                   title="Quét QR điểm danh bổ sung"
                                 >
@@ -2513,7 +2549,7 @@ export default function ActivitiesPage() {
                               ) : (
                                 <button
                                   onClick={() => openConfirmModal(student)}
-                                  disabled={!dayType}
+                                  disabled={!dayType || !!currentDateHoliday}
                                   className="w-[26px] h-[26px] rounded-[5px] border-2 border-[#e0e0e0] hover:border-brand transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
                               )}
@@ -2573,7 +2609,7 @@ export default function ActivitiesPage() {
                               ) : student.attendance_status === null ? (
                                 <button
                                   onClick={() => markAttendance(student.id, 'absent')}
-                                  disabled={!dayType || saving === student.id}
+                                  disabled={!dayType || saving === student.id || !!currentDateHoliday}
                                   className="h-[34px] px-4 bg-[rgba(250,134,94,0.15)] rounded-full flex items-center gap-2 hover:bg-[rgba(250,134,94,0.25)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-brand flex items-center justify-center">
@@ -2651,7 +2687,7 @@ export default function ActivitiesPage() {
                               {/* Scan Icon - QR scan attendance */}
                               <button
                                 onClick={() => openQRModal(student)}
-                                disabled={!dayType || saving === student.id}
+                                disabled={!dayType || saving === student.id || !!currentDateHoliday}
                                 className="flex items-center justify-center hover:opacity-70 transition-opacity disabled:opacity-50"
                                 title="Quét QR điểm danh"
                               >

@@ -1,6 +1,18 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord, NotificationWithStatus, Notification, UserNote, Holiday } from './supabase'
 
+// ============ Helper: Count weekdays between two dates ============
+export function countWeekdays(startDate: string, endDate: string, dayOfWeek: number): number {
+  let count = 0
+  const current = new Date(startDate)
+  const end = new Date(endDate)
+  while (current <= end) {
+    if (current.getDay() === dayOfWeek) count++
+    current.setDate(current.getDate() + 1)
+  }
+  return count
+}
+
 // ============ Query Keys ============
 export const queryKeys = {
   users: ['users'] as const,
@@ -201,10 +213,11 @@ export function useGLVPerStudentStats(classId: string | undefined, enabled = tru
 
       // Get school year for holiday calculation
       const { data: schoolYear } = await supabase
-        .from('school_years').select('id, total_weeks').eq('is_current', true).single()
+        .from('school_years').select('id, start_date, end_date').eq('is_current', true).single()
 
-      const totalWeeks = schoolYear?.total_weeks || 40
       const schoolYearId = schoolYear?.id
+      const totalThu5 = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 4) : 40
+      const totalCn = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 0) : 40
 
       // Get holidays, students, and all attendance records in parallel
       const [holidaysRes, studentsRes, attendanceRes] = await Promise.all([
@@ -220,8 +233,8 @@ export function useGLVPerStudentStats(classId: string | undefined, enabled = tru
       const holidays = (holidaysRes.data || []) as Holiday[]
       const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
       const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
-      const effectiveThu5Days = Math.max(1, totalWeeks - thu5Holidays)
-      const effectiveCnDays = Math.max(1, totalWeeks - cnHolidays)
+      const effectiveThu5Days = Math.max(1, totalThu5 - thu5Holidays)
+      const effectiveCnDays = Math.max(1, totalCn - cnHolidays)
 
       const students = studentsRes.data || []
       const records = attendanceRes.data || []
@@ -450,15 +463,19 @@ export function useStudentsWithDetails() {
     queryKey: queryKeys.students,
     queryFn: async () => {
       const [schoolYearRes, classesRes, studentsRes] = await Promise.all([
-        supabase.from('school_years').select('id, total_weeks').eq('is_current', true).single(),
+        supabase.from('school_years').select('id, start_date, end_date').eq('is_current', true).single(),
         supabase.from('classes').select('*').eq('status', 'ACTIVE').order('display_order', { ascending: true }),
         supabase.from('thieu_nhi').select('*').order('full_name', { ascending: true }),
       ])
 
-      const currentTotalWeeks = schoolYearRes.data?.total_weeks || 40
-      const schoolYearId = schoolYearRes.data?.id
+      const schoolYear = schoolYearRes.data
+      const schoolYearId = schoolYear?.id
       const classesData = classesRes.data || []
       const studentsData = studentsRes.data || []
+
+      // Count actual Thursdays (4) and Sundays (0) in school year
+      const totalThu5 = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 4) : 40
+      const totalCn = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 0) : 40
 
       // Fetch holidays for current school year
       let holidays: Holiday[] = []
@@ -470,11 +487,11 @@ export function useStudentsWithDetails() {
         holidays = (holidaysData || []) as Holiday[]
       }
 
-      // Calculate effective days (total weeks minus holidays)
+      // Calculate effective days (actual day count minus holidays)
       const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
       const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
-      const effectiveThu5Days = Math.max(1, currentTotalWeeks - thu5Holidays)
-      const effectiveCnDays = Math.max(1, currentTotalWeeks - cnHolidays)
+      const effectiveThu5Days = Math.max(1, totalThu5 - thu5Holidays)
+      const effectiveCnDays = Math.max(1, totalCn - cnHolidays)
 
       // Build class lookup map for O(1) access instead of O(n) find per student
       const classMap = new Map(classesData.map(c => [c.id, c]))

@@ -22,8 +22,8 @@ interface StudentWithDetails extends ThieuNhiProfile {
   avg_catechism?: number
   attendance_thu5?: number
   attendance_cn?: number
-  score_thu5?: number      // Điểm T5 = (attendance_thu5 * 0.4) * (10 / total_weeks)
-  score_cn?: number        // Điểm CN = (attendance_cn * 0.6) * (10 / total_weeks)
+  score_thu5?: number      // Điểm T5 = (attendance_thu5 * 0.4) * (10 / totalThu5Days)
+  score_cn?: number        // Điểm CN = (attendance_cn * 0.6) * (10 / totalCnDays)
   avg_attendance?: number  // TB Điểm danh = score_thu5 + score_cn
   total_avg?: number
 }

@@ -8,7 +8,7 @@ import { useTheme } from '@/lib/theme-context'
 import Image from 'next/image'
 import { Eye, EyeOff, Check, X, Plus, Trash2 } from 'lucide-react'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
-import { useCurrentSchoolYear, useHolidays, useInvalidateQueries } from '@/lib/queries'
+import { useCurrentSchoolYear, useHolidays, useInvalidateQueries, countWeekdays } from '@/lib/queries'
 
 type SettingsTab = 'personal' | 'password' | 'school-year' | 'notifications' | 'system'
 
@@ -447,13 +447,15 @@ export default function SettingsPage() {
 
   // Calculate effective days for holidays summary
   const getHolidaySummary = () => {
-    const totalWeeks = currentSchoolYear?.total_weeks || 0
+    const totalThu5 = currentSchoolYear ? countWeekdays(currentSchoolYear.start_date, currentSchoolYear.end_date, 4) : 0
+    const totalCn = currentSchoolYear ? countWeekdays(currentSchoolYear.start_date, currentSchoolYear.end_date, 0) : 0
     const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
     const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
     return {
-      totalWeeks,
-      effectiveThu5: Math.max(0, totalWeeks - thu5Holidays),
-      effectiveCn: Math.max(0, totalWeeks - cnHolidays),
+      totalThu5,
+      totalCn,
+      effectiveThu5: Math.max(0, totalThu5 - thu5Holidays),
+      effectiveCn: Math.max(0, totalCn - cnHolidays),
       thu5Holidays,
       cnHolidays,
     }
@@ -1172,8 +1174,12 @@ export default function SettingsPage() {
               return (
                 <div className="mt-4 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-primary-3">Tổng tuần:</span>
-                    <span className="text-xs font-semibold text-black dark:text-white">{summary.totalWeeks}</span>
+                    <span className="text-xs text-blue-600">Tổng T5:</span>
+                    <span className="text-xs font-semibold text-blue-700">{summary.totalThu5} buổi</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-orange-600">Tổng CN:</span>
+                    <span className="text-xs font-semibold text-orange-700">{summary.totalCn} buổi</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-blue-600">T5 hiệu lực:</span>

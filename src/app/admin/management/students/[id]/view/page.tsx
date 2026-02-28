@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ChevronLeft, User } from 'lucide-react'
-import { supabase, Class } from '@/lib/supabase'
+import { supabase, Class, Holiday } from '@/lib/supabase'
+import { countWeekdays } from '@/lib/queries'
 
 interface StudentData {
   id: string
@@ -43,7 +44,8 @@ export default function ViewStudentPage() {
   const [student, setStudent] = useState<StudentData | null>(null)
   const [classes, setClasses] = useState<Class[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [totalWeeks, setTotalWeeks] = useState(40)
+  const [effectiveThu5Days, setEffectiveThu5Days] = useState(40)
+  const [effectiveCnDays, setEffectiveCnDays] = useState(40)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,12 +54,26 @@ export default function ViewStudentPage() {
         // Fetch current school year
         const { data: schoolYearData } = await supabase
           .from('school_years')
-          .select('total_weeks')
+          .select('id, start_date, end_date')
           .eq('is_current', true)
           .single()
 
         if (schoolYearData) {
-          setTotalWeeks(schoolYearData.total_weeks || 40)
+          // Count actual Thursdays and Sundays
+          const totalThu5 = countWeekdays(schoolYearData.start_date, schoolYearData.end_date, 4)
+          const totalCn = countWeekdays(schoolYearData.start_date, schoolYearData.end_date, 0)
+
+          // Fetch holidays
+          const { data: holidaysData } = await supabase
+            .from('holidays')
+            .select('*')
+            .eq('school_year_id', schoolYearData.id)
+          const holidays = (holidaysData || []) as Holiday[]
+          const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
+          const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
+
+          setEffectiveThu5Days(Math.max(1, totalThu5 - thu5Holidays))
+          setEffectiveCnDays(Math.max(1, totalCn - cnHolidays))
         }
 
         // Fetch classes
@@ -132,7 +148,9 @@ export default function ViewStudentPage() {
     const attendance_cn = student.attendance_cn || 0
 
     const avgCatechism = (score_45_hk1 + score_45_hk2 + score_exam_hk1 * 2 + score_exam_hk2 * 2) / 6
-    const avgAttendance = (attendance_thu5 * 0.4 + attendance_cn * 0.6) * (10 / totalWeeks)
+    const score_thu5 = (attendance_thu5 * 0.4) * (10 / effectiveThu5Days)
+    const score_cn = (attendance_cn * 0.6) * (10 / effectiveCnDays)
+    const avgAttendance = score_thu5 + score_cn
     const totalAvg = avgCatechism * 0.6 + avgAttendance * 0.4
 
     return { avgCatechism, avgAttendance, totalAvg }

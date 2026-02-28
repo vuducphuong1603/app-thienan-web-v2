@@ -1,4 +1,5 @@
 import { supabase, AlertRule, RuleCondition, Holiday } from './supabase'
+import { countWeekdays } from './queries'
 
 interface StudentData {
   id: string
@@ -99,14 +100,18 @@ export async function runRuleEngine(): Promise<number> {
 
   // 2. Fetch student data
   const [schoolYearRes, classesRes, studentsRes, teachersRes] = await Promise.all([
-    supabase.from('school_years').select('id, total_weeks').eq('is_current', true).single(),
+    supabase.from('school_years').select('id, start_date, end_date').eq('is_current', true).single(),
     supabase.from('classes').select('*').eq('status', 'ACTIVE'),
     supabase.from('thieu_nhi').select('*').eq('status', 'ACTIVE'),
     supabase.from('users').select('id, class_id').eq('role', 'giao_ly_vien').eq('status', 'ACTIVE'),
   ])
 
-  const totalWeeks = schoolYearRes.data?.total_weeks || 40
-  const schoolYearId = schoolYearRes.data?.id
+  const schoolYear = schoolYearRes.data
+  const schoolYearId = schoolYear?.id
+
+  // Count actual Thursdays (4) and Sundays (0) in school year
+  const totalThu5 = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 4) : 40
+  const totalCn = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 0) : 40
 
   // Fetch holidays to calculate effective days
   let holidays: Holiday[] = []
@@ -120,8 +125,8 @@ export async function runRuleEngine(): Promise<number> {
 
   const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
   const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
-  const effectiveThu5Days = Math.max(1, totalWeeks - thu5Holidays)
-  const effectiveCnDays = Math.max(1, totalWeeks - cnHolidays)
+  const effectiveThu5Days = Math.max(1, totalThu5 - thu5Holidays)
+  const effectiveCnDays = Math.max(1, totalCn - cnHolidays)
   const classes = classesRes.data || []
   const students = studentsRes.data || []
   const teachers = teachersRes.data || []

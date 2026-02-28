@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Check } from 'lucide-react'
-import { supabase, ThieuNhiProfile, SchoolYear, AttendanceRecord } from '@/lib/supabase'
+import { supabase, ThieuNhiProfile, SchoolYear, AttendanceRecord, Holiday } from '@/lib/supabase'
+import { countWeekdays } from '@/lib/queries'
 
 interface StudentWithClass extends ThieuNhiProfile {
   class_name?: string
@@ -22,6 +23,8 @@ export default function StudentAttendancePage() {
   const [schoolYear, setSchoolYear] = useState<SchoolYear | null>(null)
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecordWithDetails[]>([])
   const [loading, setLoading] = useState(true)
+  const [totalThu5Days, setTotalThu5Days] = useState(0)
+  const [totalCnDays, setTotalCnDays] = useState(0)
 
   // Fetch student and school year data
   const fetchData = useCallback(async () => {
@@ -63,6 +66,27 @@ export default function StudentAttendancePage() {
         .single()
 
       setSchoolYear(schoolYearData)
+
+      // Calculate actual Thursday/Sunday counts
+      if (schoolYearData?.start_date && schoolYearData?.end_date) {
+        const thu5Total = countWeekdays(schoolYearData.start_date, schoolYearData.end_date, 4)
+        const cnTotal = countWeekdays(schoolYearData.start_date, schoolYearData.end_date, 0)
+
+        // Fetch holidays to subtract
+        let holidays: Holiday[] = []
+        if (schoolYearData.id) {
+          const { data: holidaysData } = await supabase
+            .from('holidays')
+            .select('*')
+            .eq('school_year_id', schoolYearData.id)
+          holidays = (holidaysData || []) as Holiday[]
+        }
+        const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
+        const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
+
+        setTotalThu5Days(Math.max(1, thu5Total - thu5Holidays))
+        setTotalCnDays(Math.max(1, cnTotal - cnHolidays))
+      }
 
       // Fetch attendance records from attendance_records table
       const { data: attendanceData, error: attendanceError } = await supabase
@@ -176,6 +200,7 @@ export default function StudentAttendancePage() {
     return weeks
   }
 
+  // Grid still uses totalWeeks (calendar weeks) for visual layout
   const thu5Weeks = generateWeekGrid(thu5AttendedWeeks, totalWeeks)
   const cnWeeks = generateWeekGrid(cnAttendedWeeks, totalWeeks)
 
@@ -321,7 +346,7 @@ export default function StudentAttendancePage() {
                   Thứ năm
                 </button>
                 <div className="h-[52px] w-[144px] rounded-[50px] text-lg bg-[#e5e1dc] dark:bg-white/20 text-black dark:text-white border border-white/60 dark:border-white/10 flex items-center justify-center">
-                  {attendanceThu5}/{totalWeeks} buổi
+                  {attendanceThu5}/{totalThu5Days} buổi
                 </div>
               </div>
             </div>
@@ -348,7 +373,7 @@ export default function StudentAttendancePage() {
                   Chủ nhật
                 </button>
                 <div className="h-[52px] w-[144px] rounded-[50px] text-lg bg-[#e5e1dc] dark:bg-white/20 text-black dark:text-white border border-white/60 dark:border-white/10 flex items-center justify-center">
-                  {attendanceCn}/{totalWeeks} buổi
+                  {attendanceCn}/{totalCnDays} buổi
                 </div>
               </div>
             </div>
