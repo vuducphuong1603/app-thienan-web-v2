@@ -97,7 +97,7 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('Dung luong file toi da 5MB')
+        alert('Dung lượng file tối đa 5MB')
         return
       }
       setAvatarFile(file)
@@ -112,13 +112,13 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
   const validateForm = (): boolean => {
     const newErrors: Partial<FormData> = {}
 
-    if (!formData.username.trim()) newErrors.username = 'Vui long nhap ten dang nhap'
+    if (!formData.username.trim()) newErrors.username = 'Vui lòng nhập tên đăng nhập'
     if (formData.password && formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Mat khau xac nhan khong khop'
+      newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp'
     }
-    if (!formData.saint_name.trim()) newErrors.saint_name = 'Vui long nhap ten thanh'
-    if (!formData.full_name.trim()) newErrors.full_name = 'Vui long nhap ho va ten'
-    if (!formData.phone.trim()) newErrors.phone = 'Vui long nhap so dien thoai'
+    if (!formData.saint_name.trim()) newErrors.saint_name = 'Vui lòng nhập tên thánh'
+    if (!formData.full_name.trim()) newErrors.full_name = 'Vui lòng nhập họ và tên'
+    if (!formData.phone.trim()) newErrors.phone = 'Vui lòng nhập số điện thoại'
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -174,7 +174,7 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
 
       if (error) {
         console.error('Error updating user:', error)
-        alert(`Loi cap nhat nguoi dung: ${error.message}`)
+        alert(`Lỗi cập nhật người dùng: ${error.message}`)
         return
       }
 
@@ -182,7 +182,7 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
       onBack()
     } catch (err) {
       console.error('Error:', err)
-      alert('Co loi xay ra')
+      alert('Có lỗi xảy ra')
     } finally {
       setIsSubmitting(false)
     }
@@ -198,9 +198,9 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
             className="flex items-center gap-2 text-primary-3 hover:text-black dark:hover:text-white transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="text-sm">Quay tro lai</span>
+            <span className="text-sm">Quay trở lại</span>
           </button>
-          <h1 className="text-4xl font-bold text-black dark:text-white">Chinh sua nguoi dung</h1>
+          <h1 className="text-4xl font-bold text-black dark:text-white">Chỉnh sửa người dùng</h1>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -208,7 +208,7 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
             disabled={isSubmitting}
             className="h-[40px] px-6 bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/20 rounded-full text-sm font-bold text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
           >
-            Huy
+            Hủy
           </button>
           <button
             onClick={handleSubmit}
@@ -221,7 +221,7 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             )}
-            Luu thay doi
+            Lưu thay đổi
           </button>
         </div>
       </div>
@@ -232,8 +232,8 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
         <div className="flex gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
           {/* Left Label */}
           <div className="w-[300px] flex-shrink-0">
-            <h2 className="text-lg font-bold text-black dark:text-white">Thong tin tai khoan</h2>
-            <p className="text-sm text-primary-3">Cap nhat thong tin nguoi dung</p>
+            <h2 className="text-lg font-bold text-black dark:text-white">Thông tin tài khoản</h2>
+            <p className="text-sm text-primary-3">Cập nhật thông tin người dùng</p>
           </div>
 
           {/* Right Form */}
@@ -258,9 +258,9 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
                   onClick={() => fileInputRef.current?.click()}
                   className="text-sm font-medium text-brand hover:underline"
                 >
-                  Chon anh dai dien
+                  Chọn ảnh đại diện
                 </button>
-                <p className="text-xs text-black/40">Ho tro JPG, PNG. Dung luong toi da 5MB.</p>
+                <p className="text-xs text-black/40">Hỗ trợ JPG, PNG. Dung lượng tối đa 5MB.</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -275,7 +275,7 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
             <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Ten dang nhap <span className="text-[#DF1C41]">*</span>
+                  Tên đăng nhập <span className="text-[#DF1C41]">*</span>
                 </label>
                 <input
                   type="text"
@@ -288,7 +288,7 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
               </div>
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Vai tro <span className="text-[#DF1C41]">*</span>
+                  Vai trò <span className="text-[#DF1C41]">*</span>
                 </label>
                 <div className="relative">
                   <button
@@ -322,26 +322,26 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
             <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Mat khau <span className="text-black/40">(de trong neu khong doi)</span>
+                  Mật khẩu <span className="text-black/40">(để trống nếu không đổi)</span>
                 </label>
                 <input
                   type="password"
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
-                  placeholder="Nhap mat khau moi"
+                  placeholder="Nhập mật khẩu mới"
                   className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.password ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
               </div>
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Xac nhan mat khau
+                  Xác nhận mật khẩu
                 </label>
                 <input
                   type="password"
                   value={formData.confirmPassword}
                   onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                  placeholder="Nhap lai mat khau"
+                  placeholder="Nhập lại mật khẩu"
                   className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.confirmPassword ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword}</p>}
@@ -355,7 +355,7 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
             <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Ten thanh <span className="text-[#DF1C41]">*</span>
+                  Tên thánh <span className="text-[#DF1C41]">*</span>
                 </label>
                 <input
                   type="text"
@@ -368,13 +368,13 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
               </div>
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Ho va ten <span className="text-[#DF1C41]">*</span>
+                  Họ và tên <span className="text-[#DF1C41]">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.full_name}
                   onChange={(e) => handleInputChange('full_name', e.target.value)}
-                  placeholder="VD: Nguyen Van A"
+                  placeholder="VD: Nguyễn Văn A"
                   className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.full_name ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.full_name && <p className="text-xs text-red-500">{errors.full_name}</p>}
@@ -385,7 +385,7 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
             <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Ngay sinh <span className="text-[#DF1C41]">*</span>
+                  Ngày sinh <span className="text-[#DF1C41]">*</span>
                 </label>
                 <CustomDatePicker
                   value={formData.birthday}
@@ -395,7 +395,7 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
               </div>
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  So dien thoai <span className="text-[#DF1C41]">*</span>
+                  Số điện thoại <span className="text-[#DF1C41]">*</span>
                 </label>
                 <input
                   type="tel"
@@ -411,12 +411,12 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
             {/* Address */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-primary-3">
-                Dia chi <span className="text-[#DF1C41]">*</span>
+                Địa chỉ <span className="text-[#DF1C41]">*</span>
               </label>
               <textarea
                 value={formData.address}
                 onChange={(e) => handleInputChange('address', e.target.value)}
-                placeholder="VD: 123 Duong ABC, Phuong XYZ..."
+                placeholder="VD: 123 Đường ABC, Phường XYZ..."
                 rows={3}
                 className="px-4 py-3 bg-[#F6F6F6] rounded-xl text-sm text-black placeholder:text-black/40 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 resize-none"
               />
@@ -428,8 +428,8 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
         <div className="flex gap-6 pt-6">
           {/* Left Label */}
           <div className="w-[300px] flex-shrink-0">
-            <h2 className="text-lg font-bold text-black dark:text-white">Phan cong & phu trach</h2>
-            <p className="text-sm text-primary-3">Vai tro</p>
+            <h2 className="text-lg font-bold text-black dark:text-white">Phân công & phụ trách</h2>
+            <p className="text-sm text-primary-3">Vai trò</p>
           </div>
 
           {/* Right Form */}

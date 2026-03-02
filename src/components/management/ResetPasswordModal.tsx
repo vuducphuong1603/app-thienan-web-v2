@@ -38,11 +38,11 @@ export default function ResetPasswordModal({ isOpen, onClose, onConfirm }: Reset
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-black dark:text-white mb-2">Reset mat khau?</h2>
+          <h2 className="text-xl font-bold text-black dark:text-white mb-2">Reset mật khẩu?</h2>
 
           {/* Description */}
           <p className="text-sm text-primary-3 text-center mb-6">
-            Ban chac chan muon reset mat khau cua nguoi dung ve 123456?
+            Bạn chắc chắn muốn reset mật khẩu của người dùng về 123456?
           </p>
 
           {/* Buttons */}
@@ -52,7 +52,7 @@ export default function ResetPasswordModal({ isOpen, onClose, onConfirm }: Reset
               disabled={isResetting}
               className="flex-1 h-[44px] bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/20 rounded-xl text-sm font-medium text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
             >
-              Huy
+              Hủy
             </button>
             <button
               onClick={handleReset}
@@ -65,7 +65,7 @@ export default function ResetPasswordModal({ isOpen, onClose, onConfirm }: Reset
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              {isResetting ? 'Dang reset...' : 'Reset mat khau'}
+              {isResetting ? 'Đang reset...' : 'Reset mật khẩu'}
             </button>
           </div>
         </div>

@@ -1486,7 +1486,7 @@ export default function ActivitiesPage() {
 
         const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
         ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, ...reportDates.map(() => ({ wch: 8 }))]
-        XLSX.utils.book_append_sheet(wb, ws, 'Diem danh')
+        XLSX.utils.book_append_sheet(wb, ws, 'Điểm danh')
 
         const typeLabel = reportAttendanceType === 'thu5' ? '_thu5' : reportAttendanceType === 'cn' ? '_cn' : ''
         const fileName = `diem_danh_${clsName}${typeLabel}_${today}.xlsx`
@@ -1548,7 +1548,7 @@ export default function ActivitiesPage() {
 
         const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
         ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 25 }, ...header.slice(3).map(() => ({ wch: 10 }))]
-        XLSX.utils.book_append_sheet(wb, ws, 'Diem so')
+        XLSX.utils.book_append_sheet(wb, ws, 'Điểm số')
 
         const fileName = `diem_so_${clsName}_${today}.xlsx`
 

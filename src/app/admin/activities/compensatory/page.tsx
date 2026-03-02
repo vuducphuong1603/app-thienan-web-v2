@@ -38,7 +38,7 @@ export default function CompensatoryAttendancePage() {
   // Get day of week from date for display
   const getDayOfWeekDisplay = (dateString: string) => {
     const date = new Date(dateString)
-    const days = ['Chu nhat', 'Thu hai', 'Thu ba', 'Thu tu', 'Thu nam', 'Thu sau', 'Thu bay']
+    const days = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy']
     return days[date.getDay()]
   }
 
@@ -156,7 +156,7 @@ export default function CompensatoryAttendancePage() {
 
       if (studentsError) {
         console.error('Error fetching students:', studentsError)
-        showNotification('error', 'Khong the tai danh sach thieu nhi')
+        showNotification('error', 'Không thể tải danh sách thiếu nhi')
         return
       }
 
@@ -217,7 +217,7 @@ export default function CompensatoryAttendancePage() {
       setStudents(studentsWithStatus)
     } catch (error) {
       console.error('Error:', error)
-      showNotification('error', 'Da co loi xay ra')
+      showNotification('error', 'Đã có lỗi xảy ra')
     } finally {
       setLoading(false)
     }
@@ -244,7 +244,7 @@ export default function CompensatoryAttendancePage() {
   // Get class name by id
   const getClassName = (classId: string) => {
     const cls = classes.find((c) => c.id === classId)
-    return cls?.name || 'Chon lop'
+    return cls?.name || 'Chọn lớp'
   }
 
   // Filter students by search query
@@ -266,7 +266,7 @@ export default function CompensatoryAttendancePage() {
   // Handle compensatory attendance marking
   const markCompensatoryAttendance = async (studentId: string) => {
     if (!isValidDay) {
-      showNotification('error', 'Chi bo sung diem danh vao Thu 2, 3, 4, 6, 7')
+      showNotification('error', 'Chỉ bổ sung điểm danh vào Thứ 2, 3, 4, 6, 7')
       return
     }
 
@@ -274,12 +274,12 @@ export default function CompensatoryAttendancePage() {
     if (!student) return
 
     if (student.has_thursday_attendance) {
-      showNotification('error', 'Thieu nhi nay da diem danh vao Thu 5 tuan nay')
+      showNotification('error', 'Thiếu nhi này đã điểm danh vào Thứ 5 tuần này')
       return
     }
 
     if (student.has_compensatory_attendance) {
-      showNotification('error', 'Thieu nhi nay da bo sung diem danh cho Thu 5 tuan nay roi')
+      showNotification('error', 'Thiếu nhi này đã bổ sung điểm danh cho Thứ 5 tuần này rồi')
       return
     }
 
@@ -302,16 +302,16 @@ export default function CompensatoryAttendancePage() {
           check_in_method: 'manual',
           is_compensatory: true,
           compensated_for_date: thursdayOfWeek,
-          notes: `Bo sung diem danh cho Thu 5 ngay ${thursdayOfWeek}`,
+          notes: `Bổ sung điểm danh cho Thứ 5 ngày ${thursdayOfWeek}`,
           created_by: user?.id,
         })
 
       if (error) {
         console.error('Error saving compensatory attendance:', error)
         if (error.code === '23505') {
-          showNotification('error', 'Da co ban ghi diem danh cho ngay nay')
+          showNotification('error', 'Đã có bản ghi điểm danh cho ngày này')
         } else {
-          showNotification('error', 'Khong the luu diem danh: ' + error.message)
+          showNotification('error', 'Không thể lưu điểm danh: ' + error.message)
         }
         return
       }
@@ -327,10 +327,10 @@ export default function CompensatoryAttendancePage() {
           : s
       ))
 
-      showNotification('success', `Da bo sung diem danh cho ${student.full_name}`)
+      showNotification('success', `Đã bổ sung điểm danh cho ${student.full_name}`)
     } catch (error) {
       console.error('Error:', error)
-      showNotification('error', 'Da co loi xay ra')
+      showNotification('error', 'Đã có lỗi xảy ra')
     } finally {
       setSaving(null)
     }
@@ -368,9 +368,9 @@ export default function CompensatoryAttendancePage() {
           <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
         </Link>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Bo sung diem danh Thu 5</h1>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Bổ sung điểm danh Thứ 5</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Diem danh bu cho thieu nhi khong the di vao Thu 5
+            Điểm danh bù cho thiếu nhi không thể đi vào Thứ 5
           </p>
         </div>
       </div>
@@ -390,11 +390,11 @@ export default function CompensatoryAttendancePage() {
         <div className="flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
           <div className="text-sm text-blue-800">
-            <p className="font-medium mb-1">Quy dinh bo sung diem danh:</p>
+            <p className="font-medium mb-1">Quy định bổ sung điểm danh:</p>
             <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>Thieu nhi co the diem danh bu vao Thu 2, 3, 4, 6, 7</li>
-              <li>Moi tuan chi duoc bo sung <strong>1 lan</strong> cho Thu 5 cua tuan do</li>
-              <li>Neu da diem danh Thu 5 hoac da bo sung roi thi khong the bo sung them</li>
+              <li>Thiếu nhi có thể điểm danh bù vào Thứ 2, 3, 4, 6, 7</li>
+              <li>Mỗi tuần chỉ được bổ sung <strong>1 lần</strong> cho Thứ 5 của tuần đó</li>
+              <li>Nếu đã điểm danh Thứ 5 hoặc đã bổ sung rồi thì không thể bổ sung thêm</li>
             </ul>
           </div>
         </div>
@@ -409,7 +409,7 @@ export default function CompensatoryAttendancePage() {
               onClick={() => setIsClassDropdownOpen(!isClassDropdownOpen)}
               className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-white/10 hover:bg-gray-50 dark:hover:bg-white/10 min-w-[180px]"
             >
-              <span className="text-sm text-gray-700 dark:text-gray-200">{selectedClassId ? getClassName(selectedClassId) : 'Chon lop'}</span>
+              <span className="text-sm text-gray-700 dark:text-gray-200">{selectedClassId ? getClassName(selectedClassId) : 'Chọn lớp'}</span>
               <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -475,7 +475,7 @@ export default function CompensatoryAttendancePage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Tim kiem thieu nhi..."
+              placeholder="Tìm kiếm thiếu nhi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-white/10 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -488,7 +488,7 @@ export default function CompensatoryAttendancePage() {
           <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-700 flex items-center gap-2">
               <X className="w-4 h-4" />
-              Ngay {dayOfWeek} khong hop le. Chi co the bo sung diem danh vao Thu 2, 3, 4, 6, 7.
+              Ngày {dayOfWeek} không hợp lệ. Chỉ có thể bổ sung điểm danh vào Thứ 2, 3, 4, 6, 7.
             </p>
           </div>
         )}
@@ -497,10 +497,10 @@ export default function CompensatoryAttendancePage() {
         {isValidDay && selectedClassId && (
           <div className="mt-3 p-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg">
             <p className="text-sm text-gray-700 dark:text-gray-200">
-              <span className="font-medium">Tuan:</span> {formatDate(weekStart)} - {formatDate(weekEnd)}
+              <span className="font-medium">Tuần:</span> {formatDate(weekStart)} - {formatDate(weekEnd)}
             </p>
             <p className="text-sm text-gray-700 dark:text-gray-200 mt-1">
-              <span className="font-medium">Bo sung cho:</span> {formatDate(thursdayOfWeek)}
+              <span className="font-medium">Bổ sung cho:</span> {formatDate(thursdayOfWeek)}
             </p>
           </div>
         )}
@@ -511,15 +511,15 @@ export default function CompensatoryAttendancePage() {
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white dark:bg-white/10 rounded-xl shadow-sm p-4">
             <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalStudents}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Tong so thieu nhi</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Tổng số thiếu nhi</p>
           </div>
           <div className="bg-white dark:bg-white/10 rounded-xl shadow-sm p-4">
             <p className="text-2xl font-bold text-green-600">{alreadyAttendedCount}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Da diem danh/bu</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Đã điểm danh/bù</p>
           </div>
           <div className="bg-white dark:bg-white/10 rounded-xl shadow-sm p-4">
             <p className="text-2xl font-bold text-blue-600">{canCompensateCount}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Chua diem danh</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Chưa điểm danh</p>
           </div>
         </div>
       )}
@@ -533,20 +533,20 @@ export default function CompensatoryAttendancePage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <p className="text-gray-500 dark:text-gray-400 text-sm">Dang tai...</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">Đang tải...</p>
             </div>
           </div>
         ) : !selectedClassId ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">Vui long chon lop de xem danh sach thieu nhi</p>
+            <p className="text-gray-500 dark:text-gray-400">Vui lòng chọn lớp để xem danh sách thiếu nhi</p>
           </div>
         ) : !isValidDay ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">Vui long chon ngay hop le (Thu 2, 3, 4, 6, 7)</p>
+            <p className="text-gray-500 dark:text-gray-400">Vui lòng chọn ngày hợp lệ (Thứ 2, 3, 4, 6, 7)</p>
           </div>
         ) : filteredStudents.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">Khong co thieu nhi nao</p>
+            <p className="text-gray-500 dark:text-gray-400">Không có thiếu nhi nào</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-white/10">
@@ -582,12 +582,12 @@ export default function CompensatoryAttendancePage() {
                   {student.has_thursday_attendance ? (
                     <div className="flex items-center gap-2 text-green-600">
                       <CheckCircle2 className="w-5 h-5" />
-                      <span className="text-sm font-medium">Da di Thu 5</span>
+                      <span className="text-sm font-medium">Đã đi Thứ 5</span>
                     </div>
                   ) : student.has_compensatory_attendance ? (
                     <div className="flex items-center gap-2 text-blue-600">
                       <CheckCircle2 className="w-5 h-5" />
-                      <span className="text-sm font-medium">Da bo sung</span>
+                      <span className="text-sm font-medium">Đã bổ sung</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-3">
@@ -614,12 +614,12 @@ export default function CompensatoryAttendancePage() {
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            <span className="text-sm">Dang luu...</span>
+                            <span className="text-sm">Đang lưu...</span>
                           </>
                         ) : (
                           <>
                             <Check className="w-4 h-4" />
-                            <span className="text-sm font-medium">Bo sung</span>
+                            <span className="text-sm font-medium">Bổ sung</span>
                           </>
                         )}
                       </button>

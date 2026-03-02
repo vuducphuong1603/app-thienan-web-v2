@@ -362,13 +362,13 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
               </div>
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Ho va ten <span className="text-[#DF1C41]">*</span>
+                  Họ và tên <span className="text-[#DF1C41]">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.full_name}
                   onChange={(e) => handleInputChange('full_name', e.target.value)}
-                  placeholder="VD: Nguyen Van A"
+                  placeholder="VD: Nguyễn Văn A"
                   className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.full_name ? 'ring-2 ring-red-500' : ''}`}
                 />
                 {errors.full_name && <p className="text-xs text-red-500">{errors.full_name}</p>}
@@ -379,7 +379,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
             <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  Ngay sinh <span className="text-[#DF1C41]">*</span>
+                  Ngày sinh <span className="text-[#DF1C41]">*</span>
                 </label>
                 <CustomDatePicker
                   value={formData.birthday}
@@ -389,7 +389,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
               </div>
               <div className="flex-1 flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-primary-3">
-                  So dien thoai <span className="text-[#DF1C41]">*</span>
+                  Số điện thoại <span className="text-[#DF1C41]">*</span>
                 </label>
                 <input
                   type="tel"
@@ -405,12 +405,12 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
             {/* Address */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-primary-3">
-                Dia chi <span className="text-[#DF1C41]">*</span>
+                Địa chỉ <span className="text-[#DF1C41]">*</span>
               </label>
               <textarea
                 value={formData.address}
                 onChange={(e) => handleInputChange('address', e.target.value)}
-                placeholder="VD: 123 Duong ABC, Phuong XYZ..."
+                placeholder="VD: 123 Đường ABC, Phường XYZ..."
                 rows={3}
                 className="px-4 py-3 bg-[#F6F6F6] rounded-xl text-sm text-black placeholder:text-black/40 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 resize-none"
               />
@@ -422,8 +422,8 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
         <div className="flex gap-6 pt-6">
           {/* Left Label */}
           <div className="w-[300px] flex-shrink-0">
-            <h2 className="text-lg font-bold text-black dark:text-white">Phan cong & phu trach</h2>
-            <p className="text-sm text-primary-3">Vai tro</p>
+            <h2 className="text-lg font-bold text-black dark:text-white">Phân công & phụ trách</h2>
+            <p className="text-sm text-primary-3">Vai trò</p>
           </div>
 
           {/* Right Form */}
