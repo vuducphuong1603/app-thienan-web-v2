@@ -31,34 +31,44 @@ function isAuthError(error: unknown): boolean {
   return false
 }
 
-async function handleAuthError() {
+// Debounced auth error handler — prevents multiple concurrent refresh attempts
+let isHandlingAuth = false
+async function handleAuthError(queryClient: QueryClient) {
+  if (isHandlingAuth) return
+  isHandlingAuth = true
+
   try {
     const { error } = await supabase.auth.refreshSession()
     if (error) {
       await supabase.auth.signOut()
       window.location.href = '/login'
+    } else {
+      // Token refreshed successfully — retry all failed queries
+      queryClient.invalidateQueries()
     }
   } catch {
     await supabase.auth.signOut()
     window.location.href = '/login'
+  } finally {
+    isHandlingAuth = false
   }
 }
 
 export default function QueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
-    () =>
-      new QueryClient({
+    () => {
+      const client = new QueryClient({
         queryCache: new QueryCache({
           onError: (error) => {
             if (isAuthError(error)) {
-              handleAuthError()
+              handleAuthError(client)
             }
           },
         }),
         mutationCache: new MutationCache({
           onError: (error) => {
             if (isAuthError(error)) {
-              handleAuthError()
+              handleAuthError(client)
             }
           },
         }),
@@ -66,8 +76,8 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
           queries: {
             staleTime: 5 * 60 * 1000, // Data stays fresh for 5 minutes
             gcTime: 10 * 60 * 1000, // Cache kept for 10 minutes
-            refetchOnWindowFocus: true, // Refetch stale data when tab regains focus
-            refetchOnReconnect: true, // Refetch when network reconnects
+            refetchOnWindowFocus: false, // Disabled — session recovery handles refetch on tab focus
+            refetchOnReconnect: 'always', // Refetch when network reconnects
             retry: (failureCount, error) => {
               // Don't retry auth errors — need session refresh, not retry
               if (isAuthError(error)) return false
@@ -77,6 +87,8 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
           },
         },
       })
+      return client
+    }
   )
 
   return (

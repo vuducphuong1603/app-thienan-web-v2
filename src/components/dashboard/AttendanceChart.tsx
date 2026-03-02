@@ -41,7 +41,7 @@ export default function AttendanceChart({ classId }: AttendanceChartProps) {
   const { data = [
     { label: 'Thứ 5', present: 0, absent: 0 },
     { label: 'Chúa nhật', present: 0, absent: 0 },
-  ], isLoading: loading } = useQuery<DayData[]>({
+  ], isLoading: loading, isError, refetch } = useQuery<DayData[]>({
     queryKey: ['attendanceChart7Days', classId || 'all'],
     queryFn: async () => {
       const { lastThursday, lastSunday } = getRecentDays()
@@ -111,6 +111,11 @@ export default function AttendanceChart({ classId }: AttendanceChartProps) {
         {loading ? (
           <div className="col-span-2 flex items-center justify-center">
             <div className="animate-spin h-6 w-6 border-2 border-brand border-t-transparent rounded-full"></div>
+          </div>
+        ) : isError ? (
+          <div className="col-span-2 flex flex-col items-center justify-center gap-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400">Không tải được dữ liệu</p>
+            <button onClick={() => refetch()} className="text-xs text-brand hover:underline">Thử lại</button>
           </div>
         ) : (
           data.map((day, index) => (

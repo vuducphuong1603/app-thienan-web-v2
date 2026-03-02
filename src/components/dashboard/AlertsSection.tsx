@@ -21,7 +21,7 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function AlertsSection() {
-  const { data: alerts, isLoading } = useDashboardAlerts()
+  const { data: alerts, isLoading, isError, refetch } = useDashboardAlerts()
 
   return (
     <div className="bg-white dark:bg-white/10 rounded-[15px] border border-white/60 dark:border-white/10 overflow-hidden h-full flex flex-col">
@@ -47,6 +47,11 @@ export default function AlertsSection() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
+          </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center justify-center py-6 gap-2">
+            <p className="text-[10px] text-[#8a8c90]">Không tải được dữ liệu</p>
+            <button onClick={() => refetch()} className="text-[10px] text-brand hover:underline">Thử lại</button>
           </div>
         ) : !alerts || alerts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6">

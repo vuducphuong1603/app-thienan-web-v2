@@ -49,7 +49,7 @@ interface AbsentStudentsListProps {
 export default function AbsentStudentsList({ classId, className: clsName }: AbsentStudentsListProps) {
   const router = useRouter()
   const [dayType, setDayType] = useState<'cn' | 'thu5'>('cn')
-  const { data, isLoading } = useAbsentStudents(classId, dayType)
+  const { data, isLoading, isError, refetch } = useAbsentStudents(classId, dayType)
 
   const totalStudents = data?.totalStudents || 0
   const presentCount = data?.presentCount || 0
@@ -117,6 +117,11 @@ export default function AbsentStudentsList({ classId, className: clsName }: Abse
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin h-6 w-6 border-2 border-brand border-t-transparent rounded-full"></div>
+        </div>
+      ) : isError ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-2">
+          <p className="text-xs text-gray-500 dark:text-gray-400">Không tải được dữ liệu</p>
+          <button onClick={() => refetch()} className="text-xs text-brand hover:underline">Thử lại</button>
         </div>
       ) : (
         <>

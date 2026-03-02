@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase, UserProfile, UserRole } from './supabase'
 import { useRouter, usePathname } from 'next/navigation'
 
@@ -69,6 +70,8 @@ async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient()
+
   // Initialize user from localStorage cache for instant UI render
   const [user, setUser] = useState<UserProfile | null>(() => {
     if (typeof window === 'undefined') return null
@@ -144,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Session recovery when tab becomes visible after idle
     let lastHiddenAt = 0
-    const IDLE_THRESHOLD = 5 * 60 * 1000 // 5 minutes
+    const IDLE_THRESHOLD = 2 * 60 * 1000 // 2 minutes
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'hidden') {
@@ -152,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      // Only check session if tab was hidden for >5 minutes
+      // Only check session if tab was hidden for >2 minutes
       if (lastHiddenAt === 0 || Date.now() - lastHiddenAt < IDLE_THRESHOLD) return
 
       try {
@@ -165,8 +168,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(null)
             localStorage.removeItem('thien_an_user')
             router.push('/login')
+            return
           }
         }
+        // Session is valid (or was refreshed) — refetch all stale queries
+        queryClient.invalidateQueries()
       } catch {
         // Network error or other issue — don't force logout, let next interaction handle it
       }

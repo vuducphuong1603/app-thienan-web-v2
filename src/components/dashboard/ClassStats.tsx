@@ -257,7 +257,7 @@ function LineChart({ branchesData }: { branchesData: BranchData[] }) {
 
 export default function ClassStats() {
   const router = useRouter()
-  const { data: branchesData = [], isLoading: loading } = useClassStats()
+  const { data: branchesData = [], isLoading: loading, isError, refetch } = useClassStats()
 
   return (
     <div className="bg-white dark:bg-white/10 rounded-[15px] p-4 border border-gray-100 dark:border-white/10 flex flex-col h-full">
@@ -280,6 +280,11 @@ export default function ClassStats() {
         {loading ? (
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin h-6 w-6 border-2 border-brand border-t-transparent rounded-full"></div>
+          </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center justify-center h-32 gap-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400">Không tải được dữ liệu</p>
+            <button onClick={() => refetch()} className="text-xs text-brand hover:underline">Thử lại</button>
           </div>
         ) : (
           branchesData.map((branch, index) => (
