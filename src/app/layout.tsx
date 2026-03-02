@@ -8,6 +8,10 @@ import QueryProvider from "@/lib/query-provider";
 export const metadata: Metadata = {
   title: "Giáo Xứ Thiên Ân - Quản Lý Thiếu Nhi",
   description: "Ứng dụng quản lý thiếu nhi Giáo Xứ Thiên Ân",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
