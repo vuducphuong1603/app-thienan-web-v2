@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
-import { useQueryClient, onlineManager } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase, UserProfile, UserRole } from './supabase'
 import { useRouter, usePathname } from 'next/navigation'
 
@@ -149,16 +149,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     // ============ Session recovery when tab becomes visible after idle ============
-    // When a browser tab is hidden, JavaScript timers are throttled or frozen.
-    // This means Supabase's autoRefreshToken timer may NOT fire, causing the JWT
-    // to expire. When the user returns to the tab:
-    //   1. We PAUSE all React Query fetches (onlineManager.setOnline(false))
-    //      so no queries fire with the expired token
-    //   2. We refresh the session to get a new token
-    //   3. We RESUME queries (onlineManager.setOnline(true))
-    //      React Query sees "reconnect" → refetches all stale queries with valid token
+    // When a browser tab is hidden, JavaScript timers are throttled/frozen.
+    // Supabase's autoRefreshToken timer may not fire, causing JWT to expire.
+    // The fetch interceptor in supabase.ts handles per-request token refresh,
+    // so we just need to proactively refresh the session and invalidate
+    // stale queries. Cached data remains visible — no loading flash.
     let lastHiddenAt = 0
-    const IDLE_THRESHOLD = 60 * 1000 // 1 minute — aggressive but ensures token freshness
+    const IDLE_THRESHOLD = 60 * 1000 // 1 minute
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'hidden') {
@@ -169,10 +166,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Skip recovery for very short idle periods
       if (lastHiddenAt === 0 || Date.now() - lastHiddenAt < IDLE_THRESHOLD) return
 
-      // PAUSE all queries — prevents any fetch with potentially expired token
-      onlineManager.setOnline(false)
-
       try {
+        // Silently refresh the session token — no query pausing needed
+        // The fetch interceptor also handles this per-request as a safety net
         const { data, error } = await supabase.auth.refreshSession()
         if (error || !data.session) {
           // Refresh token also expired — session is truly dead
@@ -183,18 +179,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        // Update user profile in case it changed
-        const profile = await fetchUserProfile(data.session.user.id)
-        if (profile && profile.status === 'ACTIVE') {
-          setUser(profile)
-          localStorage.setItem('thien_an_user', JSON.stringify(profile))
-        }
+        // Invalidate all queries so they refetch in background
+        // Cached data stays visible while fresh data loads
+        queryClient.invalidateQueries()
       } catch {
-        // Network error — don't force logout, just resume queries
-        // The fetch interceptor in supabase.ts will handle token refresh per-request
-      } finally {
-        // RESUME all queries — refetchOnReconnect: true triggers automatic refetch
-        onlineManager.setOnline(true)
+        // Network error — don't force logout
+        // The fetch interceptor handles token refresh per-request
       }
     }
 
