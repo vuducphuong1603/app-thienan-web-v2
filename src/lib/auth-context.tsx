@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, onlineManager } from '@tanstack/react-query'
 import { supabase, UserProfile, UserRole } from './supabase'
 import { useRouter, usePathname } from 'next/navigation'
 
@@ -133,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === 'SIGNED_OUT') {
         setUser(null)
         localStorage.removeItem('thien_an_user')
+        queryClient.clear()
         router.push('/login')
       } else if (event === 'SIGNED_IN' && session?.user) {
         const profile = await fetchUserProfile(session.user.id)
@@ -140,14 +141,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(profile)
           localStorage.setItem('thien_an_user', JSON.stringify(profile))
         }
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        // Token was auto-refreshed — session is still alive, no action needed
+      } else if (event === 'TOKEN_REFRESHED') {
+        // Token was auto-refreshed by Supabase — refetch any stale/errored queries
+        // so they pick up the new token
+        queryClient.refetchQueries({ type: 'active' })
       }
     })
 
-    // Session recovery when tab becomes visible after idle
+    // ============ Session recovery when tab becomes visible after idle ============
+    // When a browser tab is hidden, JavaScript timers are throttled or frozen.
+    // This means Supabase's autoRefreshToken timer may NOT fire, causing the JWT
+    // to expire. When the user returns to the tab:
+    //   1. We PAUSE all React Query fetches (onlineManager.setOnline(false))
+    //      so no queries fire with the expired token
+    //   2. We refresh the session to get a new token
+    //   3. We RESUME queries (onlineManager.setOnline(true))
+    //      React Query sees "reconnect" → refetches all stale queries with valid token
     let lastHiddenAt = 0
-    const IDLE_THRESHOLD = 5 * 60 * 1000 // 5 minutes
+    const IDLE_THRESHOLD = 60 * 1000 // 1 minute — aggressive but ensures token freshness
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'hidden') {
@@ -155,24 +166,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      // Only recover session if tab was hidden for >5 minutes
+      // Skip recovery for very short idle periods
       if (lastHiddenAt === 0 || Date.now() - lastHiddenAt < IDLE_THRESHOLD) return
 
+      // PAUSE all queries — prevents any fetch with potentially expired token
+      onlineManager.setOnline(false)
+
       try {
-        // Always call refreshSession() — getSession() only returns cached data
-        // which may contain an expired JWT that looks valid locally
         const { data, error } = await supabase.auth.refreshSession()
         if (error || !data.session) {
-          // Refresh failed — session truly expired, force logout
+          // Refresh token also expired — session is truly dead
           setUser(null)
           localStorage.removeItem('thien_an_user')
+          queryClient.clear()
           router.push('/login')
           return
         }
-        // Session refreshed — force refetch ALL active queries (including errored ones)
-        queryClient.refetchQueries({ type: 'active' })
+
+        // Update user profile in case it changed
+        const profile = await fetchUserProfile(data.session.user.id)
+        if (profile && profile.status === 'ACTIVE') {
+          setUser(profile)
+          localStorage.setItem('thien_an_user', JSON.stringify(profile))
+        }
       } catch {
-        // Network error — don't force logout, let next interaction handle it
+        // Network error — don't force logout, just resume queries
+        // The fetch interceptor in supabase.ts will handle token refresh per-request
+      } finally {
+        // RESUME all queries — refetchOnReconnect: true triggers automatic refetch
+        onlineManager.setOnline(true)
       }
     }
 
@@ -321,6 +343,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
     setUser(null)
     localStorage.removeItem('thien_an_user')
+    queryClient.clear()
     router.push('/login')
   }
 

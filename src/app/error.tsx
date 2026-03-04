@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 
 export default function GlobalError({
@@ -9,6 +10,10 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    console.error('App error:', error)
+  }, [error])
+
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center max-w-md">
@@ -31,6 +36,12 @@ export default function GlobalError({
             className="px-6 py-2.5 bg-brand text-white text-sm font-medium rounded-full hover:bg-brand/90 transition-colors"
           >
             Thử lại
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2.5 bg-gray-100 dark:bg-white/10 text-black dark:text-white text-sm font-medium rounded-full hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+          >
+            Tải lại trang
           </button>
           <Link
             href="/login"

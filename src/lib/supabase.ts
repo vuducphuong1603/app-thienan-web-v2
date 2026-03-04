@@ -1,15 +1,87 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// ============ Proactive token refresh before every API call ============
+// Prevents queries from being sent with expired JWT tokens.
+// When the browser tab is hidden, Supabase's auto-refresh timer gets
+// throttled/frozen. This interceptor checks the cached session's expires_at
+// and refreshes proactively before making any PostgREST/Storage request.
+
+let _refreshPromise: Promise<void> | null = null
+
+// Forward-declared — assigned right after createClient below
+// eslint-disable-next-line prefer-const
+let _client: SupabaseClient
+
+async function ensureSessionFresh(): Promise<void> {
+  // Wait if a refresh is already in flight
+  if (_refreshPromise) {
+    await _refreshPromise
+    return
+  }
+
+  if (typeof window === 'undefined' || !_client) return
+
+  try {
+    const { data: { session } } = await _client.auth.getSession()
+    if (!session?.expires_at) return
+
+    // Refresh if token expires within 2 minutes
+    const now = Math.floor(Date.now() / 1000)
+    if (now > session.expires_at - 120) {
+      _refreshPromise = (async () => {
+        try {
+          await _client.auth.refreshSession()
+        } finally {
+          _refreshPromise = null
+        }
+      })()
+      await _refreshPromise
+    }
+  } catch {
+    _refreshPromise = null
+  }
+}
+
+_client = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
   },
+  global: {
+    fetch: async (input, init) => {
+      // Determine the URL being fetched
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : (input as Request).url
+
+      // Skip auth endpoints to avoid recursion (refreshSession calls /auth/v1/token)
+      if (!url.includes('/auth/v1/')) {
+        await ensureSessionFresh()
+
+        // After refresh, update the Authorization header with the new token
+        if (_refreshPromise === null) {
+          const { data: { session } } = await _client.auth.getSession()
+          if (session?.access_token && init?.headers) {
+            const headers = new Headers(init.headers)
+            headers.set('Authorization', `Bearer ${session.access_token}`)
+            headers.set('apikey', supabaseAnonKey)
+            init = { ...init, headers }
+          }
+        }
+      }
+
+      return fetch(input, init)
+    },
+  },
 })
+
+export const supabase = _client
 
 // Roles từ database
 export type UserRole = 'admin' | 'phan_doan_truong' | 'giao_ly_vien'

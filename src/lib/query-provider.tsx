@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@ta
 import { useState } from 'react'
 import { supabase } from './supabase'
 
-function isAuthError(error: unknown): boolean {
+export function isAuthError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false
 
   const err = error as Record<string, unknown>
@@ -76,15 +76,19 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
           queries: {
             staleTime: 10 * 60 * 1000, // Data stays fresh for 10 minutes
             gcTime: 30 * 60 * 1000, // Cache kept for 30 minutes
-            refetchOnWindowFocus: false, // Disabled — session recovery handles refetch on tab focus
-            refetchOnReconnect: false, // Don't refetch all on reconnect — let visibility handler manage it
-            refetchOnMount: 'always', // Refetch on mount only if stale
+            refetchOnWindowFocus: false, // Disabled — visibility handler manages refetch
+            refetchOnReconnect: true, // Refetch when onlineManager goes online
+            refetchOnMount: true, // Refetch on mount only if stale
             retry: (failureCount, error) => {
-              // Don't retry auth errors — need session refresh, not retry
-              if (isAuthError(error)) return false
+              // Auth errors: allow 2 retries (gives time for token refresh)
+              if (isAuthError(error)) return failureCount < 2
               return failureCount < 1
             },
-            retryDelay: 1000,
+            retryDelay: (attemptIndex, error) => {
+              // Auth errors: wait 3s between retries (token refresh takes ~200-500ms)
+              if (isAuthError(error)) return 3000
+              return 1000
+            },
           },
         },
       })

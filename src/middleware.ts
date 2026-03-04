@@ -5,26 +5,31 @@ import type { NextRequest } from 'next/server'
 const publicRoutes = ['/login', '/register', '/forgot-password']
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  try {
+    const { pathname } = request.nextUrl
 
-  // Allow public routes
-  if (publicRoutes.some(route => pathname.startsWith(route))) {
+    // Allow public routes
+    if (publicRoutes.some(route => pathname.startsWith(route))) {
+      return NextResponse.next()
+    }
+
+    // Allow static files and API routes
+    if (
+      pathname.startsWith('/_next') ||
+      pathname.startsWith('/api') ||
+      pathname.includes('.') // static files
+    ) {
+      return NextResponse.next()
+    }
+
+    // For protected routes, we rely on client-side auth context
+    // since localStorage is not available in middleware
+    // The auth-context will handle redirects
+    return NextResponse.next()
+  } catch {
+    // Never let middleware crash — always pass through
     return NextResponse.next()
   }
-
-  // Allow static files and API routes
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.includes('.') // static files
-  ) {
-    return NextResponse.next()
-  }
-
-  // For protected routes, we rely on client-side auth context
-  // since localStorage is not available in middleware
-  // The auth-context will handle redirects
-  return NextResponse.next()
 }
 
 export const config = {
