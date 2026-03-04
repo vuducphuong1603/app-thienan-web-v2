@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Plus, MoreHorizontal, X, Check, Trash2 } from 'lucide-react'
+import { Plus, MoreHorizontal, X, Check, Trash2, ExternalLink } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { useMyNotesData, useUserNotes, useInvalidateQueries } from '@/lib/queries'
 import { supabase } from '@/lib/supabase'
+import Link from 'next/link'
 
 const NOTE_COLORS = ['#FA865E', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F']
 
@@ -292,6 +293,14 @@ export default function MyNotes() {
             </button>
             {showHeaderMenu && (
               <div className="absolute right-0 top-12 z-50 bg-white dark:bg-[#2A2A2A] rounded-xl shadow-lg border border-gray-100 dark:border-white/10 py-1 min-w-[180px]">
+                <Link
+                  href="/admin/notes"
+                  className="w-full text-left px-3 py-2 text-sm text-black/70 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors flex items-center gap-2"
+                  onClick={() => setShowHeaderMenu(false)}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Xem tất cả ghi chú
+                </Link>
                 <button
                   onClick={() => { setShowCreateModal(true); setShowHeaderMenu(false) }}
                   className="w-full text-left px-3 py-2 text-sm text-black/70 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors flex items-center gap-2"

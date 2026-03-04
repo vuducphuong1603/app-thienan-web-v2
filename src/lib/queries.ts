@@ -1174,6 +1174,34 @@ export function useUserNotes(userId?: string) {
   })
 }
 
+// ============ Filtered User Notes (by date range) ============
+export function useFilteredUserNotes(userId?: string, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ['userNotes', userId, 'filtered', startDate, endDate],
+    queryFn: async () => {
+      if (!userId) return []
+      let query = supabase
+        .from('user_notes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('note_date', { ascending: true })
+        .order('created_at', { ascending: false })
+
+      if (startDate) {
+        query = query.gte('note_date', startDate)
+      }
+      if (endDate) {
+        query = query.lte('note_date', endDate)
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+      return (data || []) as UserNote[]
+    },
+    enabled: !!userId,
+  })
+}
+
 // ============ My Notifications (all for user) ============
 export function useMyNotifications(userId?: string) {
   return useQuery({

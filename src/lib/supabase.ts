@@ -253,6 +253,11 @@ export interface UserNote {
   description?: string
   is_completed: boolean
   color: string
+  note_date?: string // YYYY-MM-DD
+  class_name?: string
+  note_time?: string // e.g., "14:00"
+  location?: string
+  is_favorite: boolean
   created_at: string
   updated_at?: string
 }

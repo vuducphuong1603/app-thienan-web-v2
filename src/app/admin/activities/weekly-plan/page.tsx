@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Plus, List, FileText, CalendarDays, ChevronLeft, ChevronRight, Bell, ShieldAlert } from 'lucide-react'
+import { Calendar, Plus, List, FileText, CalendarDays, ChevronLeft, ChevronRight, Bell, ShieldAlert, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { supabase, WeeklyPlan } from '@/lib/supabase'
-import { WeeklyPlanCalendar, PlanModal, DeletePlanModal } from '@/components/weekly-plan'
+import { WeeklyPlanCalendar, PlanModal, DeletePlanModal, WeekPickerCalendar } from '@/components/weekly-plan'
 import { usePlanStaticData, useWeeklyPlans, useInvalidateQueries } from '@/lib/queries'
 
 function getMonday(date: Date): Date {
@@ -36,6 +36,7 @@ export default function WeeklyPlanPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editPlan, setEditPlan] = useState<WeeklyPlan | null>(null)
   const [deletePlan, setDeletePlan] = useState<WeeklyPlan | null>(null)
+  const [showWeekPicker, setShowWeekPicker] = useState(false)
 
   // Current date display
   const today = new Date()
@@ -153,6 +154,15 @@ export default function WeeklyPlanPage() {
 
       {/* Main Content */}
       <div className="flex-1 min-w-0">
+        {/* Back Link */}
+        <Link
+          href="/admin/activities"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors mb-3"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Quay trở lại</span>
+        </Link>
+
         {/* Title */}
         <h1 className="text-[40px] font-bold italic text-gray-900 dark:text-white mb-5 leading-tight">
           Kế hoạch tuần này
@@ -195,30 +205,46 @@ export default function WeeklyPlanPage() {
             </button>
           </div>
 
-          {/* Right: Navigation + Date Range + Add Button */}
+          {/* Right: View Toggle + Navigation + Date Range + Add Button */}
           <div className="flex items-center gap-3">
-            {/* Week Navigation */}
-            <div className="flex items-center">
-              <button
-                onClick={goToPreviousWeek}
-                className="w-9 h-9 rounded-full flex items-center justify-center bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/20 transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4 text-gray-700 dark:text-white" />
-              </button>
-              <button
-                onClick={goToNextWeek}
-                className="w-9 h-9 rounded-full flex items-center justify-center bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/20 transition-colors -ml-px"
-              >
-                <ChevronRight className="w-4 h-4 text-gray-700 dark:text-white" />
-              </button>
+            {/* View Toggle */}
+            <div className="flex items-center bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/10 rounded-full overflow-hidden">
+              <span className="px-5 py-2 text-sm font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-white/10">
+                Tuần
+              </span>
             </div>
 
-            {/* Date Range Display */}
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/10 rounded-full">
-              <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              <span className="text-sm font-medium text-gray-700 dark:text-white">
-                {formatWeekRange(weekStart)}
-              </span>
+            {/* Date Range with Navigation + Week Picker */}
+            <div className="relative">
+              <div className="flex items-center gap-0 bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/10 rounded-full overflow-hidden">
+                <button
+                  onClick={goToPreviousWeek}
+                  className="w-9 h-9 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-white/20 transition-colors border-r border-[#E5E1DC] dark:border-white/10"
+                >
+                  <ChevronLeft className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                </button>
+                <button
+                  onClick={() => setShowWeekPicker(!showWeekPicker)}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/20 transition-colors"
+                >
+                  <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-white whitespace-nowrap">
+                    {formatWeekRange(weekStart)}
+                  </span>
+                </button>
+                <button
+                  onClick={goToNextWeek}
+                  className="w-9 h-9 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-white/20 transition-colors border-l border-[#E5E1DC] dark:border-white/10"
+                >
+                  <ChevronRight className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                </button>
+              </div>
+              <WeekPickerCalendar
+                isOpen={showWeekPicker}
+                onClose={() => setShowWeekPicker(false)}
+                currentWeekStart={weekStart}
+                onSelectWeek={(newWeekStart) => setWeekStart(newWeekStart)}
+              />
             </div>
 
             {/* Add Plan Button */}
