@@ -55,6 +55,11 @@ export function useDashboardStats(enabled = true) {
         supabase.from('classes').select('*', { count: 'exact', head: true }),
       ])
 
+      // Throw on auth/RLS errors so React Query retries instead of caching 0
+      if (glvRes.error) throw glvRes.error
+      if (thieuNhiRes.error) throw thieuNhiRes.error
+      if (classesRes.error) throw classesRes.error
+
       return {
         totalBranches: 4,
         totalClasses: classesRes.count || 0,
@@ -92,6 +97,9 @@ export function useGLVDashboardStats(user: UserProfile | null) {
         supabase.from('classes').select('id, name, branch').eq('id', user.class_id).single(),
         supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('class_id', user.class_id).eq('status', 'ACTIVE'),
       ])
+
+      if (classRes.error) throw classRes.error
+      if (studentCountRes.error) throw studentCountRes.error
 
       const className = classRes.data?.name || ''
       const branchName = classRes.data?.branch || user.branch || ''
@@ -344,6 +352,11 @@ export function useClassStats() {
         supabase.from('users').select('id, class_id').eq('role', 'giao_ly_vien').eq('status', 'ACTIVE'),
       ])
 
+      if (branchesRes.error) throw branchesRes.error
+      if (classesRes.error) throw classesRes.error
+      if (studentsRes.error) throw studentsRes.error
+      if (teachersRes.error) throw teachersRes.error
+
       const branches = branchesRes.data
       if (!branches) return []
 
@@ -474,6 +487,9 @@ export function useStudentsWithDetails() {
         supabase.from('thieu_nhi').select('id, full_name, saint_name, student_code, date_of_birth, gender, phone, address, parent_name, parent_phone, parent_name_2, parent_phone_2, class_id, status, avatar_url, notes, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn, created_at, updated_at').order('full_name', { ascending: true }),
         supabase.from('holidays').select('day_type'),
       ])
+
+      if (classesRes.error) throw classesRes.error
+      if (studentsRes.error) throw studentsRes.error
 
       const schoolYear = schoolYearRes.data
       const classesData = classesRes.data || []
@@ -912,6 +928,8 @@ export function useMyNotesData(user: UserProfile | null) {
           supabase.from('classes').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
           supabase.from('thieu_nhi').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
         ])
+        if (classesRes.error) throw classesRes.error
+        if (studentsRes.error) throw studentsRes.error
         classCount = classesRes.count || 0
         studentCount = studentsRes.count || 0
       } else if (user.role === 'phan_doan_truong' && user.branch) {
@@ -1105,6 +1123,11 @@ export function useAlertStats() {
         supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('severity', 'high').in('status', ['unread', 'read']),
         supabase.from('alerts').select('*', { count: 'exact', head: true }).in('status', ['resolved', 'dismissed']),
       ])
+
+      if (totalRes.error) throw totalRes.error
+      if (unreadRes.error) throw unreadRes.error
+      if (highRes.error) throw highRes.error
+      if (resolvedRes.error) throw resolvedRes.error
 
       return {
         total: totalRes.count || 0,

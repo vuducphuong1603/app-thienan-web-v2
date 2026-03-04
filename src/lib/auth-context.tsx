@@ -151,9 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // ============ Session recovery when tab becomes visible after idle ============
     // When a browser tab is hidden, JavaScript timers are throttled/frozen.
     // Supabase's autoRefreshToken timer may not fire, causing JWT to expire.
-    // The fetch interceptor in supabase.ts handles per-request token refresh,
-    // so we just need to proactively refresh the session and invalidate
-    // stale queries. Cached data remains visible — no loading flash.
+    // We refresh the token here; React Query's refetchOnWindowFocus handles
+    // data refetch automatically. Cached data stays visible — no loading flash.
     let lastHiddenAt = 0
     const IDLE_THRESHOLD = 60 * 1000 // 1 minute
 
@@ -167,8 +166,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (lastHiddenAt === 0 || Date.now() - lastHiddenAt < IDLE_THRESHOLD) return
 
       try {
-        // Silently refresh the session token — no query pausing needed
-        // The fetch interceptor also handles this per-request as a safety net
+        // Silently refresh the session token before queries refetch
+        // refetchOnWindowFocus: true handles data refetch automatically
         const { data, error } = await supabase.auth.refreshSession()
         if (error || !data.session) {
           // Refresh token also expired — session is truly dead
@@ -176,12 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem('thien_an_user')
           queryClient.clear()
           router.push('/login')
-          return
         }
-
-        // Invalidate all queries so they refetch in background
-        // Cached data stays visible while fresh data loads
-        queryClient.invalidateQueries()
       } catch {
         // Network error — don't force logout
         // The fetch interceptor handles token refresh per-request

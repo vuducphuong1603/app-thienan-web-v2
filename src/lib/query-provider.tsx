@@ -76,7 +76,7 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
           queries: {
             staleTime: 10 * 60 * 1000, // Data stays fresh for 10 minutes
             gcTime: 30 * 60 * 1000, // Cache kept for 30 minutes
-            refetchOnWindowFocus: false, // Disabled — visibility handler manages refetch
+            refetchOnWindowFocus: true, // Refetch stale queries when tab gains focus
             refetchOnReconnect: true, // Refetch when onlineManager goes online
             refetchOnMount: true, // Refetch on mount only if stale
             retry: (failureCount, error) => {
