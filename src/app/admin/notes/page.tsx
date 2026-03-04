@@ -3,17 +3,15 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS, UserNote } from '@/lib/supabase'
-import { useFilteredUserNotes, useActiveClasses, useInvalidateQueries } from '@/lib/queries'
+import { useFilteredUserNotes, useInvalidateQueries } from '@/lib/queries'
 import { supabase } from '@/lib/supabase'
 import DashboardHeader from '@/components/dashboard/DashboardHeader'
-import { ArrowLeft, Plus, Heart, Calendar, SlidersHorizontal, X, Check } from 'lucide-react'
+import { ArrowLeft, Plus, Heart, Calendar, SlidersHorizontal } from 'lucide-react'
 import Link from 'next/link'
 
 // ─── Types ───────────────────────────────────────────────
 type ViewMode = 'day' | 'week' | 'month'
 type NoteFilter = 'all' | 'pending' | 'completed' | 'favorite'
-
-const NOTE_COLORS = ['#FA865E', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F']
 
 // ─── Date Helpers ────────────────────────────────────────
 function toLocalDateString(date: Date) {
@@ -84,6 +82,14 @@ function formatNoteTime(timeStr?: string): string {
   return `${h - 12}${minutes !== '00' ? `:${minutes}` : ''} giờ chiều`
 }
 
+// ─── Reminder Options ────────────────────────────────────
+const REMINDER_OPTIONS = [
+  { value: '30_min', label: '30 phút' },
+  { value: '2_hours', label: '2 tiếng' },
+  { value: '1_day', label: '1 ngày' },
+  { value: 'custom', label: 'Tự đặt giờ' },
+]
+
 // ─── Create Note Modal ───────────────────────────────────
 function CreateNoteModal({ userId, defaultDate, onClose, onCreated }: {
   userId: string
@@ -91,15 +97,16 @@ function CreateNoteModal({ userId, defaultDate, onClose, onCreated }: {
   onClose: () => void
   onCreated: () => void
 }) {
-  const { data: classes = [] } = useActiveClasses()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [noteDate, setNoteDate] = useState(defaultDate)
-  const [className, setClassName] = useState('')
-  const [noteTime, setNoteTime] = useState('')
-  const [location, setLocation] = useState('')
-  const [color, setColor] = useState(NOTE_COLORS[0])
+  const [dateEnd, setDateEnd] = useState(defaultDate)
+  const [noteTime, setNoteTime] = useState('08:00')
+  const [timeEnd, setTimeEnd] = useState('16:00')
+  const [reminder, setReminder] = useState('2_hours')
+  const [link, setLink] = useState('')
   const [saving, setSaving] = useState(false)
+  const [showDateInputs, setShowDateInputs] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { titleRef.current?.focus() }, [])
@@ -110,6 +117,20 @@ function CreateNoteModal({ userId, defaultDate, onClose, onCreated }: {
     return () => window.removeEventListener('keydown', handleKey)
   }, [onClose])
 
+  function formatDisplayDate(dateStr: string): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr + 'T00:00:00')
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
+  }
+
+  function formatDisplayTime(timeStr: string): string {
+    if (!timeStr) return ''
+    const [h, m] = timeStr.split(':')
+    const hour = parseInt(h, 10)
+    const suffix = hour < 12 ? 'AM' : 'PM'
+    return `${hour}:${m} ${suffix}`
+  }
+
   const handleCreate = async () => {
     if (!title.trim()) return
     setSaving(true)
@@ -119,10 +140,12 @@ function CreateNoteModal({ userId, defaultDate, onClose, onCreated }: {
         title: title.trim(),
         description: description.trim() || null,
         note_date: noteDate || toLocalDateString(new Date()),
-        class_name: className || null,
+        date_end: dateEnd || null,
         note_time: noteTime || null,
-        location: location || null,
-        color,
+        time_end: timeEnd || null,
+        reminder: reminder || null,
+        link: link.trim() || null,
+        color: '#FA865E',
         is_favorite: false,
       })
       if (!error) {
@@ -140,129 +163,156 @@ function CreateNoteModal({ userId, defaultDate, onClose, onCreated }: {
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+
       <div className="relative bg-white dark:bg-[#1E1E1E] rounded-2xl w-full max-w-[480px] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <div className="h-2 w-full" style={{ backgroundColor: color }} />
-        <div className="p-6">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
-          >
-            <X className="w-4 h-4 text-black/50 dark:text-white/50" />
-          </button>
+        <div className="px-8 py-5 flex flex-col gap-2.5 items-center">
 
-          <h3 className="text-lg font-semibold text-black dark:text-white mb-5">Thêm ghi chú mới</h3>
-
-          {/* Title */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-black/50 dark:text-white/50 mb-1.5">Tiêu đề *</label>
-            <input
-              ref={titleRef}
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && title.trim()) handleCreate() }}
-              placeholder="Nhập tiêu đề ghi chú..."
-              className="w-full px-3.5 py-2.5 bg-[#F6F6F6] dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/30 dark:placeholder:text-white/30 focus:outline-none focus:border-[#FA865E]/50 focus:ring-1 focus:ring-[#FA865E]/20 transition-all"
-            />
-          </div>
-
-          {/* Date + Time row */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div>
-              <label className="block text-xs font-medium text-black/50 dark:text-white/50 mb-1.5">Ngày</label>
-              <input
-                type="date"
-                value={noteDate}
-                onChange={(e) => setNoteDate(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#F6F6F6] dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-sm text-black dark:text-white focus:outline-none focus:border-[#FA865E]/50 focus:ring-1 focus:ring-[#FA865E]/20 transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-black/50 dark:text-white/50 mb-1.5">Thời gian</label>
-              <input
-                type="time"
-                value={noteTime}
-                onChange={(e) => setNoteTime(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#F6F6F6] dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-sm text-black dark:text-white focus:outline-none focus:border-[#FA865E]/50 focus:ring-1 focus:ring-[#FA865E]/20 transition-all"
-              />
+          {/* Plus Icon Header */}
+          <div className="flex items-center justify-center w-[85px] h-[85px]">
+            <div className="bg-gradient-to-b from-[#FA865E29] to-transparent border border-[#FFF0F3] rounded-full p-4">
+              <div className="border border-[#FA865E66] rounded-full p-3.5 shadow-[0_2px_4px_rgba(223,28,65,0.04)]">
+                <Plus className="w-[25px] h-[25px] text-[#FA865E]" />
+              </div>
             </div>
           </div>
 
-          {/* Class + Location row */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div>
-              <label className="block text-xs font-medium text-black/50 dark:text-white/50 mb-1.5">Lớp</label>
-              <select
-                value={className}
-                onChange={(e) => setClassName(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#F6F6F6] dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-sm text-black dark:text-white focus:outline-none focus:border-[#FA865E]/50 focus:ring-1 focus:ring-[#FA865E]/20 transition-all"
-              >
-                <option value="">Chọn lớp...</option>
-                {classes.map((cls) => (
-                  <option key={cls.id} value={cls.name}>{cls.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-black/50 dark:text-white/50 mb-1.5">Phòng</label>
+          {/* Title + Subtitle */}
+          <div className="text-center w-full">
+            <h3 className="text-[22px] font-semibold text-black dark:text-white">Thêm ghi chú</h3>
+            <p className="text-xs text-black/40 dark:text-white/40">Thêm ghi chú về công việc, kế hoạch, sự kiện</p>
+          </div>
+
+          {/* Name Input Card */}
+          <div className="w-full border border-[#E5E1DC] dark:border-white/15 rounded-2xl overflow-hidden">
+            {/* Header - Name input */}
+            <div className="border-b border-[#E5E1DC] dark:border-white/15 px-4 h-[38px] flex items-center">
               <input
+                ref={titleRef}
                 type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="VD: Phòng 1C"
-                className="w-full px-3.5 py-2.5 bg-[#F6F6F6] dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/30 dark:placeholder:text-white/30 focus:outline-none focus:border-[#FA865E]/50 focus:ring-1 focus:ring-[#FA865E]/20 transition-all"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Tên ghi chú"
+                className="w-full text-sm font-light text-black dark:text-white placeholder:text-[#8A8C90] bg-transparent outline-none"
               />
+            </div>
+            {/* Body - Date & Time display */}
+            <div className="px-4 py-3 flex items-center gap-1 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setShowDateInputs(!showDateInputs)}
+                className="flex items-center gap-1 text-xs text-black dark:text-white"
+              >
+                <svg className="w-4 h-4 text-[#FA865E]" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 1.33a6.67 6.67 0 100 13.34A6.67 6.67 0 008 1.33zm0 12A5.34 5.34 0 1113.33 8 5.34 5.34 0 018 13.33zm.33-8.66H7.33v4l3.5 2.1.5-.82-3-1.78V4.67z" fill="currentColor"/>
+                </svg>
+                <span>Ngày: {formatDisplayDate(noteDate)} - {formatDisplayDate(dateEnd)}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDateInputs(!showDateInputs)}
+                className="flex items-center gap-1 text-xs text-black dark:text-white ml-2"
+              >
+                <svg className="w-4 h-4 text-[#FA865E]" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 1.33a6.67 6.67 0 100 13.34A6.67 6.67 0 008 1.33zm0 12A5.34 5.34 0 1113.33 8 5.34 5.34 0 018 13.33zm.33-8.66H7.33v4l3.5 2.1.5-.82-3-1.78V4.67z" fill="currentColor"/>
+                </svg>
+                <span>Giờ: {formatDisplayTime(noteTime)} - {formatDisplayTime(timeEnd)}</span>
+              </button>
             </div>
           </div>
 
-          {/* Description */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-black/50 dark:text-white/50 mb-1.5">Mô tả <span className="text-black/30 dark:text-white/20">(tuỳ chọn)</span></label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Thêm mô tả..."
-              rows={2}
-              className="w-full px-3.5 py-2.5 bg-[#F6F6F6] dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/30 dark:placeholder:text-white/30 focus:outline-none focus:border-[#FA865E]/50 focus:ring-1 focus:ring-[#FA865E]/20 transition-all resize-none"
-            />
-          </div>
+          {/* Expandable Date/Time Inputs */}
+          {showDateInputs && (
+            <div className="w-full grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div>
+                <label className="block text-xs text-[#666D80] mb-1">Ngày bắt đầu</label>
+                <input type="date" value={noteDate} onChange={(e) => setNoteDate(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#F6F6F6] dark:bg-white/5 border border-[#E5E1DC] dark:border-white/15 rounded-xl text-xs text-black dark:text-white outline-none focus:border-[#FA865E]/50" />
+              </div>
+              <div>
+                <label className="block text-xs text-[#666D80] mb-1">Ngày kết thúc</label>
+                <input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#F6F6F6] dark:bg-white/5 border border-[#E5E1DC] dark:border-white/15 rounded-xl text-xs text-black dark:text-white outline-none focus:border-[#FA865E]/50" />
+              </div>
+              <div>
+                <label className="block text-xs text-[#666D80] mb-1">Giờ bắt đầu</label>
+                <input type="time" value={noteTime} onChange={(e) => setNoteTime(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#F6F6F6] dark:bg-white/5 border border-[#E5E1DC] dark:border-white/15 rounded-xl text-xs text-black dark:text-white outline-none focus:border-[#FA865E]/50" />
+              </div>
+              <div>
+                <label className="block text-xs text-[#666D80] mb-1">Giờ kết thúc</label>
+                <input type="time" value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#F6F6F6] dark:bg-white/5 border border-[#E5E1DC] dark:border-white/15 rounded-xl text-xs text-black dark:text-white outline-none focus:border-[#FA865E]/50" />
+              </div>
+            </div>
+          )}
 
-          {/* Color picker */}
-          <div className="mb-6">
-            <label className="block text-xs font-medium text-black/50 dark:text-white/50 mb-2">Màu sắc</label>
-            <div className="flex gap-2.5">
-              {NOTE_COLORS.map((c) => (
+          {/* Reminder Tags */}
+          <div className="w-full">
+            <p className="text-xs mb-1.5">
+              <span className="text-[#666D80]">Nhắc hẹn trước </span>
+              <span className="text-[#DF1C41]">*</span>
+            </p>
+            <div className="flex gap-1.5">
+              {REMINDER_OPTIONS.map((opt) => (
                 <button
-                  key={c}
-                  onClick={() => setColor(c)}
-                  className="w-7 h-7 rounded-full transition-all duration-150 flex items-center justify-center flex-shrink-0"
-                  style={{
-                    backgroundColor: c,
-                    boxShadow: color === c ? `0 0 0 2px white, 0 0 0 4px ${c}` : 'none',
-                    transform: color === c ? 'scale(1.1)' : 'scale(1)',
-                  }}
+                  key={opt.value}
+                  onClick={() => setReminder(opt.value)}
+                  className={`h-8 flex-1 rounded-[50px] text-xs transition-colors shadow-[0_0_14px_rgba(214,161,255,0.04)] ${
+                    reminder === opt.value
+                      ? 'bg-[#FA865E] text-white'
+                      : 'bg-[#E5E1DC] dark:bg-white/15 text-black dark:text-white hover:bg-[#d9d4ce] dark:hover:bg-white/25'
+                  }`}
                 >
-                  {color === c && <Check className="w-3.5 h-3.5 text-white drop-shadow-sm" />}
+                  {opt.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Create button */}
-          <button
-            onClick={handleCreate}
-            disabled={!title.trim() || saving}
-            className="w-full py-3 bg-[#FA865E] text-white text-sm font-semibold rounded-xl hover:bg-[#e8764f] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-          >
-            {saving ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                Thêm ghi chú
-              </>
-            )}
-          </button>
+          {/* Description */}
+          <div className="w-full">
+            <label className="block text-xs text-[#666D80] mb-1.5">Mô tả</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Thêm mô tả..."
+              className="w-full h-[38px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white placeholder:text-black/30 dark:placeholder:text-white/30 outline-none focus:ring-1 focus:ring-[#FA865E]/20 transition-all"
+            />
+          </div>
+
+          {/* Link */}
+          <div className="w-full">
+            <label className="block text-xs text-[#666D80] mb-1.5">Link đính kèm</label>
+            <input
+              type="url"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="https://..."
+              className="w-full h-[38px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white placeholder:text-black/30 dark:placeholder:text-white/30 outline-none focus:ring-1 focus:ring-[#FA865E]/20 transition-all"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="w-full flex gap-4">
+            <button
+              onClick={onClose}
+              className="flex-1 h-[38px] bg-[#F6F6F6] dark:bg-white/10 rounded-full text-sm font-bold text-black dark:text-white hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={!title.trim() || saving}
+              className="flex-1 h-[38px] bg-[#FA865E] rounded-full text-sm font-bold text-white hover:bg-[#e8764f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-[0_1px_2px_rgba(13,13,18,0.06)] flex items-center justify-center"
+            >
+              {saving ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                'Tạo kế hoạch'
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -340,6 +390,29 @@ function NoteCard({ note, onToggleFavorite, onToggleComplete, onCancel }: {
           </span>
         )}
       </div>
+
+      {/* Description */}
+      {note.description && (
+        <p className="text-xs text-black/50 dark:text-white/50 leading-relaxed line-clamp-2">
+          {note.description}
+        </p>
+      )}
+
+      {/* Link */}
+      {note.link && (
+        <a
+          href={note.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs text-[#FA865E] hover:text-[#e8764f] transition-colors truncate"
+        >
+          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 16 16" fill="none">
+            <path d="M6.67 8.67a3.33 3.33 0 005.02.36l2-2a3.33 3.33 0 00-4.72-4.72l-1.14 1.14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M9.33 7.33a3.33 3.33 0 00-5.02-.36l-2 2a3.33 3.33 0 004.72 4.72l1.13-1.14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span className="truncate">{note.link}</span>
+        </a>
+      )}
 
       {/* Action buttons */}
       <div className="flex gap-1.5 mt-auto pt-1">

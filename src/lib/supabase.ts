@@ -253,11 +253,15 @@ export interface UserNote {
   description?: string
   is_completed: boolean
   color: string
-  note_date?: string // YYYY-MM-DD
+  note_date?: string // YYYY-MM-DD (start date)
+  date_end?: string // YYYY-MM-DD (end date)
   class_name?: string
-  note_time?: string // e.g., "14:00"
+  note_time?: string // e.g., "08:00" (start time)
+  time_end?: string // e.g., "16:00" (end time)
   location?: string
   is_favorite: boolean
+  reminder?: string // e.g., "30_min", "2_hours", "1_day", or custom
+  link?: string
   created_at: string
   updated_at?: string
 }
