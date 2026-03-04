@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord, NotificationWithStatus, Notification, UserNote, Holiday } from './supabase'
+import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord, NotificationWithStatus, Notification, UserNote, Holiday, SchoolYear, AttendanceRecord, ThieuNhiProfile, BRANCHES } from './supabase'
 
 // ============ Helper: Count weekdays between two dates ============
 export function countWeekdays(startDate: string, endDate: string, dayOfWeek: number): number {
@@ -41,6 +41,9 @@ export const queryKeys = {
   holidays: (schoolYearId: string) => ['holidays', schoolYearId] as const,
   glvClassTrend: (classId: string) => ['glvClassTrend', classId] as const,
   glvPerStudentStats: (classId: string) => ['glvPerStudentStats', classId] as const,
+  schoolYears: ['schoolYears'] as const,
+  attendanceStudents: (classId: string, date: string) => ['attendanceStudents', classId, date] as const,
+  holidayCheck: (schoolYearId: string, date: string) => ['holidayCheck', schoolYearId, date] as const,
 }
 
 // ============ Dashboard Stats ============
@@ -1408,6 +1411,283 @@ export function useHolidays(schoolYearId: string | undefined) {
   })
 }
 
+// ============ School Years (all) ============
+export function useSchoolYears() {
+  return useQuery({
+    queryKey: queryKeys.schoolYears,
+    staleTime: 60 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('school_years')
+        .select('*')
+        .order('start_date', { ascending: false })
+
+      if (error) throw error
+      return (data || []) as SchoolYear[]
+    },
+  })
+}
+
+// ============ Attendance Students ============
+export interface StudentWithAttendance extends ThieuNhiProfile {
+  class_name?: string
+  attendance_status?: 'present' | 'absent' | null
+  attendance_time?: string
+  attendance_by?: string
+  attendance_record_id?: string
+  has_thursday_attendance?: boolean
+  has_compensatory_attendance?: boolean
+  compensatory_record_id?: string
+  compensatory_time?: string
+  compensatory_by?: string
+}
+
+export function useAttendanceStudents(
+  classId: string,
+  date: string,
+  classes: Class[]
+) {
+  // Compute derived date info
+  const dateObj = new Date(date)
+  const dayIndex = dateObj.getDay()
+  const dayType: 'thu5' | 'cn' | null = dayIndex === 4 ? 'thu5' : dayIndex === 0 ? 'cn' : null
+  const isCompensatoryMode = [1, 2, 3, 5, 6].includes(dayIndex)
+
+  // Thursday of the week
+  const getThursdayOfWeek = (d: Date): string => {
+    const di = d.getDay()
+    let daysToThursday = 4 - di
+    if (di === 0) daysToThursday = -3
+    const thu = new Date(d)
+    thu.setDate(d.getDate() + daysToThursday)
+    return thu.toISOString().split('T')[0]
+  }
+  const thursdayOfWeek = getThursdayOfWeek(dateObj)
+
+  return useQuery({
+    queryKey: queryKeys.attendanceStudents(classId, date),
+    queryFn: async (): Promise<StudentWithAttendance[]> => {
+      if (!classId) return []
+
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('thieu_nhi')
+        .select('*')
+        .eq('class_id', classId)
+        .eq('status', 'ACTIVE')
+        .order('full_name', { ascending: true })
+
+      if (studentsError) throw studentsError
+
+      const selectedClass = classes.find(c => c.id === classId)
+      const studentIds = (studentsData || []).map(s => s.id)
+
+      if (isCompensatoryMode) {
+        // Compensatory mode
+        const thursdayAttendanceMap = new Map<string, { check_in_time?: string; created_by?: string }>()
+        if (studentIds.length > 0) {
+          const { data: thursdayData } = await supabase
+            .from('attendance_records')
+            .select('student_id, is_compensatory, check_in_time, created_by')
+            .in('student_id', studentIds)
+            .eq('attendance_date', thursdayOfWeek)
+            .eq('day_type', 'thu5')
+            .eq('status', 'present')
+
+          if (thursdayData) {
+            thursdayData.forEach(record => {
+              if (!record.is_compensatory) {
+                thursdayAttendanceMap.set(record.student_id, {
+                  check_in_time: record.check_in_time,
+                  created_by: record.created_by,
+                })
+              }
+            })
+          }
+        }
+
+        const compensatoryMap = new Map<string, { id: string; check_in_time?: string; created_by?: string }>()
+        if (studentIds.length > 0) {
+          try {
+            const { data: compensatoryData } = await supabase
+              .from('attendance_records')
+              .select('id, student_id, check_in_time, created_by')
+              .in('student_id', studentIds)
+              .eq('is_compensatory', true)
+              .eq('compensated_for_date', thursdayOfWeek)
+              .eq('status', 'present')
+
+            if (compensatoryData) {
+              compensatoryData.forEach(record => {
+                compensatoryMap.set(record.student_id, {
+                  id: record.id,
+                  check_in_time: record.check_in_time,
+                  created_by: record.created_by,
+                })
+              })
+            }
+          } catch { /* column might not exist */ }
+        }
+
+        // Resolve user names
+        const allCreatedByIds = [
+          ...Array.from(thursdayAttendanceMap.values()).map(v => v.created_by),
+          ...Array.from(compensatoryMap.values()).map(v => v.created_by),
+        ].filter((id): id is string => !!id)
+        const userNameMap = new Map<string, string>()
+        if (allCreatedByIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, full_name')
+            .in('id', Array.from(new Set(allCreatedByIds)))
+          if (usersData) usersData.forEach(u => userNameMap.set(u.id, u.full_name))
+        }
+
+        return (studentsData || []).map(student => {
+          const thursdayRecord = thursdayAttendanceMap.get(student.id)
+          const hasThursday = !!thursdayRecord
+          const compensatory = compensatoryMap.get(student.id)
+          return {
+            ...student,
+            class_name: selectedClass?.name,
+            attendance_status: (hasThursday || !!compensatory) ? 'present' as const : null,
+            attendance_time: thursdayRecord?.check_in_time?.substring(0, 5),
+            attendance_by: thursdayRecord?.created_by ? userNameMap.get(thursdayRecord.created_by) : undefined,
+            has_thursday_attendance: hasThursday,
+            has_compensatory_attendance: !!compensatory,
+            compensatory_record_id: compensatory?.id,
+            compensatory_time: compensatory?.check_in_time?.substring(0, 5),
+            compensatory_by: compensatory?.created_by ? userNameMap.get(compensatory.created_by) : undefined,
+          }
+        })
+      } else {
+        // Normal mode
+        let attendanceData: AttendanceRecord[] | null = null
+        try {
+          const { data, error: attendanceError } = await supabase
+            .from('attendance_records')
+            .select('*')
+            .eq('class_id', classId)
+            .eq('attendance_date', date)
+          if (!attendanceError) attendanceData = data
+        } catch { /* table may not exist */ }
+
+        // Compensatory records for Thursday
+        const compensatoryMap = new Map<string, { id: string; check_in_time?: string; created_by?: string }>()
+        if (dayType === 'thu5' && studentIds.length > 0) {
+          try {
+            const { data: compensatoryData } = await supabase
+              .from('attendance_records')
+              .select('id, student_id, check_in_time, created_by')
+              .in('student_id', studentIds)
+              .eq('is_compensatory', true)
+              .eq('compensated_for_date', date)
+              .eq('status', 'present')
+            if (compensatoryData) {
+              compensatoryData.forEach(record => {
+                compensatoryMap.set(record.student_id, {
+                  id: record.id,
+                  check_in_time: record.check_in_time,
+                  created_by: record.created_by,
+                })
+              })
+            }
+          } catch { /* compensatory column might not exist */ }
+        }
+
+        // Resolve compensatory user names
+        const compensatoryUserIds = Array.from(compensatoryMap.values()).map(v => v.created_by).filter((id): id is string => !!id)
+        const compensatoryUserNameMap = new Map<string, string>()
+        if (compensatoryUserIds.length > 0) {
+          const { data: usersData } = await supabase.from('users').select('id, full_name').in('id', Array.from(new Set(compensatoryUserIds)))
+          if (usersData) usersData.forEach(u => compensatoryUserNameMap.set(u.id, u.full_name))
+        }
+
+        // Build attendance map (exclude compensatory)
+        const attendanceMap = new Map<string, AttendanceRecord>()
+        if (attendanceData) {
+          attendanceData.forEach(record => {
+            if ((record as unknown as { is_compensatory?: boolean }).is_compensatory === true) return
+            attendanceMap.set(record.student_id, record)
+          })
+        }
+
+        // Resolve attendance user names
+        const attendanceUserIds = Array.from(attendanceMap.values()).map(r => r.created_by).filter((id): id is string => !!id)
+        const attendanceUserNameMap = new Map<string, string>()
+        if (attendanceUserIds.length > 0) {
+          const { data: usersData } = await supabase.from('users').select('id, full_name').in('id', Array.from(new Set(attendanceUserIds)))
+          if (usersData) usersData.forEach(u => attendanceUserNameMap.set(u.id, u.full_name))
+        }
+
+        return (studentsData || []).map(student => {
+          const attendance = attendanceMap.get(student.id)
+          const compensatory = compensatoryMap.get(student.id)
+          return {
+            ...student,
+            class_name: selectedClass?.name,
+            attendance_status: attendance?.status || null,
+            attendance_time: attendance?.check_in_time?.substring(0, 5) || undefined,
+            attendance_by: attendance?.created_by ? attendanceUserNameMap.get(attendance.created_by) : undefined,
+            attendance_record_id: attendance?.id || undefined,
+            has_compensatory_attendance: !!compensatory,
+            compensatory_record_id: compensatory?.id,
+            compensatory_time: compensatory?.check_in_time?.substring(0, 5),
+            compensatory_by: compensatory?.created_by ? compensatoryUserNameMap.get(compensatory.created_by) : undefined,
+          }
+        })
+      }
+    },
+    enabled: !!classId,
+    staleTime: 0, // Always refetch attendance
+  })
+}
+
+// ============ Holiday Check for a specific date ============
+export function useHolidayCheck(schoolYearId: string | undefined, date: string) {
+  return useQuery({
+    queryKey: queryKeys.holidayCheck(schoolYearId || '', date),
+    queryFn: async (): Promise<{ name: string; day_type: string } | null> => {
+      if (!schoolYearId || !date) return null
+
+      const dateObj = new Date(date)
+      const dayIndex = dateObj.getDay()
+
+      let queryDate: string
+      let dayTypes: string[]
+
+      if (dayIndex === 0) {
+        queryDate = date
+        dayTypes = ['cn', 'both']
+      } else if (dayIndex === 4) {
+        queryDate = date
+        dayTypes = ['thu5', 'both']
+      } else {
+        // Compensatory days: check Thursday of this week
+        const daysToThursday = dayIndex === 0 ? -3 : 4 - dayIndex
+        const thu = new Date(dateObj)
+        thu.setDate(dateObj.getDate() + daysToThursday)
+        queryDate = thu.toISOString().split('T')[0]
+        dayTypes = ['thu5', 'both']
+      }
+
+      const { data } = await supabase
+        .from('holidays')
+        .select('name, day_type')
+        .eq('school_year_id', schoolYearId)
+        .eq('holiday_date', queryDate)
+        .in('day_type', dayTypes)
+        .limit(1)
+
+      if (data && data.length > 0) {
+        return { name: data[0].name, day_type: data[0].day_type }
+      }
+      return null
+    },
+    enabled: !!schoolYearId && !!date,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 // ============ Invalidation helpers ============
 export function useInvalidateQueries() {
   const queryClient = useQueryClient()
@@ -1429,6 +1709,11 @@ export function useInvalidateQueries() {
     invalidateUserNotes: () => queryClient.invalidateQueries({ queryKey: ['userNotes'] }),
     invalidateNotifications: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
     invalidateHolidays: () => queryClient.invalidateQueries({ queryKey: ['holidays'] }),
+    invalidateAttendanceStudents: (classId?: string, date?: string) =>
+      classId && date
+        ? queryClient.invalidateQueries({ queryKey: queryKeys.attendanceStudents(classId, date) })
+        : queryClient.invalidateQueries({ queryKey: ['attendanceStudents'] }),
+    invalidateHolidayCheck: () => queryClient.invalidateQueries({ queryKey: ['holidayCheck'] }),
     invalidateGLVClassTrend: () => queryClient.invalidateQueries({ queryKey: ['glvClassTrend'] }),
     invalidateGLVPerStudentStats: () => queryClient.invalidateQueries({ queryKey: ['glvPerStudentStats'] }),
     invalidateAll: () => queryClient.invalidateQueries(),

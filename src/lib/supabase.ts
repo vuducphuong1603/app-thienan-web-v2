@@ -9,40 +9,57 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 // throttled/frozen. This interceptor checks the cached session's expires_at
 // and refreshes proactively before making any PostgREST/Storage request.
 
-let _refreshPromise: Promise<void> | null = null
+let _refreshPromise: Promise<string | null> | null = null
+let _lastFreshCheck = 0
+const FRESH_CHECK_INTERVAL = 30_000 // Throttle: check at most every 30s
 
 // Forward-declared — assigned right after createClient below
 // eslint-disable-next-line prefer-const
 let _client: SupabaseClient
 
-async function ensureSessionFresh(): Promise<void> {
+// Returns the fresh access_token if a refresh happened, null otherwise
+async function ensureSessionFresh(): Promise<string | null> {
   // Wait if a refresh is already in flight
   if (_refreshPromise) {
-    await _refreshPromise
-    return
+    return _refreshPromise
   }
 
-  if (typeof window === 'undefined' || !_client) return
+  // Throttle: skip check if we verified recently
+  const now = Date.now()
+  if (now - _lastFreshCheck < FRESH_CHECK_INTERVAL) return null
+  _lastFreshCheck = now
+
+  if (typeof window === 'undefined' || !_client) return null
 
   try {
     const { data: { session } } = await _client.auth.getSession()
-    if (!session?.expires_at) return
+    if (!session?.expires_at) return null
 
     // Refresh if token expires within 2 minutes
-    const now = Math.floor(Date.now() / 1000)
-    if (now > session.expires_at - 120) {
+    const nowSec = Math.floor(now / 1000)
+    if (nowSec > session.expires_at - 120) {
       _refreshPromise = (async () => {
         try {
-          await _client.auth.refreshSession()
+          const { data } = await _client.auth.refreshSession()
+          return data.session?.access_token ?? null
         } finally {
           _refreshPromise = null
         }
       })()
-      await _refreshPromise
+      return _refreshPromise
     }
   } catch {
     _refreshPromise = null
   }
+  return null
+}
+
+// Timeout helper — resolves to null after ms
+function timeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>(resolve => setTimeout(() => resolve(null), ms)),
+  ])
 }
 
 _client = createClient(supabaseUrl, supabaseAnonKey, {
@@ -62,17 +79,14 @@ _client = createClient(supabaseUrl, supabaseAnonKey, {
 
       // Skip auth endpoints to avoid recursion (refreshSession calls /auth/v1/token)
       if (!url.includes('/auth/v1/')) {
-        await ensureSessionFresh()
+        // 5s timeout prevents indefinite hangs from lock contention
+        const freshToken = await timeout(ensureSessionFresh(), 5000)
 
-        // After refresh, update the Authorization header with the new token
-        if (_refreshPromise === null) {
-          const { data: { session } } = await _client.auth.getSession()
-          if (session?.access_token && init?.headers) {
-            const headers = new Headers(init.headers)
-            headers.set('Authorization', `Bearer ${session.access_token}`)
-            headers.set('apikey', supabaseAnonKey)
-            init = { ...init, headers }
-          }
+        // If a refresh happened, update the Authorization header with the new token
+        if (freshToken && init?.headers) {
+          const headers = new Headers(init.headers)
+          headers.set('Authorization', `Bearer ${freshToken}`)
+          init = { ...init, headers }
         }
       }
 

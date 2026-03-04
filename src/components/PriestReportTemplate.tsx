@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, Fragment } from 'react'
 
 export interface PriestReportClassData {
   classId: string
@@ -106,7 +106,7 @@ const PriestReportTemplate = forwardRef<HTMLDivElement, PriestReportTemplateProp
         </thead>
         <tbody>
           {data.branches.map((branch) => (
-            <>
+            <Fragment key={branch.branch}>
               {branch.classes.map((cls) => {
                 globalIndex++
                 return (
@@ -134,7 +134,7 @@ const PriestReportTemplate = forwardRef<HTMLDivElement, PriestReportTemplateProp
                   {branch.totalSlots > 0 ? branch.rate.toFixed(1) : '-'}
                 </td>
               </tr>
-            </>
+            </Fragment>
           ))}
           {/* Grand total */}
           <tr className="bg-[#d4edda] font-bold">

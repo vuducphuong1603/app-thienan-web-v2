@@ -26,13 +26,18 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
+                var h = document.documentElement;
                 var stored = localStorage.getItem('darkMode');
                 var isDark = stored === null ? true : stored === 'true';
-                if (isDark) {
-                  document.documentElement.classList.add('dark');
-                } else {
-                  document.documentElement.classList.remove('dark');
-                }
+                if (isDark) { h.classList.add('dark'); } else { h.classList.remove('dark'); }
+                try {
+                  var ds = JSON.parse(localStorage.getItem('thien_an_display_settings') || '{}');
+                  if (ds.fontSize === 'small') h.classList.add('font-size-small');
+                  else if (ds.fontSize === 'large') h.classList.add('font-size-large');
+                  if (ds.isCompactMode) h.classList.add('compact-mode');
+                  if (ds.isHighContrast) h.classList.add('high-contrast');
+                  if (ds.reduceMotion) h.classList.add('reduce-motion');
+                } catch(e) {}
               })();
             `,
           }}

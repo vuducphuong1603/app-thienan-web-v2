@@ -1,9 +1,16 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase, UserProfile, UserRole } from './supabase'
 import { useRouter, usePathname } from 'next/navigation'
+import {
+  StoredAccount,
+  getStoredAccounts,
+  saveAccount,
+  removeAccount as removeStoredAccount,
+  updateAccountTokens,
+} from './account-manager'
 
 interface AuthContextType {
   user: UserProfile | null
@@ -18,6 +25,10 @@ interface AuthContextType {
   isAdmin: boolean
   isGiaoLyVien: boolean
   isPhanDoanTruong: boolean
+  // Multi-account
+  storedAccounts: StoredAccount[]
+  switchAccount: (userId: string) => Promise<{ success: boolean; error?: string }>
+  removeAccount: (userId: string) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -69,6 +80,21 @@ async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
   }
 }
 
+// Save current session to account store
+function saveCurrentSession(profile: UserProfile, session: { access_token: string; refresh_token: string; expires_at?: number }) {
+  saveAccount({
+    userId: profile.id,
+    email: profile.email || '',
+    fullName: profile.full_name,
+    role: profile.role,
+    avatarUrl: profile.avatar_url,
+    phone: profile.phone,
+    accessToken: session.access_token,
+    refreshToken: session.refresh_token,
+    expiresAt: session.expires_at || 0,
+  })
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
 
@@ -86,8 +112,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return true
     return !localStorage.getItem('thien_an_user')
   })
+  const [storedAccounts, setStoredAccounts] = useState<StoredAccount[]>(() => getStoredAccounts())
+  const isSwitchingRef = useRef(false)
   const router = useRouter()
   const pathname = usePathname()
+
+  const refreshAccountList = useCallback(() => {
+    setStoredAccounts(getStoredAccounts())
+  }, [])
 
   // Redirect user based on their role
   const redirectBasedOnRole = useCallback((role: UserRole) => {
@@ -109,6 +141,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (profile && profile.status === 'ACTIVE') {
             setUser(profile)
             localStorage.setItem('thien_an_user', JSON.stringify(profile))
+            // Save/update account in store
+            saveCurrentSession(profile, session)
+            refreshAccountList()
           } else {
             await supabase.auth.signOut()
             setUser(null)
@@ -130,6 +165,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Skip events during account switch — switchAccount handles state itself
+      if (isSwitchingRef.current) return
+
       if (event === 'SIGNED_OUT') {
         setUser(null)
         localStorage.removeItem('thien_an_user')
@@ -140,19 +178,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (profile && profile.status === 'ACTIVE') {
           setUser(profile)
           localStorage.setItem('thien_an_user', JSON.stringify(profile))
+          // Save/update account in store
+          saveCurrentSession(profile, session)
+          refreshAccountList()
         }
-      } else if (event === 'TOKEN_REFRESHED') {
+      } else if (event === 'TOKEN_REFRESHED' && session) {
         // Token was auto-refreshed by Supabase — refetch any stale/errored queries
         // so they pick up the new token
         queryClient.refetchQueries({ type: 'active' })
+        // Update tokens in account store
+        if (session.user) {
+          updateAccountTokens(
+            session.user.id,
+            session.access_token,
+            session.refresh_token,
+            session.expires_at || 0
+          )
+          refreshAccountList()
+        }
       }
     })
 
     // ============ Session recovery when tab becomes visible after idle ============
-    // When a browser tab is hidden, JavaScript timers are throttled/frozen.
-    // Supabase's autoRefreshToken timer may not fire, causing JWT to expire.
-    // We refresh the token here; React Query's refetchOnWindowFocus handles
-    // data refetch automatically. Cached data stays visible — no loading flash.
     let lastHiddenAt = 0
     const IDLE_THRESHOLD = 60 * 1000 // 1 minute
 
@@ -166,11 +213,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (lastHiddenAt === 0 || Date.now() - lastHiddenAt < IDLE_THRESHOLD) return
 
       try {
-        // Silently refresh the session token before queries refetch
-        // refetchOnWindowFocus: true handles data refetch automatically
         const { data, error } = await supabase.auth.refreshSession()
         if (error || !data.session) {
-          // Refresh token also expired — session is truly dead
           setUser(null)
           localStorage.removeItem('thien_an_user')
           queryClient.clear()
@@ -178,7 +222,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch {
         // Network error — don't force logout
-        // The fetch interceptor handles token refresh per-request
       }
     }
 
@@ -238,6 +281,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(profile)
       localStorage.setItem('thien_an_user', JSON.stringify(profile))
+
+      // Save account to store for multi-account switching
+      if (authData.session) {
+        saveCurrentSession(profile, authData.session)
+        refreshAccountList()
+      }
 
       // Redirect based on role
       redirectBasedOnRole(profile.role)
@@ -324,11 +373,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
-    await supabase.auth.signOut()
+    // Keep account in stored list (user can still switch back)
+    // Only sign out the current Supabase session
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // Session already expired — ignore API error
+    }
     setUser(null)
     localStorage.removeItem('thien_an_user')
     queryClient.clear()
     router.push('/login')
+  }
+
+  const switchAccount = async (userId: string): Promise<{ success: boolean; error?: string }> => {
+    const accounts = getStoredAccounts()
+    const account = accounts.find((a) => a.userId === userId)
+    if (!account) {
+      return { success: false, error: 'Không tìm thấy tài khoản' }
+    }
+
+    // Prevent onAuthStateChange from interfering
+    isSwitchingRef.current = true
+
+    try {
+      // Try to restore session using stored tokens
+      const { data, error } = await supabase.auth.setSession({
+        access_token: account.accessToken,
+        refresh_token: account.refreshToken,
+      })
+
+      if (error || !data.session) {
+        // Token expired — remove account from store
+        removeStoredAccount(userId)
+        refreshAccountList()
+        return { success: false, error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' }
+      }
+
+      // Fetch fresh profile
+      const profile = await fetchUserProfile(data.session.user.id)
+      if (!profile || profile.status !== 'ACTIVE') {
+        removeStoredAccount(userId)
+        refreshAccountList()
+        return { success: false, error: 'Tài khoản không còn hoạt động.' }
+      }
+
+      // Update state
+      setUser(profile)
+      localStorage.setItem('thien_an_user', JSON.stringify(profile))
+      queryClient.clear()
+
+      // Update tokens in store (setSession may have refreshed them)
+      saveCurrentSession(profile, data.session)
+      refreshAccountList()
+
+      // Redirect based on role
+      redirectBasedOnRole(profile.role)
+
+      return { success: true }
+    } catch (err) {
+      console.error('Switch account error:', err)
+      return { success: false, error: 'Đã có lỗi xảy ra khi chuyển tài khoản.' }
+    } finally {
+      isSwitchingRef.current = false
+    }
+  }
+
+  const removeAccount = (userId: string) => {
+    removeStoredAccount(userId)
+    refreshAccountList()
   }
 
   const updateProfile = async (data: Partial<UserProfile>): Promise<{ success: boolean; error?: string }> => {
@@ -539,7 +652,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       deleteAvatar,
       isAdmin,
       isGiaoLyVien,
-      isPhanDoanTruong
+      isPhanDoanTruong,
+      storedAccounts,
+      switchAccount,
+      removeAccount,
     }}>
       {children}
     </AuthContext.Provider>

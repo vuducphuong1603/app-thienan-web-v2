@@ -305,6 +305,59 @@ button:focus {
   background: #4a4a4a;
 }
 
+/* Display settings: Font size */
+html.font-size-small {
+  font-size: 13px;
+}
+
+html.font-size-large {
+  font-size: 18px;
+}
+
+/* Display settings: Compact mode */
+html.compact-mode .compact-padding {
+  padding: 0.5rem;
+}
+
+html.compact-mode .compact-gap {
+  gap: 0.25rem;
+}
+
+html.compact-mode main {
+  gap: 0.5rem;
+}
+
+/* Display settings: High contrast */
+html.high-contrast .text-black\/40,
+html.high-contrast .dark .text-white\/60 {
+  opacity: 1;
+}
+
+html.high-contrast [class*="text-black/40"] {
+  color: rgba(0, 0, 0, 0.75);
+}
+
+html.high-contrast.dark [class*="text-white/60"] {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+html.high-contrast [class*="text-black/60"] {
+  color: rgba(0, 0, 0, 0.9);
+}
+
+html.high-contrast.dark [class*="text-white/40"] {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Display settings: Reduce motion */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
