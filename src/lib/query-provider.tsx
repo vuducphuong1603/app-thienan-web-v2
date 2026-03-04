@@ -43,8 +43,8 @@ async function handleAuthError(queryClient: QueryClient) {
       await supabase.auth.signOut()
       window.location.href = '/login'
     } else {
-      // Token refreshed successfully — retry all failed queries
-      queryClient.invalidateQueries()
+      // Token refreshed — force refetch ALL active queries (including errored ones)
+      queryClient.refetchQueries({ type: 'active' })
     }
   } catch {
     await supabase.auth.signOut()
@@ -74,16 +74,17 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
         }),
         defaultOptions: {
           queries: {
-            staleTime: 5 * 60 * 1000, // Data stays fresh for 5 minutes
-            gcTime: 10 * 60 * 1000, // Cache kept for 10 minutes
+            staleTime: 10 * 60 * 1000, // Data stays fresh for 10 minutes
+            gcTime: 30 * 60 * 1000, // Cache kept for 30 minutes
             refetchOnWindowFocus: false, // Disabled — session recovery handles refetch on tab focus
-            refetchOnReconnect: 'always', // Refetch when network reconnects
+            refetchOnReconnect: false, // Don't refetch all on reconnect — let visibility handler manage it
+            refetchOnMount: 'always', // Refetch on mount only if stale
             retry: (failureCount, error) => {
               // Don't retry auth errors — need session refresh, not retry
               if (isAuthError(error)) return false
-              return failureCount < 2
+              return failureCount < 1
             },
-            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+            retryDelay: 1000,
           },
         },
       })

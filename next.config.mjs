@@ -13,6 +13,7 @@ const nextConfig = {
     ],
     unoptimized: true,
   },
+  devIndicators: false,
 };
 
 export default nextConfig;

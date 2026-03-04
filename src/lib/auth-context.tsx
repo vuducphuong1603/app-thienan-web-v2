@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Session recovery when tab becomes visible after idle
     let lastHiddenAt = 0
-    const IDLE_THRESHOLD = 2 * 60 * 1000 // 2 minutes
+    const IDLE_THRESHOLD = 5 * 60 * 1000 // 5 minutes
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'hidden') {
@@ -155,26 +155,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      // Only check session if tab was hidden for >2 minutes
+      // Only recover session if tab was hidden for >5 minutes
       if (lastHiddenAt === 0 || Date.now() - lastHiddenAt < IDLE_THRESHOLD) return
 
       try {
-        const { data: { session: currentSession } } = await supabase.auth.getSession()
-        if (!currentSession) {
-          // Session gone — try to refresh
-          const { error } = await supabase.auth.refreshSession()
-          if (error) {
-            // Refresh failed — force logout
-            setUser(null)
-            localStorage.removeItem('thien_an_user')
-            router.push('/login')
-            return
-          }
+        // Always call refreshSession() — getSession() only returns cached data
+        // which may contain an expired JWT that looks valid locally
+        const { data, error } = await supabase.auth.refreshSession()
+        if (error || !data.session) {
+          // Refresh failed — session truly expired, force logout
+          setUser(null)
+          localStorage.removeItem('thien_an_user')
+          router.push('/login')
+          return
         }
-        // Session is valid (or was refreshed) — refetch all stale queries
-        queryClient.invalidateQueries()
+        // Session refreshed — force refetch ALL active queries (including errored ones)
+        queryClient.refetchQueries({ type: 'active' })
       } catch {
-        // Network error or other issue — don't force logout, let next interaction handle it
+        // Network error — don't force logout, let next interaction handle it
       }
     }
 

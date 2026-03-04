@@ -47,6 +47,7 @@ export const queryKeys = {
 export function useDashboardStats(enabled = true) {
   return useQuery({
     queryKey: queryKeys.dashboardStats,
+    staleTime: 15 * 60 * 1000, // Dashboard stats don't change often
     queryFn: async () => {
       const [glvRes, thieuNhiRes, classesRes] = await Promise.all([
         supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'giao_ly_vien'),
@@ -334,6 +335,7 @@ export function useAbsentStudents(classId: string | undefined, dayType: 'cn' | '
 export function useClassStats() {
   return useQuery({
     queryKey: queryKeys.classStats,
+    staleTime: 30 * 60 * 1000, // Stats rarely change - cache 30 min
     queryFn: async () => {
       const [branchesRes, classesRes, studentsRes, teachersRes] = await Promise.all([
         supabase.from('branches').select('id, name, order_index').order('order_index'),
@@ -391,10 +393,11 @@ export function useClassStats() {
 export function useUsers() {
   return useQuery({
     queryKey: queryKeys.users,
+    staleTime: 15 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('id, username, email, full_name, saint_name, phone, address, role, status, branch, class_id, class_name, avatar_url, created_at, updated_at')
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -407,6 +410,7 @@ export function useUsers() {
 export function useClasses() {
   return useQuery({
     queryKey: queryKeys.classes,
+    staleTime: 30 * 60 * 1000, // Classes rarely change
     queryFn: async () => {
       const { data, error } = await supabase
         .from('classes')
@@ -423,6 +427,7 @@ export function useClasses() {
 export function useActiveClasses() {
   return useQuery({
     queryKey: queryKeys.activeClasses,
+    staleTime: 30 * 60 * 1000, // Classes rarely change
     queryFn: async () => {
       const { data, error } = await supabase
         .from('classes')
@@ -462,30 +467,22 @@ export function useStudentsWithDetails() {
   return useQuery({
     queryKey: queryKeys.students,
     queryFn: async () => {
-      const [schoolYearRes, classesRes, studentsRes] = await Promise.all([
+      // Fetch everything in parallel - no waterfall
+      const [schoolYearRes, classesRes, studentsRes, allHolidaysRes] = await Promise.all([
         supabase.from('school_years').select('id, start_date, end_date').eq('is_current', true).single(),
-        supabase.from('classes').select('*').eq('status', 'ACTIVE').order('display_order', { ascending: true }),
-        supabase.from('thieu_nhi').select('*').order('full_name', { ascending: true }),
+        supabase.from('classes').select('id, name, branch, display_order, status, created_at, updated_at').eq('status', 'ACTIVE').order('display_order', { ascending: true }),
+        supabase.from('thieu_nhi').select('id, full_name, saint_name, student_code, date_of_birth, gender, phone, address, parent_name, parent_phone, parent_name_2, parent_phone_2, class_id, status, avatar_url, notes, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn, created_at, updated_at').order('full_name', { ascending: true }),
+        supabase.from('holidays').select('day_type'),
       ])
 
       const schoolYear = schoolYearRes.data
-      const schoolYearId = schoolYear?.id
       const classesData = classesRes.data || []
       const studentsData = studentsRes.data || []
+      const holidays = (allHolidaysRes.data || []) as Pick<Holiday, 'day_type'>[]
 
       // Count actual Thursdays (4) and Sundays (0) in school year
       const totalThu5 = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 4) : 40
       const totalCn = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 0) : 40
-
-      // Fetch holidays for current school year
-      let holidays: Holiday[] = []
-      if (schoolYearId) {
-        const { data: holidaysData } = await supabase
-          .from('holidays')
-          .select('*')
-          .eq('school_year_id', schoolYearId)
-        holidays = (holidaysData || []) as Holiday[]
-      }
 
       // Calculate effective days (actual day count minus holidays)
       const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
@@ -534,6 +531,7 @@ export function useStudentsWithDetails() {
 export function useClassesWithDetails() {
   return useQuery({
     queryKey: ['classes', 'withDetails'],
+    staleTime: 30 * 60 * 1000, // Class details rarely change
     queryFn: async () => {
       const [classesRes, usersRes, studentsRes] = await Promise.all([
         supabase.from('classes').select('*').order('display_order', { ascending: true }),
@@ -590,6 +588,7 @@ export function useClassesWithDetails() {
 export function useCurrentSchoolYear(enabled = true) {
   return useQuery({
     queryKey: queryKeys.schoolYear,
+    staleTime: 60 * 60 * 1000, // School year almost never changes - cache 1 hour
     queryFn: async () => {
       const { data, error } = await supabase
         .from('school_years')
@@ -630,6 +629,7 @@ export function useCurrentSchoolYear(enabled = true) {
 export function usePlanStaticData() {
   return useQuery({
     queryKey: ['planStaticData'],
+    staleTime: 30 * 60 * 1000, // Categories and classes rarely change
     queryFn: async () => {
       const [catRes, classRes] = await Promise.all([
         supabase.from('plan_categories').select('*').order('display_order'),
@@ -709,6 +709,7 @@ const branchDisplayNames: Record<Branch, string> = {
 export function usePerformanceTrendData(chartType: 'sunday' | 'thursday', enabled = true) {
   return useQuery({
     queryKey: queryKeys.performanceTrend(chartType),
+    staleTime: 15 * 60 * 1000, // Attendance trends don't change frequently
     queryFn: async () => {
       const dayType: 'thu5' | 'cn' = chartType === 'sunday' ? 'cn' : 'thu5'
       const weeks = getLast3Weeks(dayType)
@@ -908,34 +909,27 @@ export function useMyNotesData(user: UserProfile | null) {
 
       if (user.role === 'admin') {
         const [classesRes, studentsRes] = await Promise.all([
-          supabase.from('classes').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
-          supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+          supabase.from('classes').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+          supabase.from('thieu_nhi').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
         ])
         classCount = classesRes.count || 0
         studentCount = studentsRes.count || 0
       } else if (user.role === 'phan_doan_truong' && user.branch) {
+        // Parallel: get class IDs and student count by branch classes
         const { data: branchClasses } = await supabase
-          .from('classes')
-          .select('id')
-          .eq('branch', user.branch)
-          .eq('status', 'ACTIVE')
+          .from('classes').select('id').eq('branch', user.branch).eq('status', 'ACTIVE')
         classCount = branchClasses?.length || 0
-        if (branchClasses && branchClasses.length > 0) {
-          const classIds = branchClasses.map(c => c.id)
+        if (classCount > 0) {
           const { count } = await supabase
-            .from('thieu_nhi')
-            .select('*', { count: 'exact', head: true })
-            .in('class_id', classIds)
-            .eq('status', 'ACTIVE')
+            .from('thieu_nhi').select('id', { count: 'exact', head: true })
+            .in('class_id', branchClasses!.map(c => c.id)).eq('status', 'ACTIVE')
           studentCount = count || 0
         }
       } else if (user.role === 'giao_ly_vien' && user.class_id) {
         classCount = 1
         const { count } = await supabase
-          .from('thieu_nhi')
-          .select('*', { count: 'exact', head: true })
-          .eq('class_id', user.class_id)
-          .eq('status', 'ACTIVE')
+          .from('thieu_nhi').select('id', { count: 'exact', head: true })
+          .eq('class_id', user.class_id).eq('status', 'ACTIVE')
         studentCount = count || 0
       }
 
