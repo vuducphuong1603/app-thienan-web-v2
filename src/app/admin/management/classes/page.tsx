@@ -47,7 +47,7 @@ function ClassesPageContent() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [classToDelete, setClassToDelete] = useState<ClassWithDetails | null>(null)
 
-  const { data: classes = [], isLoading: loading } = useClassesWithDetails()
+  const { data: classes = [], isLoading: loading, isError, error, refetch } = useClassesWithDetails()
   const { invalidateClasses } = useInvalidateQueries()
 
   const fetchClasses = invalidateClasses
@@ -221,6 +221,16 @@ function ClassesPageContent() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-12 text-primary-3 gap-3">
+          <p className="text-sm text-red-500">Không tải được dữ liệu: {(error as Error)?.message || 'Lỗi không xác định'}</p>
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 bg-brand text-white text-sm rounded-xl hover:bg-orange-500 transition-colors"
+          >
+            Thử lại
+          </button>
         </div>
       ) : Object.keys(groupedClasses).length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-primary-3">

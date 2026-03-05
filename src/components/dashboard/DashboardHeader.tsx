@@ -26,8 +26,8 @@ const adminNavTabs = [
 ]
 
 const glvNavTabs = [
-  { id: 'overview', label: 'Tổng quan', href: '/dashboard' },
-  { id: 'management', label: 'Quản lý', href: '/admin/management/users' },
+  { id: 'overview', label: 'Tổng quản', href: '/dashboard' },
+  { id: 'management', label: 'Quản lý', href: '/dashboard/management' },
   { id: 'activities', label: 'Hoạt động', href: '/admin/activities' },
   { id: 'system', label: 'Hệ thống', href: '/admin/settings' },
 ]

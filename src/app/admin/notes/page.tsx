@@ -519,7 +519,7 @@ export default function NotesPage() {
       .from('user_notes')
       .update({ is_favorite: !currentState, updated_at: new Date().toISOString() })
       .eq('id', noteId)
-    await invalidateUserNotes()
+    invalidateUserNotes()
   }
 
   const handleToggleComplete = async (noteId: string) => {
@@ -529,13 +529,13 @@ export default function NotesPage() {
       .from('user_notes')
       .update({ is_completed: !note.is_completed, updated_at: new Date().toISOString() })
       .eq('id', noteId)
-    await invalidateUserNotes()
+    invalidateUserNotes()
   }
 
   const handleCancel = async (noteId: string) => {
     if (!confirm('Bạn có chắc muốn xoá ghi chú này?')) return
     await supabase.from('user_notes').delete().eq('id', noteId)
-    await invalidateUserNotes()
+    invalidateUserNotes()
   }
 
   if (!user && !loading) return null

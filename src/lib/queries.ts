@@ -50,7 +50,7 @@ export const queryKeys = {
 export function useDashboardStats(enabled = true) {
   return useQuery({
     queryKey: queryKeys.dashboardStats,
-    staleTime: 15 * 60 * 1000, // Dashboard stats don't change often
+    staleTime: 5 * 60 * 1000, // Dashboard stats don't change often
     queryFn: async () => {
       const [glvRes, thieuNhiRes, classesRes] = await Promise.all([
         supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'giao_ly_vien'),
@@ -169,6 +169,9 @@ export function useGLVClassTrend(classId: string | undefined, enabled = true) {
           .gte('attendance_date', startDate).lte('attendance_date', endDate),
       ])
 
+      if (studentCountRes.error) throw studentCountRes.error
+      if (attendanceRes.error) throw attendanceRes.error
+
       const totalStudents = studentCountRes.count || 0
       const records = attendanceRes.data || []
 
@@ -241,6 +244,9 @@ export function useGLVPerStudentStats(classId: string | undefined, enabled = tru
         supabase.from('attendance_records').select('student_id, day_type')
           .eq('class_id', classId).eq('status', 'present'),
       ])
+
+      if (studentsRes.error) throw studentsRes.error
+      if (attendanceRes.error) throw attendanceRes.error
 
       const holidays = (holidaysRes.data || []) as Holiday[]
       const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
@@ -325,6 +331,9 @@ export function useAbsentStudents(classId: string | undefined, dayType: 'cn' | '
           .eq('class_id', classId).eq('attendance_date', date).eq('day_type', dayType).eq('status', 'present'),
       ])
 
+      if (studentsRes.error) throw studentsRes.error
+      if (attendanceRes.error) throw attendanceRes.error
+
       const students = (studentsRes.data || []) as AbsentStudent[]
       const presentIds = new Set((attendanceRes.data || []).map(r => r.student_id))
 
@@ -343,10 +352,11 @@ export function useAbsentStudents(classId: string | undefined, dayType: 'cn' | '
 }
 
 // ============ Class Stats (for ClassStats component) ============
-export function useClassStats() {
+export function useClassStats(enabled = true) {
   return useQuery({
     queryKey: queryKeys.classStats,
-    staleTime: 30 * 60 * 1000, // Stats rarely change - cache 30 min
+    staleTime: 10 * 60 * 1000, // Stats rarely change
+    enabled,
     queryFn: async () => {
       const [branchesRes, classesRes, studentsRes, teachersRes] = await Promise.all([
         supabase.from('branches').select('id, name, order_index').order('order_index'),
@@ -409,7 +419,7 @@ export function useClassStats() {
 export function useUsers() {
   return useQuery({
     queryKey: queryKeys.users,
-    staleTime: 15 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('users')
@@ -426,7 +436,7 @@ export function useUsers() {
 export function useClasses() {
   return useQuery({
     queryKey: queryKeys.classes,
-    staleTime: 30 * 60 * 1000, // Classes rarely change
+    staleTime: 10 * 60 * 1000, // Classes rarely change
     queryFn: async () => {
       const { data, error } = await supabase
         .from('classes')
@@ -443,7 +453,7 @@ export function useClasses() {
 export function useActiveClasses() {
   return useQuery({
     queryKey: queryKeys.activeClasses,
-    staleTime: 30 * 60 * 1000, // Classes rarely change
+    staleTime: 10 * 60 * 1000, // Classes rarely change
     queryFn: async () => {
       const { data, error } = await supabase
         .from('classes')
@@ -550,7 +560,7 @@ export function useStudentsWithDetails() {
 export function useClassesWithDetails() {
   return useQuery({
     queryKey: ['classes', 'withDetails'],
-    staleTime: 30 * 60 * 1000, // Class details rarely change
+    staleTime: 10 * 60 * 1000, // Class details rarely change
     queryFn: async () => {
       const [classesRes, usersRes, studentsRes] = await Promise.all([
         supabase.from('classes').select('*').order('display_order', { ascending: true }),
@@ -559,6 +569,8 @@ export function useClassesWithDetails() {
       ])
 
       if (classesRes.error) throw classesRes.error
+      if (usersRes.error) throw usersRes.error
+      if (studentsRes.error) throw studentsRes.error
 
       // Build student count map - O(n) instead of sequential pagination
       const studentCountByClass: Record<string, number> = {}
@@ -607,7 +619,7 @@ export function useClassesWithDetails() {
 export function useCurrentSchoolYear(enabled = true) {
   return useQuery({
     queryKey: queryKeys.schoolYear,
-    staleTime: 60 * 60 * 1000, // School year almost never changes - cache 1 hour
+    staleTime: 30 * 60 * 1000, // School year almost never changes
     queryFn: async () => {
       const { data, error } = await supabase
         .from('school_years')
@@ -648,12 +660,16 @@ export function useCurrentSchoolYear(enabled = true) {
 export function usePlanStaticData() {
   return useQuery({
     queryKey: ['planStaticData'],
-    staleTime: 30 * 60 * 1000, // Categories and classes rarely change
+    staleTime: 10 * 60 * 1000, // Categories and classes rarely change
     queryFn: async () => {
       const [catRes, classRes] = await Promise.all([
         supabase.from('plan_categories').select('*').order('display_order'),
         supabase.from('classes').select('*').eq('status', 'ACTIVE').order('display_order'),
       ])
+
+      if (catRes.error) throw catRes.error
+      if (classRes.error) throw classRes.error
+
       return {
         categories: catRes.data || [],
         classes: classRes.data || [],
@@ -728,7 +744,7 @@ const branchDisplayNames: Record<Branch, string> = {
 export function usePerformanceTrendData(chartType: 'sunday' | 'thursday', enabled = true) {
   return useQuery({
     queryKey: queryKeys.performanceTrend(chartType),
-    staleTime: 15 * 60 * 1000, // Attendance trends don't change frequently
+    staleTime: 5 * 60 * 1000, // Attendance trends don't change frequently
     queryFn: async () => {
       const dayType: 'thu5' | 'cn' = chartType === 'sunday' ? 'cn' : 'thu5'
       const weeks = getLast3Weeks(dayType)
@@ -1161,7 +1177,7 @@ export function useAlertHistory() {
 }
 
 // ============ Dashboard Alerts (latest 2) ============
-export function useDashboardAlerts() {
+export function useDashboardAlerts(enabled = true) {
   return useQuery({
     queryKey: ['dashboardAlerts'],
     queryFn: async () => {
@@ -1174,6 +1190,7 @@ export function useDashboardAlerts() {
       if (error) throw error
       return (data || []) as AlertRecord[]
     },
+    enabled,
   })
 }
 // ============ User Notes (personal notes) ============
@@ -1415,7 +1432,7 @@ export function useHolidays(schoolYearId: string | undefined) {
 export function useSchoolYears() {
   return useQuery({
     queryKey: queryKeys.schoolYears,
-    staleTime: 60 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('school_years')

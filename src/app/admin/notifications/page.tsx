@@ -246,13 +246,14 @@ export default function NotificationManagementPage() {
   const [filterPriority, setFilterPriority] = useState('all')
   const [filterTarget, setFilterTarget] = useState('all')
 
-  // Redirect non-admin
-  if (!loading && (!user || !isAdmin)) {
-    router.push('/dashboard')
-    return null
-  }
+  // Redirect unauthenticated users
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/dashboard')
+    }
+  }, [loading, user, router])
 
-  if (!user) return null
+  if (loading || !user) return null
 
   const firstName = user.full_name?.split(' ').pop() || user.full_name
 
@@ -340,13 +341,15 @@ export default function NotificationManagementPage() {
               ]}
             />
           </div>
-          <button
-            onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-2 h-[38px] px-4 bg-brand text-white rounded-full hover:bg-brand/90 transition-colors text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Tạo thông báo mới
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="flex items-center gap-2 h-[38px] px-4 bg-brand text-white rounded-full hover:bg-brand/90 transition-colors text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Tạo thông báo mới
+            </button>
+          )}
         </div>
 
         {/* Notification List */}
@@ -377,26 +380,28 @@ export default function NotificationManagementPage() {
               <NotificationAdminItem
                 key={notification.id}
                 notification={notification}
-                onDelete={(id) => setDeleteTarget({ id, title: notification.title })}
+                onDelete={isAdmin ? (id) => setDeleteTarget({ id, title: notification.title }) : undefined}
               />
             ))
           )}
         </div>
       </main>
 
-      {/* Create Modal */}
-      <CreateNotificationModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-      />
-
-      {/* Delete Modal */}
-      <DeleteNotificationModal
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        notificationTitle={deleteTarget?.title}
-      />
+      {/* Modals - admin only */}
+      {isAdmin && (
+        <>
+          <CreateNotificationModal
+            isOpen={isCreateOpen}
+            onClose={() => setIsCreateOpen(false)}
+          />
+          <DeleteNotificationModal
+            isOpen={!!deleteTarget}
+            onClose={() => setDeleteTarget(null)}
+            onConfirm={handleDelete}
+            notificationTitle={deleteTarget?.title}
+          />
+        </>
+      )}
     </div>
   )
 }

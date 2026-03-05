@@ -241,7 +241,7 @@ export default function MyNotes() {
         .from('user_notes')
         .update({ is_completed: !currentState, updated_at: new Date().toISOString() })
         .eq('id', noteId)
-      if (!error) await invalidateUserNotes()
+      if (!error) invalidateUserNotes()
     } finally {
       setTogglingId(null)
     }
@@ -252,7 +252,7 @@ export default function MyNotes() {
     setDeletingId(noteId)
     try {
       const { error } = await supabase.from('user_notes').delete().eq('id', noteId)
-      if (!error) await invalidateUserNotes()
+      if (!error) invalidateUserNotes()
     } finally {
       setDeletingId(null)
     }
@@ -265,7 +265,7 @@ export default function MyNotes() {
     setShowHeaderMenu(false)
     setShowNotesMenu(false)
     const { error } = await supabase.from('user_notes').delete().in('id', completedIds)
-    if (!error) await invalidateUserNotes()
+    if (!error) invalidateUserNotes()
   }
 
   const handleDeleteAll = async () => {
@@ -275,7 +275,7 @@ export default function MyNotes() {
     setShowNotesMenu(false)
     const ids = notes.map(n => n.id)
     const { error } = await supabase.from('user_notes').delete().in('id', ids)
-    if (!error) await invalidateUserNotes()
+    if (!error) invalidateUserNotes()
   }
 
   return (

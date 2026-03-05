@@ -69,6 +69,8 @@ export default function AttendanceChart({ classId }: AttendanceChartProps) {
           : Promise.resolve({ count: 0 }),
       ])
 
+      if ('error' in totalRes && totalRes.error) throw totalRes.error
+
       const total = totalRes.count || 0
       const thu5Present = thu5Res.count || 0
       const cnPresent = cnRes.count || 0

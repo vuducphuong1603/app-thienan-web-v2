@@ -123,8 +123,8 @@ export default function StudentsPage() {
     }
 
     console.log('Delete successful, refreshing data...')
-    // Refresh data after deletion
-    await fetchData()
+    // Refresh data in background (don't await — UI updates when refetch completes)
+    fetchData()
   }
 
   // Open delete modal
@@ -176,9 +176,9 @@ export default function StudentsPage() {
         return
       }
 
-      // Refresh data and exit edit mode
-      await fetchData()
+      // Exit edit mode immediately, refresh data in background
       cancelEditing()
+      fetchData()
     } catch (err) {
       console.error('Error:', err)
     } finally {

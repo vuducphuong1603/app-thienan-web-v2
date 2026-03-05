@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { supabase, WeeklyPlan } from '@/lib/supabase'
 import { WeeklyPlanCalendar, PlanModal, DeletePlanModal, WeekPickerCalendar } from '@/components/weekly-plan'
 import { usePlanStaticData, useWeeklyPlans, useInvalidateQueries } from '@/lib/queries'
+import { useAuth } from '@/lib/auth-context'
 
 function getMonday(date: Date): Date {
   const d = new Date(date)
@@ -29,6 +30,8 @@ function formatWeekRange(weekStart: Date) {
 }
 
 export default function WeeklyPlanPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
@@ -247,14 +250,16 @@ export default function WeeklyPlanPage() {
               />
             </div>
 
-            {/* Add Plan Button */}
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-brand text-white text-sm font-medium rounded-full hover:bg-[#e8764f] transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Thêm kế hoạch
-            </button>
+            {/* Add Plan Button - admin only */}
+            {isAdmin && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-brand text-white text-sm font-medium rounded-full hover:bg-[#e8764f] transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Thêm kế hoạch
+              </button>
+            )}
           </div>
         </div>
 
@@ -275,40 +280,40 @@ export default function WeeklyPlanPage() {
             plans={plans}
             categories={categories}
             classes={classes}
-            onEditPlan={plan => setEditPlan(plan)}
-            onDeletePlan={plan => setDeletePlan(plan)}
+            onEditPlan={isAdmin ? plan => setEditPlan(plan) : undefined}
+            onDeletePlan={isAdmin ? plan => setDeletePlan(plan) : undefined}
           />
         )}
       </div>
 
-      {/* Add Plan Modal */}
-      <PlanModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSuccess={handleAddSuccess}
-        mode="add"
-        categories={categories}
-        classes={classes}
-      />
-
-      {/* Edit Plan Modal */}
-      <PlanModal
-        isOpen={!!editPlan}
-        onClose={() => setEditPlan(null)}
-        onSuccess={handleEditSuccess}
-        mode="edit"
-        plan={editPlan}
-        categories={categories}
-        classes={classes}
-      />
-
-      {/* Delete Plan Modal */}
-      <DeletePlanModal
-        isOpen={!!deletePlan}
-        onClose={() => setDeletePlan(null)}
-        onConfirm={handleDeleteConfirm}
-        planTitle={deletePlan?.title}
-      />
+      {/* Modals - admin only */}
+      {isAdmin && (
+        <>
+          <PlanModal
+            isOpen={showAddModal}
+            onClose={() => setShowAddModal(false)}
+            onSuccess={handleAddSuccess}
+            mode="add"
+            categories={categories}
+            classes={classes}
+          />
+          <PlanModal
+            isOpen={!!editPlan}
+            onClose={() => setEditPlan(null)}
+            onSuccess={handleEditSuccess}
+            mode="edit"
+            plan={editPlan}
+            categories={categories}
+            classes={classes}
+          />
+          <DeletePlanModal
+            isOpen={!!deletePlan}
+            onClose={() => setDeletePlan(null)}
+            onConfirm={handleDeleteConfirm}
+            planTitle={deletePlan?.title}
+          />
+        </>
+      )}
     </div>
   )
 }

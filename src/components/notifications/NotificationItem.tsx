@@ -140,7 +140,7 @@ export function NotificationAdminItem({
     created_at: string
     creator_name?: string
   }
-  onDelete: (id: string) => void
+  onDelete?: (id: string) => void
 }) {
   const targetLabel = {
     all: 'Tất cả',
@@ -189,12 +189,14 @@ export function NotificationAdminItem({
       </div>
 
       {/* Delete button */}
-      <button
-        onClick={() => onDelete(notification.id)}
-        className="px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 text-xs rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors flex-shrink-0"
-      >
-        Xoá
-      </button>
+      {onDelete && (
+        <button
+          onClick={() => onDelete(notification.id)}
+          className="px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 text-xs rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors flex-shrink-0"
+        >
+          Xoá
+        </button>
+      )}
     </div>
   )
 }

@@ -1751,7 +1751,7 @@ export default function SettingsPage() {
             {/* Sidebar */}
             <div className="w-[200px] border-r border-primary-4 dark:border-gray-700 pt-7 pb-4 px-4 flex-shrink-0">
               <nav className="flex flex-col">
-                {settingsTabs.map((tab) => (
+                {(isAdmin ? settingsTabs : settingsTabs.filter(t => t.id === 'personal' || t.id === 'password')).map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}

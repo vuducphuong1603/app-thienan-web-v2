@@ -31,10 +31,19 @@ export function isAuthError(error: unknown): boolean {
   return false
 }
 
-// Debounced auth error handler — prevents multiple concurrent refresh attempts
+// Debounced auth error handler — prevents multiple concurrent refresh attempts.
+// Uses a timestamp cooldown to prevent infinite refetch loops:
+// query fails → refresh → refetch → fails again → would loop forever without cooldown.
 let isHandlingAuth = false
+let _lastRefetchAt = 0
+
 async function handleAuthError(queryClient: QueryClient) {
   if (isHandlingAuth) return
+
+  // Prevent infinite loop: only allow one refetch cycle per 10 seconds
+  const now = Date.now()
+  if (now - _lastRefetchAt < 10_000) return
+
   isHandlingAuth = true
 
   try {
@@ -44,6 +53,7 @@ async function handleAuthError(queryClient: QueryClient) {
       window.location.href = '/login'
     } else {
       // Token refreshed — force refetch ALL active queries (including errored ones)
+      _lastRefetchAt = Date.now()
       queryClient.refetchQueries({ type: 'active' })
     }
   } catch {
@@ -74,20 +84,22 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
         }),
         defaultOptions: {
           queries: {
-            staleTime: 10 * 60 * 1000, // Data stays fresh for 10 minutes
-            gcTime: 30 * 60 * 1000, // Cache kept for 30 minutes
+            staleTime: 2 * 60 * 1000, // Data stays fresh for 2 minutes — balances freshness & perf
+            gcTime: 10 * 60 * 1000, // Cache kept for 10 minutes
             refetchOnWindowFocus: true, // Refetch stale queries when tab gains focus
             refetchOnReconnect: true, // Refetch when onlineManager goes online
             refetchOnMount: true, // Refetch on mount only if stale
             retry: (failureCount, error) => {
               // Auth errors: allow 2 retries (gives time for token refresh)
               if (isAuthError(error)) return failureCount < 2
-              return failureCount < 1
+              // Non-auth errors: retry up to 2 times for transient failures
+              return failureCount < 2
             },
             retryDelay: (attemptIndex, error) => {
               // Auth errors: wait 3s between retries (token refresh takes ~200-500ms)
               if (isAuthError(error)) return 3000
-              return 1000
+              // Exponential backoff: 1s, 2s
+              return Math.min(1000 * (attemptIndex + 1), 3000)
             },
           },
         },

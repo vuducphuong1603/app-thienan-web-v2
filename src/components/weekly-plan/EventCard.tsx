@@ -8,8 +8,8 @@ interface EventCardProps {
   plan: WeeklyPlan
   category?: PlanCategory | null
   classes?: Class[]
-  onEdit: (plan: WeeklyPlan) => void
-  onDelete: (plan: WeeklyPlan) => void
+  onEdit?: (plan: WeeklyPlan) => void
+  onDelete?: (plan: WeeklyPlan) => void
 }
 
 function formatTimeAMPM(time: string): string {
@@ -105,30 +105,36 @@ export default function EventCard({ plan, category, classes = [], onEdit, onDele
             <CalendarDays className="w-[22px] h-[22px]" style={{ color: categoryColor }} />
           )}
         </div>
-        <div ref={menuRef} className="relative">
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="w-[22px] h-[22px] flex items-center justify-center hover:opacity-70 transition-opacity"
-          >
-            <MoreHorizontal className="w-[22px] h-[22px] text-[#8a8c90]" />
-          </button>
-          {menuOpen && (
-            <div className="absolute right-0 top-7 z-20 w-36 bg-white dark:bg-[#2a2a2a] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg overflow-hidden">
-              <button
-                onClick={() => { setMenuOpen(false); onEdit(plan) }}
-                className="w-full px-3.5 py-2.5 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 flex items-center gap-2 transition-colors"
-              >
-                <Pencil className="w-3.5 h-3.5" /> Chỉnh sửa
-              </button>
-              <button
-                onClick={() => { setMenuOpen(false); onDelete(plan) }}
-                className="w-full px-3.5 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" /> Xoá
-              </button>
-            </div>
-          )}
-        </div>
+        {(onEdit || onDelete) && (
+          <div ref={menuRef} className="relative">
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="w-[22px] h-[22px] flex items-center justify-center hover:opacity-70 transition-opacity"
+            >
+              <MoreHorizontal className="w-[22px] h-[22px] text-[#8a8c90]" />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-7 z-20 w-36 bg-white dark:bg-[#2a2a2a] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg overflow-hidden">
+                {onEdit && (
+                  <button
+                    onClick={() => { setMenuOpen(false); onEdit(plan) }}
+                    className="w-full px-3.5 py-2.5 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 flex items-center gap-2 transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5" /> Chỉnh sửa
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={() => { setMenuOpen(false); onDelete(plan) }}
+                    className="w-full px-3.5 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Xoá
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Event Details */}

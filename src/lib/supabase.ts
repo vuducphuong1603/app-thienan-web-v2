@@ -3,64 +3,24 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// ============ Proactive token refresh before every API call ============
-// Prevents queries from being sent with expired JWT tokens.
-// When the browser tab is hidden, Supabase's auto-refresh timer gets
-// throttled/frozen. This interceptor checks the cached session's expires_at
-// and refreshes proactively before making any PostgREST/Storage request.
+// ============ Lightweight proactive token refresh ============
+// When the browser tab is hidden, Supabase's auto-refresh timer gets throttled.
+// This interceptor fires a NON-BLOCKING background refresh when the cached
+// expires_at is within 2 minutes of expiry.
+//
+// CRITICAL: This interceptor NEVER calls getSession() and NEVER awaits anything.
+// In Supabase JS v2.90+, getSession() uses navigator.locks internally.
+// Calling it from a fetch interceptor causes severe lock contention when multiple
+// requests fire simultaneously, leading to requests hanging for seconds or forever.
 
-let _refreshPromise: Promise<string | null> | null = null
-let _lastFreshCheck = 0
-const FRESH_CHECK_INTERVAL = 30_000 // Throttle: check at most every 30s
+let _refreshing = false
+let _cachedExpiresAt = 0 // Unix seconds — kept in sync via onAuthStateChange
 
-// Forward-declared — assigned right after createClient below
+// Forward-declared — assigned by createClient below.
+// The fetch callback captures this by reference (not value), so it's available
+// when callbacks actually execute (which is always after this assignment).
 // eslint-disable-next-line prefer-const
 let _client: SupabaseClient
-
-// Returns the fresh access_token if a refresh happened, null otherwise
-async function ensureSessionFresh(): Promise<string | null> {
-  // Wait if a refresh is already in flight
-  if (_refreshPromise) {
-    return _refreshPromise
-  }
-
-  // Throttle: skip check if we verified recently
-  const now = Date.now()
-  if (now - _lastFreshCheck < FRESH_CHECK_INTERVAL) return null
-  _lastFreshCheck = now
-
-  if (typeof window === 'undefined' || !_client) return null
-
-  try {
-    const { data: { session } } = await _client.auth.getSession()
-    if (!session?.expires_at) return null
-
-    // Refresh if token expires within 2 minutes
-    const nowSec = Math.floor(now / 1000)
-    if (nowSec > session.expires_at - 120) {
-      _refreshPromise = (async () => {
-        try {
-          const { data } = await _client.auth.refreshSession()
-          return data.session?.access_token ?? null
-        } finally {
-          _refreshPromise = null
-        }
-      })()
-      return _refreshPromise
-    }
-  } catch {
-    _refreshPromise = null
-  }
-  return null
-}
-
-// Timeout helper — resolves to null after ms
-function timeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
-  return Promise.race([
-    promise,
-    new Promise<null>(resolve => setTimeout(() => resolve(null), ms)),
-  ])
-}
 
 _client = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -70,30 +30,45 @@ _client = createClient(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     fetch: async (input, init) => {
-      // Determine the URL being fetched
-      const url = typeof input === 'string'
-        ? input
-        : input instanceof URL
-          ? input.href
-          : (input as Request).url
+      // Non-blocking proactive token refresh: if the cached expiry shows the
+      // token is about to expire, fire a background refreshSession(). The current
+      // request goes through IMMEDIATELY without waiting — Supabase's internal
+      // _getAccessToken() handles the actual auth header for this request.
+      if (typeof window !== 'undefined' && _cachedExpiresAt > 0 && !_refreshing) {
+        const url = typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.href
+            : (input as Request).url
 
-      // Skip auth endpoints to avoid recursion (refreshSession calls /auth/v1/token)
-      if (!url.includes('/auth/v1/')) {
-        // 5s timeout prevents indefinite hangs from lock contention
-        const freshToken = await timeout(ensureSessionFresh(), 5000)
-
-        // If a refresh happened, update the Authorization header with the new token
-        if (freshToken && init?.headers) {
-          const headers = new Headers(init.headers)
-          headers.set('Authorization', `Bearer ${freshToken}`)
-          init = { ...init, headers }
+        if (!url.includes('/auth/v1/')) {
+          const nowSec = Math.floor(Date.now() / 1000)
+          if (nowSec > _cachedExpiresAt - 120) {
+            // Token expires within 2 min — trigger background refresh
+            _refreshing = true
+            _client.auth.refreshSession()
+              .catch(() => { /* let handleAuthError in query-provider deal with it */ })
+              .finally(() => { _refreshing = false })
+          }
         }
       }
 
+      // Pass through immediately — no blocking, no timeout, no lock contention
       return fetch(input, init)
     },
   },
 })
+
+// Keep cached expiry in sync with Supabase auth events (sign-in, refresh, sign-out)
+if (typeof window !== 'undefined') {
+  _client.auth.onAuthStateChange((event, session) => {
+    if (session?.expires_at) {
+      _cachedExpiresAt = session.expires_at
+    } else if (event === 'SIGNED_OUT') {
+      _cachedExpiresAt = 0
+    }
+  })
+}
 
 export const supabase = _client
 

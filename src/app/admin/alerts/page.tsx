@@ -334,11 +334,13 @@ function AlertItem({
   onMarkRead,
   onResolve,
   onDismiss,
+  showActions = true,
 }: {
   alert: AlertRecord
   onMarkRead: (id: string) => void
   onResolve: (id: string) => void
   onDismiss: (id: string) => void
+  showActions?: boolean
 }) {
   const statusLabel = alert.status === 'unread' ? 'Chưa đọc' : alert.status === 'read' ? 'Đã đọc' : alert.status === 'resolved' ? 'Đã xử lý' : 'Đã bỏ qua'
 
@@ -390,6 +392,7 @@ function AlertItem({
       </div>
 
       {/* Actions */}
+      {showActions && (
       <div className="flex flex-col items-end gap-2 flex-shrink-0">
         {alert.status === 'unread' && (
           <button
@@ -412,6 +415,7 @@ function AlertItem({
           <X className="w-3.5 h-3.5 text-black dark:text-white" />
         </button>
       </div>
+      )}
     </div>
   )
 }
@@ -672,7 +676,7 @@ function HistoryTabContent({
 
 // ============ Main Page ============
 export default function AlertsPage() {
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
   const {
     invalidateAlerts,
     invalidateAlertRules,
@@ -809,13 +813,15 @@ export default function AlertsPage() {
               active={activeTab === 'alerts'}
               onClick={() => setActiveTab('alerts')}
             />
-            <SidebarTab
-              icon={<Lock className="w-5 h-5" />}
-              label="Quy tắc"
-              count={rules?.length}
-              active={activeTab === 'rules'}
-              onClick={() => setActiveTab('rules')}
-            />
+            {isAdmin && (
+              <SidebarTab
+                icon={<Lock className="w-5 h-5" />}
+                label="Quy tắc"
+                count={rules?.length}
+                active={activeTab === 'rules'}
+                onClick={() => setActiveTab('rules')}
+              />
+            )}
             <SidebarTab
               icon={<History className="w-5 h-5" />}
               label="Lịch sử"
@@ -823,22 +829,24 @@ export default function AlertsPage() {
               onClick={() => setActiveTab('history')}
             />
 
-            {/* Run Engine button */}
-            <button
-              onClick={handleRunEngine}
-              disabled={isRunningEngine}
-              className="w-full flex items-center gap-3 px-4 py-3 mt-4 bg-brand/10 dark:bg-brand/20 text-brand rounded-full hover:bg-brand/20 dark:hover:bg-brand/30 transition-colors disabled:opacity-50"
-            >
-              {isRunningEngine ? (
-                <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                <Play className="w-5 h-5" />
-              )}
-              <span className="text-sm font-medium">Chạy kiểm tra</span>
-            </button>
+            {/* Run Engine button - admin only */}
+            {isAdmin && (
+              <button
+                onClick={handleRunEngine}
+                disabled={isRunningEngine}
+                className="w-full flex items-center gap-3 px-4 py-3 mt-4 bg-brand/10 dark:bg-brand/20 text-brand rounded-full hover:bg-brand/20 dark:hover:bg-brand/30 transition-colors disabled:opacity-50"
+              >
+                {isRunningEngine ? (
+                  <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <Play className="w-5 h-5" />
+                )}
+                <span className="text-sm font-medium">Chạy kiểm tra</span>
+              </button>
+            )}
           </div>
 
           {/* Main Content Area */}
@@ -902,7 +910,7 @@ export default function AlertsPage() {
                         { value: '30days', label: '30 ngày qua' },
                       ]}
                     />
-                    {unreadCount > 0 && (
+                    {isAdmin && unreadCount > 0 && (
                       <button
                         onClick={handleMarkAllRead}
                         className="h-[38px] px-4 bg-brand text-white rounded-full text-sm font-medium hover:bg-brand/90 transition-colors"
@@ -928,13 +936,14 @@ export default function AlertsPage() {
                       <p className="text-sm font-medium text-[#8a8c90]">Không có cảnh báo nào</p>
                     </div>
                   ) : (
-                    alertsData.map(alert => (
+                    (isAdmin ? alertsData : alertsData.filter(a => a.class_name === user.class_name)).map(alert => (
                       <AlertItem
                         key={alert.id}
                         alert={alert}
                         onMarkRead={handleMarkRead}
                         onResolve={handleResolve}
                         onDismiss={handleDismiss}
+                        showActions={isAdmin}
                       />
                     ))
                   )}
