@@ -524,6 +524,7 @@ export default function ActivitiesPage() {
     score45HK2: false,
     scoreExamHK2: false,
     diemTong: false,
+    ketQua: false,
   })
 
   // Get day of week from selected date
@@ -1867,6 +1868,7 @@ export default function ActivitiesPage() {
         const show45HK2 = showAll || scoreColumns.score45HK2
         const showExamHK2 = showAll || scoreColumns.scoreExamHK2
         const showDiemTong = showAll || scoreColumns.diemTong
+        const showKetQua = scoreColumns.ketQua
 
         const header: string[] = ['STT', 'Tên thánh', 'Họ và tên']
         if (showDiLeT5) header.push('Đi Lễ T5')
@@ -1879,6 +1881,36 @@ export default function ActivitiesPage() {
         if (show45HK2 || showExamHK2) header.push('TB HK2')
         if (showDiemTong) header.push('TB Năm')
         header.push('Xếp loại')
+        if (showKetQua) header.push('Kết quả')
+
+        const getKetQua = (s: ReportStudentScore) => {
+          const scoreThu5 = s.score_di_le_t5
+          const scoreCn = s.score_hoc_gl
+          const s45hk1 = s.score_45_hk1
+          const s45hk2 = s.score_45_hk2
+          const examHk1 = s.score_exam_hk1
+          const examHk2 = s.score_exam_hk2
+
+          const avgCatechism = (s45hk1 !== null && s45hk2 !== null && examHk1 !== null && examHk2 !== null)
+            ? (s45hk1 + s45hk2 + examHk1 * 2 + examHk2 * 2) / 6
+            : null
+          const avgAttendance = (scoreThu5 !== null && scoreCn !== null)
+            ? scoreThu5 + scoreCn
+            : null
+          const totalAvg = (avgCatechism !== null && avgAttendance !== null)
+            ? avgCatechism * 0.6 + avgAttendance * 0.4
+            : null
+
+          if (
+            (scoreThu5 !== null && scoreThu5 < 2.5) ||
+            (scoreCn !== null && scoreCn < 2.5) ||
+            (avgCatechism !== null && avgCatechism < 2.5) ||
+            (totalAvg !== null && totalAvg < 5)
+          ) {
+            return 'Ở lại'
+          }
+          return 'Đạt'
+        }
 
         const rows = reportScoreStudents.map((student, index) => {
           const row: (string | number)[] = [index + 1, student.saint_name || '', student.full_name]
@@ -1899,10 +1931,81 @@ export default function ActivitiesPage() {
           } else {
             row.push('')
           }
+          if (showKetQua) row.push(getKetQua(student))
           return row
         })
 
         const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
+
+        // Track column indices for Excel formulas
+        const colMap: Record<string, number> = {}
+        let ci = 3 // after STT(0), Tên thánh(1), Họ và tên(2)
+        if (showDiLeT5) colMap.diLeT5 = ci++
+        if (showHocGL) colMap.hocGL = ci++
+        if (show45HK1) colMap.s45HK1 = ci++
+        if (showExamHK1) colMap.examHK1 = ci++
+        if (show45HK1 || showExamHK1) colMap.tbHK1 = ci++
+        if (show45HK2) colMap.s45HK2 = ci++
+        if (showExamHK2) colMap.examHK2 = ci++
+        if (show45HK2 || showExamHK2) colMap.tbHK2 = ci++
+        if (showDiemTong) colMap.tbNam = ci++
+        colMap.xepLoai = ci++
+        if (showKetQua) colMap.ketQua = ci++
+
+        // Column index to Excel letter (A, B, ... Z, AA, AB, ...)
+        const CL = (c: number): string => {
+          let s = '', n = c
+          while (n >= 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1 }
+          return s
+        }
+
+        // Add Excel formulas for calculated columns
+        reportScoreStudents.forEach((_, idx) => {
+          const row = idx + 2 // Excel row (header=1, first data=2)
+          const r = idx + 1   // 0-indexed sheet row
+
+          // TB HK1 = (45p_HK1 + Thi_HK1 * 2) / 3
+          if (colMap.tbHK1 !== undefined && colMap.s45HK1 !== undefined && colMap.examHK1 !== undefined) {
+            const ref = XLSX.utils.encode_cell({ r, c: colMap.tbHK1 })
+            ws[ref] = { f: `(${CL(colMap.s45HK1)}${row}+${CL(colMap.examHK1)}${row}*2)/3`, t: 'n' }
+          }
+
+          // TB HK2 = (45p_HK2 + Thi_HK2 * 2) / 3
+          if (colMap.tbHK2 !== undefined && colMap.s45HK2 !== undefined && colMap.examHK2 !== undefined) {
+            const ref = XLSX.utils.encode_cell({ r, c: colMap.tbHK2 })
+            ws[ref] = { f: `(${CL(colMap.s45HK2)}${row}+${CL(colMap.examHK2)}${row}*2)/3`, t: 'n' }
+          }
+
+          // TB Năm = (TB_HK1 + TB_HK2 * 2) / 3
+          if (colMap.tbNam !== undefined && colMap.tbHK1 !== undefined && colMap.tbHK2 !== undefined) {
+            const ref = XLSX.utils.encode_cell({ r, c: colMap.tbNam })
+            ws[ref] = { f: `(${CL(colMap.tbHK1)}${row}+${CL(colMap.tbHK2)}${row}*2)/3`, t: 'n' }
+          }
+
+          // Xếp loại = IF(TB_Năm>=8,"Giỏi",...)
+          if (colMap.tbNam !== undefined) {
+            const ref = XLSX.utils.encode_cell({ r, c: colMap.xepLoai })
+            const tn = `${CL(colMap.tbNam)}${row}`
+            ws[ref] = { f: `IF(${tn}>=8,"Giỏi",IF(${tn}>=6.5,"Khá",IF(${tn}>=5,"TB","Yếu")))`, t: 's' }
+          }
+
+          // Kết quả = IF(OR(T5<2.5, CN<2.5, avgCatechism<2.5, totalAvg<5), "Ở Lại", "")
+          if (colMap.ketQua !== undefined && colMap.diLeT5 !== undefined && colMap.hocGL !== undefined &&
+              colMap.s45HK1 !== undefined && colMap.examHK1 !== undefined &&
+              colMap.s45HK2 !== undefined && colMap.examHK2 !== undefined) {
+            const ref = XLSX.utils.encode_cell({ r, c: colMap.ketQua })
+            const t5 = `${CL(colMap.diLeT5)}${row}`
+            const cn = `${CL(colMap.hocGL)}${row}`
+            const f1 = `${CL(colMap.s45HK1)}${row}`
+            const e1 = `${CL(colMap.examHK1)}${row}`
+            const f2 = `${CL(colMap.s45HK2)}${row}`
+            const e2 = `${CL(colMap.examHK2)}${row}`
+            const avgCat = `(${f1}+${f2}+${e1}*2+${e2}*2)/6`
+            const totalAvg = `${avgCat}*0.6+(${t5}+${cn})*0.4`
+            ws[ref] = { f: `IF(OR(${t5}<2.5,${cn}<2.5,${avgCat}<2.5,${totalAvg}<5),"Ở Lại","")`, t: 's' }
+          }
+        })
+
         ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 25 }, ...header.slice(3).map(() => ({ wch: 10 }))]
         XLSX.utils.book_append_sheet(wb, ws, 'Điểm số')
 
@@ -3145,8 +3248,8 @@ export default function ActivitiesPage() {
                 <p className="text-sm font-medium text-[#666d80] mt-1">Tạo và xuất báo cáo</p>
               </div>
 
-              {/* Time Filter Mode Selector */}
-              <div className="flex-1 bg-white dark:bg-white/10 border border-[#e5e1dc] rounded-2xl overflow-hidden">
+              {/* Time Filter Mode Selector - chỉ hiển thị khi báo cáo điểm danh */}
+              {reportType !== 'score' && <div className="flex-1 bg-white dark:bg-white/10 border border-[#e5e1dc] rounded-2xl overflow-hidden">
                 <div className="flex items-center h-12 px-4">
                   <span className="flex-1 text-base font-semibold text-black dark:text-white">Cách chọn lọc thời gian</span>
                   <div className="flex items-center gap-4">
@@ -3196,15 +3299,15 @@ export default function ActivitiesPage() {
                     </button>
                   </div>
                 </div>
-              </div>
+              </div>}
             </div>
 
             {/* Divider */}
             <div className="h-px bg-[#e5e1dc] mb-6" />
 
-            {/* Form Row 1 - Date Selection */}
+            {/* Form Row 1 - Date Selection + Report Type */}
             <div className="flex items-start gap-3 mb-6">
-              {reportTimeFilterMode === 'dateRange' ? (
+              {reportType !== 'score' && (reportTimeFilterMode === 'dateRange' ? (
                 <>
                   {/* Từ ngày */}
                   <div className="w-[27%]">
@@ -3362,7 +3465,7 @@ export default function ActivitiesPage() {
                     )}
                   </div>
                 </div>
-              )}
+              ))}
 
               {/* Loại báo cáo */}
               <div className="flex-1">
@@ -3648,6 +3751,15 @@ export default function ActivitiesPage() {
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
                     <span className="text-sm text-black dark:text-white">Điểm Tổng</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scoreColumns.ketQua}
+                      onChange={(e) => setScoreColumns(prev => ({ ...prev, ketQua: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                    />
+                    <span className="text-sm text-black dark:text-white">Kết quả</span>
                   </label>
                 </div>
               </div>
@@ -3940,8 +4052,39 @@ export default function ActivitiesPage() {
                       const show45HK2 = showAll || scoreColumns.score45HK2
                       const showExamHK2 = showAll || scoreColumns.scoreExamHK2
                       const showDiemTong = showAll || scoreColumns.diemTong
+                      const showKetQua = scoreColumns.ketQua
+
+                      const getKetQua = (s: ReportStudentScore) => {
+                        const scoreThu5 = s.score_di_le_t5
+                        const scoreCn = s.score_hoc_gl
+                        const s45hk1 = s.score_45_hk1
+                        const s45hk2 = s.score_45_hk2
+                        const examHk1 = s.score_exam_hk1
+                        const examHk2 = s.score_exam_hk2
+
+                        const avgCatechism = (s45hk1 !== null && s45hk2 !== null && examHk1 !== null && examHk2 !== null)
+                          ? (s45hk1 + s45hk2 + examHk1 * 2 + examHk2 * 2) / 6
+                          : null
+                        const avgAttendance = (scoreThu5 !== null && scoreCn !== null)
+                          ? scoreThu5 + scoreCn
+                          : null
+                        const totalAvg = (avgCatechism !== null && avgAttendance !== null)
+                          ? avgCatechism * 0.6 + avgAttendance * 0.4
+                          : null
+
+                        if (
+                          (scoreThu5 !== null && scoreThu5 < 2.5) ||
+                          (scoreCn !== null && scoreCn < 2.5) ||
+                          (avgCatechism !== null && avgCatechism < 2.5) ||
+                          (totalAvg !== null && totalAvg < 5)
+                        ) {
+                          return 'Ở lại'
+                        }
+                        return 'Đạt'
+                      }
+
                       // Count visible columns for colSpan
-                      const visibleScoreCols = [showDiLeT5, showHocGL, show45HK1, showExamHK1, show45HK2, showExamHK2, showDiemTong].filter(Boolean).length
+                      const visibleScoreCols = [showDiLeT5, showHocGL, show45HK1, showExamHK1, show45HK2, showExamHK2, showDiemTong, showKetQua].filter(Boolean).length
 
                       return (
                         <table className="w-full">
@@ -3960,6 +4103,7 @@ export default function ActivitiesPage() {
                               {(show45HK2 || showExamHK2) && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">TB HK2</th>}
                               {showDiemTong && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">TB Năm</th>}
                               <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[100px]">Xếp loại</th>
+                              {showKetQua && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[100px]">Kết quả</th>}
                             </tr>
                           </thead>
                           <tbody>
@@ -4004,6 +4148,12 @@ export default function ActivitiesPage() {
                                     {(show45HK2 || showExamHK2) && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.average_hk2 !== null ? student.average_hk2 : '-'}</td>}
                                     {showDiemTong && <td className="text-center px-2 text-[14px] font-bold text-brand">{student.average_year !== null ? student.average_year : '-'}</td>}
                                     <td className={`text-center px-2 text-[14px] ${classColor}`}>{classification}</td>
+                                    {showKetQua && (() => {
+                                      const kq = getKetQua(student)
+                                      return (
+                                        <td className={`text-center px-2 text-[14px] font-semibold ${kq === 'Đạt' ? 'text-green-600' : 'text-red-600'}`}>{kq}</td>
+                                      )
+                                    })()}
                                   </tr>
                                 )
                               })

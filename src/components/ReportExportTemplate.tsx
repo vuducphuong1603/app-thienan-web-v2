@@ -43,6 +43,7 @@ interface ScoreColumns {
   score45HK2: boolean
   scoreExamHK2: boolean
   diemTong: boolean
+  ketQua: boolean
 }
 
 interface ScoreReportProps {
@@ -229,6 +230,36 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
   const show45HK2 = showAll || scoreColumns?.score45HK2
   const showExamHK2 = showAll || scoreColumns?.scoreExamHK2
   const showDiemTong = showAll || scoreColumns?.diemTong
+  const showKetQua = scoreColumns?.ketQua ?? false
+
+  const getKetQua = (s: ScoreReportStudent) => {
+    const scoreThu5 = s.score_di_le_t5
+    const scoreCn = s.score_hoc_gl
+    const s45hk1 = s.score_45_hk1
+    const s45hk2 = s.score_45_hk2
+    const examHk1 = s.score_exam_hk1
+    const examHk2 = s.score_exam_hk2
+
+    const avgCatechism = (s45hk1 !== null && s45hk2 !== null && examHk1 !== null && examHk2 !== null)
+      ? (s45hk1 + s45hk2 + examHk1 * 2 + examHk2 * 2) / 6
+      : null
+    const avgAttendance = (scoreThu5 !== null && scoreCn !== null)
+      ? scoreThu5 + scoreCn
+      : null
+    const totalAvg = (avgCatechism !== null && avgAttendance !== null)
+      ? avgCatechism * 0.6 + avgAttendance * 0.4
+      : null
+
+    if (
+      (scoreThu5 !== null && scoreThu5 < 2.5) ||
+      (scoreCn !== null && scoreCn < 2.5) ||
+      (avgCatechism !== null && avgCatechism < 2.5) ||
+      (totalAvg !== null && totalAvg < 5)
+    ) {
+      return 'Ở lại'
+    }
+    return 'Đạt'
+  }
 
   return (
     <table className="w-full border-collapse text-sm">
@@ -247,6 +278,7 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
           {(show45HK2 || showExamHK2) && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>HK2</th>}
           {showDiemTong && <th className="border border-gray-400 px-1 py-2 text-center w-[55px] bg-[#ffecb3]">TB<br/>Năm</th>}
           <th className="border border-gray-400 px-1 py-2 text-center w-[60px]">Xếp<br/>loại</th>
+          {showKetQua && <th className="border border-gray-400 px-1 py-2 text-center w-[60px] bg-[#e3f2fd]">Kết<br/>quả</th>}
         </tr>
       </thead>
       <tbody>
@@ -310,6 +342,14 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
               <td className={`border border-gray-400 px-1 py-2 text-center font-semibold ${classification.color}`}>
                 {classification.text}
               </td>
+              {showKetQua && (() => {
+                const kq = getKetQua(student)
+                return (
+                  <td className={`border border-gray-400 px-1 py-2 text-center font-semibold ${kq === 'Đạt' ? 'text-green-600' : 'text-red-600'} bg-[#e3f2fd]`}>
+                    {kq}
+                  </td>
+                )
+              })()}
             </tr>
           )
         })}
