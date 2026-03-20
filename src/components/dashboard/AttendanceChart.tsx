@@ -46,38 +46,27 @@ export default function AttendanceChart({ classId }: AttendanceChartProps) {
     queryFn: async () => {
       const { lastThursday, lastSunday } = getRecentDays()
 
-      // Build total students query (optionally filtered by class)
-      let totalQuery = supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE')
-      if (classId) totalQuery = totalQuery.eq('class_id', classId)
-
-      // Build attendance queries (optionally filtered by class)
-      const buildAttendanceQuery = (date: string, dayType: string) => {
+      // Build attendance count queries (optionally filtered by class)
+      const buildQuery = (date: string, dayType: string, status: 'present' | 'absent') => {
         let q = supabase.from('attendance_records').select('*', { count: 'exact', head: true })
-          .eq('attendance_date', date).eq('day_type', dayType).eq('status', 'present')
+          .eq('attendance_date', date).eq('day_type', dayType).eq('status', status)
         if (classId) q = q.eq('class_id', classId)
         return q
       }
 
-      // Fetch all counts in parallel
-      const [totalRes, thu5Res, cnRes] = await Promise.all([
-        totalQuery,
-        lastThursday
-          ? buildAttendanceQuery(lastThursday, 'thu5')
-          : Promise.resolve({ count: 0 }),
-        lastSunday
-          ? buildAttendanceQuery(lastSunday, 'cn')
-          : Promise.resolve({ count: 0 }),
+      const noData = Promise.resolve({ count: 0 })
+
+      // Fetch actual present + absent counts directly from records
+      const [thu5PresentRes, thu5AbsentRes, cnPresentRes, cnAbsentRes] = await Promise.all([
+        lastThursday ? buildQuery(lastThursday, 'thu5', 'present') : noData,
+        lastThursday ? buildQuery(lastThursday, 'thu5', 'absent') : noData,
+        lastSunday ? buildQuery(lastSunday, 'cn', 'present') : noData,
+        lastSunday ? buildQuery(lastSunday, 'cn', 'absent') : noData,
       ])
 
-      if ('error' in totalRes && totalRes.error) throw totalRes.error
-
-      const total = totalRes.count || 0
-      const thu5Present = thu5Res.count || 0
-      const cnPresent = cnRes.count || 0
-
       return [
-        { label: 'Thứ 5', present: thu5Present, absent: total - thu5Present },
-        { label: 'Chúa nhật', present: cnPresent, absent: total - cnPresent },
+        { label: 'Thứ 5', present: thu5PresentRes.count || 0, absent: thu5AbsentRes.count || 0 },
+        { label: 'Chúa nhật', present: cnPresentRes.count || 0, absent: cnAbsentRes.count || 0 },
       ]
     },
   })
