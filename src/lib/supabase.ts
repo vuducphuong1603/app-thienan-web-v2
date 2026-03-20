@@ -16,13 +16,10 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 let _refreshing = false
 let _cachedExpiresAt = 0 // Unix seconds — kept in sync via onAuthStateChange
 
-// Forward-declared — assigned by createClient below.
-// The fetch callback captures this by reference (not value), so it's available
-// when callbacks actually execute (which is always after this assignment).
-// eslint-disable-next-line prefer-const
-let _client: SupabaseClient
-
-_client = createClient(supabaseUrl, supabaseAnonKey, {
+// The fetch callback references _client to fire background refreshes.
+// By the time fetch actually runs (during a network request), _client is
+// fully initialized, so const + direct initialization is safe.
+const _client: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,

@@ -168,68 +168,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Skip events during account switch — switchAccount handles state itself
       if (isSwitchingRef.current) return
 
-      if (event === 'SIGNED_OUT') {
-        setUser(null)
-        localStorage.removeItem('thien_an_user')
-        queryClient.clear()
-        router.push('/login')
-      } else if (event === 'SIGNED_IN' && session?.user) {
-        const profile = await fetchUserProfile(session.user.id)
-        if (profile && profile.status === 'ACTIVE') {
-          setUser(profile)
-          localStorage.setItem('thien_an_user', JSON.stringify(profile))
-          // Save/update account in store
-          saveCurrentSession(profile, session)
-          refreshAccountList()
-        }
-      } else if (event === 'TOKEN_REFRESHED' && session) {
-        // Token was auto-refreshed by Supabase — refetch any stale/errored queries
-        // so they pick up the new token
-        queryClient.refetchQueries({ type: 'active' })
-        // Update tokens in account store
-        if (session.user) {
-          updateAccountTokens(
-            session.user.id,
-            session.access_token,
-            session.refresh_token,
-            session.expires_at || 0
-          )
-          refreshAccountList()
-        }
-      }
-    })
-
-    // ============ Session recovery when tab becomes visible after idle ============
-    let lastHiddenAt = 0
-    const IDLE_THRESHOLD = 60 * 1000 // 1 minute
-
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'hidden') {
-        lastHiddenAt = Date.now()
-        return
-      }
-
-      // Skip recovery for very short idle periods
-      if (lastHiddenAt === 0 || Date.now() - lastHiddenAt < IDLE_THRESHOLD) return
-
       try {
-        const { data, error } = await supabase.auth.refreshSession()
-        if (error || !data.session) {
+        if (event === 'SIGNED_OUT') {
           setUser(null)
           localStorage.removeItem('thien_an_user')
           queryClient.clear()
           router.push('/login')
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          const profile = await fetchUserProfile(session.user.id)
+          if (profile && profile.status === 'ACTIVE') {
+            setUser(profile)
+            localStorage.setItem('thien_an_user', JSON.stringify(profile))
+            // Save/update account in store
+            saveCurrentSession(profile, session)
+            refreshAccountList()
+          }
+        } else if (event === 'TOKEN_REFRESHED' && session) {
+          // Token was auto-refreshed by Supabase — refetch any stale/errored queries
+          // so they pick up the new token
+          queryClient.refetchQueries({ type: 'active' })
+          // Update tokens in account store
+          if (session.user) {
+            updateAccountTokens(
+              session.user.id,
+              session.access_token,
+              session.refresh_token,
+              session.expires_at || 0
+            )
+            refreshAccountList()
+          }
         }
-      } catch {
-        // Network error — don't force logout
+      } catch (err) {
+        console.error('onAuthStateChange error:', err)
       }
-    }
+    })
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    // NOTE: Supabase v2.90+ has built-in auto-refresh with navigator.locks
+    // and its own visibilitychange handler. Adding a custom one causes
+    // duplicate refreshSession() calls → lock contention → race conditions
+    // that can crash the Next.js router action queue.
+    // The handleAuthError in query-provider.tsx already handles token
+    // expiration for data queries.
 
     return () => {
       subscription.unsubscribe()
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
