@@ -11,24 +11,8 @@ interface DayData {
   absent: number
 }
 
-function getRecentDays() {
-  const today = new Date()
-  let lastThursday: string | null = null
-  let lastSunday: string | null = null
-
-  for (let i = 0; i <= 7; i++) {
-    const d = new Date(today)
-    d.setDate(today.getDate() - i)
-    const dayIndex = d.getDay()
-    if (dayIndex === 4 && !lastThursday) {
-      lastThursday = d.toISOString().split('T')[0]
-    }
-    if (dayIndex === 0 && !lastSunday) {
-      lastSunday = d.toISOString().split('T')[0]
-    }
-    if (lastThursday && lastSunday) break
-  }
-  return { lastThursday, lastSunday }
+function toLocalDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 interface AttendanceChartProps {
@@ -44,24 +28,29 @@ export default function AttendanceChart({ classId }: AttendanceChartProps) {
   ], isLoading: loading, isError, refetch } = useQuery<DayData[]>({
     queryKey: ['attendanceChart7Days', classId || 'all'],
     queryFn: async () => {
-      const { lastThursday, lastSunday } = getRecentDays()
+      const today = new Date()
+      const sevenDaysAgo = new Date(today)
+      sevenDaysAgo.setDate(today.getDate() - 7)
 
-      // Build attendance count queries (optionally filtered by class)
-      const buildQuery = (date: string, dayType: string, status: 'present' | 'absent') => {
+      const todayStr = toLocalDateString(today)
+      const sevenDaysAgoStr = toLocalDateString(sevenDaysAgo)
+
+      // Count records in the last 7 days by day_type + status
+      const buildQuery = (dayType: string, status: 'present' | 'absent') => {
         let q = supabase.from('attendance_records').select('*', { count: 'exact', head: true })
-          .eq('attendance_date', date).eq('day_type', dayType).eq('status', status)
+          .gte('attendance_date', sevenDaysAgoStr)
+          .lte('attendance_date', todayStr)
+          .eq('day_type', dayType)
+          .eq('status', status)
         if (classId) q = q.eq('class_id', classId)
         return q
       }
 
-      const noData = Promise.resolve({ count: 0 })
-
-      // Fetch actual present + absent counts directly from records
       const [thu5PresentRes, thu5AbsentRes, cnPresentRes, cnAbsentRes] = await Promise.all([
-        lastThursday ? buildQuery(lastThursday, 'thu5', 'present') : noData,
-        lastThursday ? buildQuery(lastThursday, 'thu5', 'absent') : noData,
-        lastSunday ? buildQuery(lastSunday, 'cn', 'present') : noData,
-        lastSunday ? buildQuery(lastSunday, 'cn', 'absent') : noData,
+        buildQuery('thu5', 'present'),
+        buildQuery('thu5', 'absent'),
+        buildQuery('cn', 'present'),
+        buildQuery('cn', 'absent'),
       ])
 
       return [
