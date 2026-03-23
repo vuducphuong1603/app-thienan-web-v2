@@ -13,7 +13,10 @@ const nextConfig = {
     ],
     unoptimized: true,
   },
-  devIndicators: false,
+  devIndicators: {
+    buildActivity: false,
+    buildActivityPosition: 'bottom-right',
+  },
 };
 
 export default nextConfig;

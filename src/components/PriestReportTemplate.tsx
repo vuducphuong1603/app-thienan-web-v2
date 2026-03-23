@@ -58,7 +58,7 @@ const PriestReportTemplate = forwardRef<HTMLDivElement, PriestReportTemplateProp
       <div className="flex items-center justify-between mb-6">
         <div className="w-[70px] h-[70px] flex items-center justify-center">
           <img
-            src="/logo.png"
+            src="/logo-tntt.png"
             alt="Logo TNTT"
             className="w-full h-full object-contain"
             crossOrigin="anonymous"
