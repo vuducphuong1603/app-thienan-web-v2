@@ -614,14 +614,19 @@ export default function ActivitiesPage() {
 
   // Fetch classes
   const fetchClasses = useCallback(async () => {
+    console.log('[activities] fetchClasses START')
+    const t0 = Date.now()
     const { data, error } = await supabase
       .from('classes')
       .select('*')
       .eq('status', 'ACTIVE')
       .order('display_order', { ascending: true })
 
+    console.log('[activities] fetchClasses done:', Date.now() - t0, 'ms', error?.message || 'OK', 'rows:', data?.length)
     if (!error && data) {
       setClasses(data)
+    } else if (error) {
+      console.error('[activities] fetchClasses ERROR:', error)
     }
   }, [])
 
@@ -840,7 +845,7 @@ export default function ActivitiesPage() {
           return {
             ...student,
             class_name: selectedClass?.name,
-            attendance_status: attendance?.status || null,
+            attendance_status: attendance?.status || (compensatory ? 'present' as const : null),
             attendance_time: attendance?.check_in_time?.substring(0, 5) || undefined,
             attendance_by: attendance?.created_by ? attendanceUserNameMap.get(attendance.created_by) : undefined,
             attendance_record_id: attendance?.id || undefined,

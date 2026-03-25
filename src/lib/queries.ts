@@ -13,6 +13,26 @@ export function countWeekdays(startDate: string, endDate: string, dayOfWeek: num
   return count
 }
 
+// ============ Helper: fetch all rows bypassing Supabase 1000-row default limit ============
+async function fetchAllRows<T = Record<string, unknown>>(
+  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+): Promise<T[]> {
+  const PAGE_SIZE = 1000
+  const allData: T[] = []
+  let from = 0
+
+  while (true) {
+    const { data, error } = await buildQuery(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    allData.push(...data)
+    if (data.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+
+  return allData
+}
+
 // ============ Query Keys ============
 export const queryKeys = {
   users: ['users'] as const,
@@ -82,7 +102,7 @@ function getRecentDay(dayType: 'cn' | 'thu5'): string | null {
     const d = new Date(today)
     d.setDate(today.getDate() - i)
     if (d.getDay() === targetDay) {
-      return d.toISOString().split('T')[0]
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     }
   }
   return null
@@ -161,19 +181,21 @@ export function useGLVClassTrend(classId: string | undefined, enabled = true) {
       const startDate = allDates.reduce((a, b) => (a < b ? a : b))
       const endDate = allDates.reduce((a, b) => (a > b ? a : b))
 
-      const [studentCountRes, attendanceRes] = await Promise.all([
+      const [studentCountRes, attendanceData] = await Promise.all([
         supabase.from('thieu_nhi').select('*', { count: 'exact', head: true })
           .eq('class_id', classId).eq('status', 'ACTIVE'),
-        supabase.from('attendance_records').select('attendance_date, day_type, student_id')
-          .eq('class_id', classId).eq('status', 'present')
-          .gte('attendance_date', startDate).lte('attendance_date', endDate),
+        fetchAllRows<{ attendance_date: string; day_type: string; student_id: string }>(
+          (from, to) => supabase.from('attendance_records').select('attendance_date, day_type, student_id')
+            .eq('class_id', classId).eq('status', 'present')
+            .gte('attendance_date', startDate).lte('attendance_date', endDate)
+            .range(from, to)
+        ),
       ])
 
       if (studentCountRes.error) throw studentCountRes.error
-      if (attendanceRes.error) throw attendanceRes.error
 
       const totalStudents = studentCountRes.count || 0
-      const records = attendanceRes.data || []
+      const records = attendanceData
 
       const countByDate = new Map<string, number>()
       records.forEach(r => {
@@ -241,8 +263,11 @@ export function useGLVPerStudentStats(classId: string | undefined, enabled = tru
           : Promise.resolve({ data: [] }),
         supabase.from('thieu_nhi').select('id, full_name, saint_name')
           .eq('class_id', classId).eq('status', 'ACTIVE').order('full_name'),
-        supabase.from('attendance_records').select('student_id, day_type')
-          .eq('class_id', classId).eq('status', 'present'),
+        schoolYearId
+          ? supabase.from('attendance_records').select('student_id, day_type')
+              .eq('class_id', classId).eq('status', 'present').eq('school_year_id', schoolYearId)
+          : supabase.from('attendance_records').select('student_id, day_type')
+              .eq('class_id', classId).eq('status', 'present'),
       ])
 
       if (studentsRes.error) throw studentsRes.error
@@ -493,13 +518,22 @@ export function useStudentsWithDetails() {
   return useQuery({
     queryKey: queryKeys.students,
     queryFn: async () => {
+      console.log('[useStudentsWithDetails] queryFn START')
+      const t0 = Date.now()
+
       // Fetch everything in parallel - no waterfall
       const [schoolYearRes, classesRes, studentsRes, allHolidaysRes] = await Promise.all([
-        supabase.from('school_years').select('id, start_date, end_date').eq('is_current', true).single(),
-        supabase.from('classes').select('id, name, branch, display_order, status, created_at, updated_at').eq('status', 'ACTIVE').order('display_order', { ascending: true }),
-        supabase.from('thieu_nhi').select('id, full_name, saint_name, student_code, date_of_birth, gender, phone, address, parent_name, parent_phone, parent_name_2, parent_phone_2, class_id, status, avatar_url, notes, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn, created_at, updated_at').order('full_name', { ascending: true }),
-        supabase.from('holidays').select('day_type'),
+        supabase.from('school_years').select('id, start_date, end_date').eq('is_current', true).single()
+          .then(r => { console.log('[query] school_years done:', Date.now() - t0, 'ms', r.error?.message || 'OK'); return r }),
+        supabase.from('classes').select('id, name, branch, display_order, status, created_at, updated_at').eq('status', 'ACTIVE').order('display_order', { ascending: true })
+          .then(r => { console.log('[query] classes done:', Date.now() - t0, 'ms', r.error?.message || 'OK'); return r }),
+        supabase.from('thieu_nhi').select('id, full_name, saint_name, student_code, date_of_birth, gender, phone, address, parent_name, parent_phone, parent_name_2, parent_phone_2, class_id, status, avatar_url, notes, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn, created_at, updated_at').order('full_name', { ascending: true })
+          .then(r => { console.log('[query] thieu_nhi done:', Date.now() - t0, 'ms', r.error?.message || 'OK', 'rows:', r.data?.length); return r }),
+        supabase.from('holidays').select('day_type')
+          .then(r => { console.log('[query] holidays done:', Date.now() - t0, 'ms', r.error?.message || 'OK'); return r }),
       ])
+
+      console.log('[useStudentsWithDetails] All queries done:', Date.now() - t0, 'ms')
 
       if (classesRes.error) throw classesRes.error
       if (studentsRes.error) throw studentsRes.error
@@ -722,7 +756,7 @@ function getLast3Weeks(dayType: 'thu5' | 'cn') {
   for (let i = 0; i < 3; i++) {
     const weekDate = new Date(current)
     weekDate.setDate(weekDate.getDate() - (i * 7))
-    const dateStr = weekDate.toISOString().split('T')[0]
+    const dateStr = `${weekDate.getFullYear()}-${String(weekDate.getMonth() + 1).padStart(2, '0')}-${String(weekDate.getDate()).padStart(2, '0')}`
     const day = weekDate.getDate()
     const month = weekDate.getMonth() + 1
     weeks.push({
@@ -775,18 +809,19 @@ export function usePerformanceTrendData(chartType: 'sunday' | 'thursday', enable
       const startDate = weeks[0].date
       const endDate = weeks[weeks.length - 1].date
 
-      const { data: attendanceData, error: attendanceError } = await supabase
-        .from('attendance_records')
-        .select('id, student_id, class_id, attendance_date, day_type, status')
-        .eq('day_type', dayType)
-        .eq('status', 'present')
-        .gte('attendance_date', startDate)
-        .lte('attendance_date', endDate)
-
-      if (attendanceError) throw attendanceError
+      const attendanceData = await fetchAllRows<{ id: string; student_id: string; class_id: string; attendance_date: string; day_type: string; status: string }>(
+        (from, to) => supabase
+          .from('attendance_records')
+          .select('id, student_id, class_id, attendance_date, day_type, status')
+          .eq('day_type', dayType)
+          .eq('status', 'present')
+          .gte('attendance_date', startDate)
+          .lte('attendance_date', endDate)
+          .range(from, to)
+      )
 
       const chartData = weeks.map(week => {
-        const weekAttendance = attendanceData?.filter(r => r.attendance_date === week.date) || []
+        const weekAttendance = attendanceData.filter(r => r.attendance_date === week.date)
         const countByBranch: Record<string, number> = {
           'Chiên Con': 0, 'Ấu Nhi': 0, 'Thiếu Nhi': 0, 'Nghĩa Sĩ': 0,
         }
@@ -807,12 +842,12 @@ export function usePerformanceTrendData(chartType: 'sunday' | 'thursday', enable
 
       const statsTypes: ('line' | 'bar' | 'progress')[] = ['line', 'bar', 'progress']
       const statsData = weeks.map((week, index) => {
-        const weekAttendance = attendanceData?.filter(r => r.attendance_date === week.date) || []
+        const weekAttendance = attendanceData.filter(r => r.attendance_date === week.date)
         return { date: week.fullDisplayDate, value: weekAttendance.length, type: statsTypes[index] }
       })
 
       const mostRecentWeek = weeks[weeks.length - 1]
-      const recentAttendance = attendanceData?.filter(r => r.attendance_date === mostRecentWeek.date) || []
+      const recentAttendance = attendanceData.filter(r => r.attendance_date === mostRecentWeek.date)
       const countByBranch: Record<string, number> = {
         'Chiên Con': 0, 'Ấu Nhi': 0, 'Thiếu Nhi': 0, 'Nghĩa Sĩ': 0,
       }
@@ -860,14 +895,16 @@ export function useClassAttendanceData(branch: Branch, date: string, dayType: 'c
 
       const classIds = classesData.map(c => c.id)
 
-      const [studentsRes, attendanceRes] = await Promise.all([
+      const [studentsRes, attendanceData] = await Promise.all([
         supabase.from('thieu_nhi').select('id, class_id').in('class_id', classIds).eq('status', 'ACTIVE'),
-        supabase.from('attendance_records').select('id, student_id, class_id, status')
-          .in('class_id', classIds).eq('attendance_date', date).eq('day_type', dayType).eq('status', 'present'),
+        fetchAllRows<{ id: string; student_id: string; class_id: string; status: string }>(
+          (from, to) => supabase.from('attendance_records').select('id, student_id, class_id, status')
+            .in('class_id', classIds).eq('attendance_date', date).eq('day_type', dayType).eq('status', 'present')
+            .range(from, to)
+        ),
       ])
 
       if (studentsRes.error) throw studentsRes.error
-      if (attendanceRes.error) throw attendanceRes.error
 
       const studentsByClass: Record<string, number> = {}
       classIds.forEach(id => { studentsByClass[id] = 0 })
@@ -879,7 +916,7 @@ export function useClassAttendanceData(branch: Branch, date: string, dayType: 'c
 
       const attendanceByClass: Record<string, number> = {}
       classIds.forEach(id => { attendanceByClass[id] = 0 })
-      attendanceRes.data?.forEach(record => {
+      attendanceData.forEach(record => {
         if (record.class_id) {
           attendanceByClass[record.class_id] = (attendanceByClass[record.class_id] || 0) + 1
         }
@@ -1477,7 +1514,7 @@ export function useAttendanceStudents(
     if (di === 0) daysToThursday = -3
     const thu = new Date(d)
     thu.setDate(d.getDate() + daysToThursday)
-    return thu.toISOString().split('T')[0]
+    return `${thu.getFullYear()}-${String(thu.getMonth() + 1).padStart(2, '0')}-${String(thu.getDate()).padStart(2, '0')}`
   }
   const thursdayOfWeek = getThursdayOfWeek(dateObj)
 
@@ -1683,7 +1720,7 @@ export function useHolidayCheck(schoolYearId: string | undefined, date: string) 
         const daysToThursday = dayIndex === 0 ? -3 : 4 - dayIndex
         const thu = new Date(dateObj)
         thu.setDate(dateObj.getDate() + daysToThursday)
-        queryDate = thu.toISOString().split('T')[0]
+        queryDate = `${thu.getFullYear()}-${String(thu.getMonth() + 1).padStart(2, '0')}-${String(thu.getDate()).padStart(2, '0')}`
         dayTypes = ['thu5', 'both']
       }
 

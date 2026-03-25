@@ -28,34 +28,53 @@ export default function AttendanceChart({ classId }: AttendanceChartProps) {
   ], isLoading: loading, isError, refetch } = useQuery<DayData[]>({
     queryKey: ['attendanceChart7Days', classId || 'all'],
     queryFn: async () => {
-      const today = new Date()
-      const sevenDaysAgo = new Date(today)
-      sevenDaysAgo.setDate(today.getDate() - 7)
+      // Find most recent Thursday (day 4) and Sunday (day 0) within last 7 days
+      function getRecentDay(targetDay: number): string | null {
+        const today = new Date()
+        for (let i = 0; i <= 7; i++) {
+          const d = new Date(today)
+          d.setDate(today.getDate() - i)
+          if (d.getDay() === targetDay) {
+            return toLocalDateString(d)
+          }
+        }
+        return null
+      }
 
-      const todayStr = toLocalDateString(today)
-      const sevenDaysAgoStr = toLocalDateString(sevenDaysAgo)
+      const lastThu5 = getRecentDay(4) // Thursday
+      const lastCN = getRecentDay(0)    // Sunday
 
-      // Count records in the last 7 days by day_type + status
-      const buildQuery = (dayType: string, status: 'present' | 'absent') => {
+      // Count total students and present counts for each specific date
+      const totalStudentsQuery = classId
+        ? supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('class_id', classId).eq('status', 'ACTIVE')
+        : supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE')
+
+      const buildPresentQuery = (date: string, dayType: string) => {
         let q = supabase.from('attendance_records').select('*', { count: 'exact', head: true })
-          .gte('attendance_date', sevenDaysAgoStr)
-          .lte('attendance_date', todayStr)
+          .eq('attendance_date', date)
           .eq('day_type', dayType)
-          .eq('status', status)
+          .eq('status', 'present')
         if (classId) q = q.eq('class_id', classId)
         return q
       }
 
-      const [thu5PresentRes, thu5AbsentRes, cnPresentRes, cnAbsentRes] = await Promise.all([
-        buildQuery('thu5', 'present'),
-        buildQuery('thu5', 'absent'),
-        buildQuery('cn', 'present'),
-        buildQuery('cn', 'absent'),
+      const [totalRes, thu5PresentRes, cnPresentRes] = await Promise.all([
+        totalStudentsQuery,
+        lastThu5 ? buildPresentQuery(lastThu5, 'thu5') : Promise.resolve({ count: 0, error: null }),
+        lastCN ? buildPresentQuery(lastCN, 'cn') : Promise.resolve({ count: 0, error: null }),
       ])
 
+      if (totalRes.error) throw totalRes.error
+      if (thu5PresentRes.error) throw thu5PresentRes.error
+      if (cnPresentRes.error) throw cnPresentRes.error
+
+      const totalStudents = totalRes.count || 0
+      const thu5Present = thu5PresentRes.count || 0
+      const cnPresent = cnPresentRes.count || 0
+
       return [
-        { label: 'Thứ 5', present: thu5PresentRes.count || 0, absent: thu5AbsentRes.count || 0 },
-        { label: 'Chúa nhật', present: cnPresentRes.count || 0, absent: cnAbsentRes.count || 0 },
+        { label: 'Thứ 5', present: thu5Present, absent: totalStudents - thu5Present },
+        { label: 'Chúa nhật', present: cnPresent, absent: totalStudents - cnPresent },
       ]
     },
   })

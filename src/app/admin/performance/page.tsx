@@ -580,9 +580,10 @@ function BranchCard({
 
 // Bar Chart Component
 function BarChart({ data, chartType }: { data: ChartDataItem[], chartType: ChartType }) {
-  // Fixed max value of 400
-  const maxValue = 400
-  const yAxisLabels = [400, 300, 200, 100, 0]
+  // Dynamic max value based on actual data
+  const rawMax = Math.max(...data.flatMap(d => [d.chienCon, d.nghiaSi, d.thieuNhi, d.auNhi]), 1)
+  const maxValue = Math.ceil(rawMax / 100) * 100
+  const yAxisLabels = Array.from({ length: 5 }, (_, i) => maxValue - (i * maxValue / 4))
 
   const barColors = {
     chienCon: '#6E62E5',

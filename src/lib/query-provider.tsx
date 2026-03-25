@@ -2,7 +2,17 @@
 
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query'
 import { useState } from 'react'
-import { supabase } from './supabase'
+import { supabase, markAuthDead, isAuthDead } from './supabase'
+
+// Check if the error is specifically an unrecoverable refresh token failure.
+// These errors mean the session cannot be recovered — retrying is pointless.
+function isRefreshTokenDead(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const msg = ((error as Record<string, unknown>).message as string || '').toLowerCase()
+  return msg.includes('refresh_token_not_found') ||
+    msg.includes('invalid refresh token') ||
+    msg.includes('session_not_found')
+}
 
 export function isAuthError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false
@@ -36,31 +46,74 @@ export function isAuthError(error: unknown): boolean {
 // query fails → refresh → refetch → fails again → would loop forever without cooldown.
 let isHandlingAuth = false
 let _lastRefetchAt = 0
+let _handleStartedAt = 0 // Track when handling started for stuck detection
+
+function forceLogout(queryClient: QueryClient) {
+  // Reset handling state so it doesn't stay stuck
+  isHandlingAuth = false
+  _handleStartedAt = 0
+  // Mark auth as dead to prevent any further refresh attempts
+  markAuthDead()
+  // Cancel ALL pending queries immediately — prevents retry storm
+  queryClient.cancelQueries()
+  queryClient.clear()
+  // Sign out locally only (no API call — token is already dead).
+  // This fires SIGNED_OUT via onAuthStateChange, but the hard redirect below
+  // will reload the page and reset all module-level state (isHandlingAuth, etc.)
+  supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+  // Hard redirect — intentional full reload to clear all in-memory state.
+  // Do NOT use router.push (can lock up Next.js router action queue).
+  window.location.href = '/login'
+}
 
 async function handleAuthError(queryClient: QueryClient) {
+  // Safety valve: if handling has been stuck for >10s (e.g. navigator.locks deadlock),
+  // force reset and logout. This prevents the app from being permanently stuck.
+  if (isHandlingAuth && _handleStartedAt > 0 && Date.now() - _handleStartedAt > 10_000) {
+    console.warn('[handleAuthError] Stuck for >10s, forcing logout')
+    forceLogout(queryClient)
+    return
+  }
+
   if (isHandlingAuth) return
+
+  // If auth is already dead (e.g. initAuth already detected it), just redirect
+  if (isAuthDead()) {
+    forceLogout(queryClient)
+    return
+  }
 
   // Prevent infinite loop: only allow one refetch cycle per 10 seconds
   const now = Date.now()
   if (now - _lastRefetchAt < 10_000) return
 
   isHandlingAuth = true
+  _handleStartedAt = Date.now()
 
   try {
-    const { error } = await supabase.auth.refreshSession()
-    if (error) {
-      await supabase.auth.signOut()
-      window.location.href = '/login'
+    // Race refreshSession against a 5s timeout.
+    // refreshSession() can hang indefinitely due to navigator.locks contention
+    // when Supabase's internal auto-refresh is also competing for the lock.
+    const result = await Promise.race([
+      supabase.auth.refreshSession(),
+      new Promise<{ data: null; error: Error }>((resolve) =>
+        setTimeout(() => resolve({ data: null, error: new Error('Refresh timeout after 5s') }), 5000)
+      ),
+    ])
+
+    if (result.error) {
+      console.warn('[handleAuthError] Refresh failed:', result.error.message)
+      forceLogout(queryClient)
     } else {
       // Token refreshed — force refetch ALL active queries (including errored ones)
       _lastRefetchAt = Date.now()
       queryClient.refetchQueries({ type: 'active' })
     }
   } catch {
-    await supabase.auth.signOut()
-    window.location.href = '/login'
+    forceLogout(queryClient)
   } finally {
     isHandlingAuth = false
+    _handleStartedAt = 0
   }
 }
 
@@ -90,6 +143,8 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
             refetchOnReconnect: true, // Refetch when onlineManager goes online
             refetchOnMount: true, // Refetch on mount only if stale
             retry: (failureCount, error) => {
+              // Dead refresh token: session is unrecoverable, don't retry at all
+              if (isRefreshTokenDead(error)) return false
               // Auth errors: allow 2 retries (gives time for token refresh)
               if (isAuthError(error)) return failureCount < 2
               // Non-auth errors: retry up to 2 times for transient failures
@@ -107,6 +162,12 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
       return client
     }
   )
+
+  // NOTE: Do NOT add a visibilitychange handler here. Supabase v2.98+ has
+  // built-in lock timeout + steal recovery (see locks.js). Adding our own
+  // session check on visibility causes aggressive reloads because getSession()
+  // competes for navigator.locks and often times out, triggering false logouts.
+  // React Query's refetchOnWindowFocus + handleAuthError is sufficient.
 
   return (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>

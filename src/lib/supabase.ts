@@ -16,6 +16,15 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 let _refreshing = false
 let _cachedExpiresAt = 0 // Unix seconds — kept in sync via onAuthStateChange
 
+// Auth-dead flag: set when refresh token is definitively invalid (e.g. revoked,
+// expired on server). Prevents further proactive refresh attempts that would
+// cascade into multiple 400 errors and competing navigations.
+let _authDead = false
+
+export function isAuthDead() { return _authDead }
+export function markAuthDead() { _authDead = true }
+export function resetAuthDead() { _authDead = false }
+
 // The fetch callback references _client to fire background refreshes.
 // By the time fetch actually runs (during a network request), _client is
 // fully initialized, so const + direct initialization is safe.
@@ -31,7 +40,7 @@ const _client: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       // token is about to expire, fire a background refreshSession(). The current
       // request goes through IMMEDIATELY without waiting — Supabase's internal
       // _getAccessToken() handles the actual auth header for this request.
-      if (typeof window !== 'undefined' && _cachedExpiresAt > 0 && !_refreshing) {
+      if (typeof window !== 'undefined' && _cachedExpiresAt > 0 && !_refreshing && !_authDead) {
         const url = typeof input === 'string'
           ? input
           : input instanceof URL
@@ -50,8 +59,23 @@ const _client: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
         }
       }
 
-      // Pass through immediately — no blocking, no timeout, no lock contention
-      return fetch(input, init)
+      // 30-second hard timeout: prevents ANY Supabase request from hanging forever.
+      // Without this, navigator.locks contention or network issues cause requests
+      // to hang indefinitely → React Query never gets an error → infinite loading.
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 30_000)
+
+      // If the caller already has an abort signal, forward its abort to ours
+      if (init?.signal) {
+        init.signal.addEventListener('abort', () => controller.abort(), { once: true })
+      }
+
+      try {
+        const response = await fetch(input, { ...init, signal: controller.signal })
+        return response
+      } finally {
+        clearTimeout(timeout)
+      }
     },
   },
 })
@@ -61,8 +85,10 @@ if (typeof window !== 'undefined') {
   _client.auth.onAuthStateChange((event, session) => {
     if (session?.expires_at) {
       _cachedExpiresAt = session.expires_at
+      _authDead = false // Successful auth → reset dead flag
     } else if (event === 'SIGNED_OUT') {
       _cachedExpiresAt = 0
+      _authDead = true // Prevent further refresh attempts
     }
   })
 }

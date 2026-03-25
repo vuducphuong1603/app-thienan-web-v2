@@ -14,9 +14,17 @@ const nextConfig = {
     unoptimized: true,
   },
   devIndicators: {
-    buildActivity: false,
-    buildActivityPosition: 'bottom-right',
+    position: 'bottom-right',
   },
+  // Force cache busting: ensure browsers always get fresh JS bundles
+  headers: async () => [
+    {
+      source: '/:path*',
+      headers: [
+        { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+      ],
+    },
+  ],
 };
 
 export default nextConfig;

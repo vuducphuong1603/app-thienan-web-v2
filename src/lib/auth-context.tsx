@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { supabase, UserProfile, UserRole } from './supabase'
+import { supabase, UserProfile, UserRole, resetAuthDead } from './supabase'
 import { useRouter, usePathname } from 'next/navigation'
 import {
   StoredAccount,
@@ -98,7 +98,9 @@ function saveCurrentSession(profile: UserProfile, session: { access_token: strin
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
 
-  // Initialize user from localStorage cache for instant UI render
+  // Initialize user from localStorage cache for instant UI render.
+  // NOTE: This cached user is for display only. The actual session is verified
+  // by initAuth before loading is set to false.
   const [user, setUser] = useState<UserProfile | null>(() => {
     if (typeof window === 'undefined') return null
     try {
@@ -108,12 +110,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null
     }
   })
-  const [loading, setLoading] = useState(() => {
-    if (typeof window === 'undefined') return true
-    return !localStorage.getItem('thien_an_user')
-  })
+  // ALWAYS start loading=true so route protection and data queries wait
+  // until initAuth verifies the session. This prevents a cascade of 401
+  // errors when the refresh token is invalid but a cached user exists.
+  const [loading, setLoading] = useState(true)
   const [storedAccounts, setStoredAccounts] = useState<StoredAccount[]>(() => getStoredAccounts())
   const isSwitchingRef = useRef(false)
+  const isLoggingOutRef = useRef(false)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -130,33 +133,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [router])
 
+  // Helper: clear all auth state in one place
+  const clearAuthState = useCallback(() => {
+    setUser(null)
+    localStorage.removeItem('thien_an_user')
+  }, [])
+
   // Auth initialization - runs ONCE on mount, not on every pathname change
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        console.log('[initAuth] Starting getSession...')
+        // Race getSession against a 5s timeout — getSession() in Supabase v2.90+
+        // uses navigator.locks which can hang if another lock holder is stuck.
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<{ data: { session: null }; error: Error }>((resolve) =>
+            setTimeout(() => resolve({ data: { session: null }, error: new Error('getSession timeout after 5s') }), 5000)
+          ),
+        ])
+        const session = sessionResult.data.session
+        const sessionError = sessionResult.error
+        console.log('[initAuth] getSession done:', { hasSession: !!session, sessionError: sessionError?.message })
 
-        if (session?.user) {
-          const profile = await fetchUserProfile(session.user.id)
-          if (profile && profile.status === 'ACTIVE') {
-            setUser(profile)
-            localStorage.setItem('thien_an_user', JSON.stringify(profile))
-            // Save/update account in store
-            saveCurrentSession(profile, session)
-            refreshAccountList()
-          } else {
-            await supabase.auth.signOut()
-            setUser(null)
-            localStorage.removeItem('thien_an_user')
-          }
-        } else {
-          setUser(null)
-          localStorage.removeItem('thien_an_user')
+        if (sessionError || !session?.user) {
+          console.log('[initAuth] No valid session → clearAuthState')
+          clearAuthState()
+          return
         }
-      } catch {
-        setUser(null)
-        localStorage.removeItem('thien_an_user')
+
+        // Session verified by Supabase's internal recovery — fetch profile
+        resetAuthDead()
+        console.log('[initAuth] Fetching profile for:', session.user.id)
+        // Race fetchUserProfile against 10s timeout — prevents initAuth from
+        // hanging forever if the DB query or navigator.locks gets stuck.
+        const profile = await Promise.race([
+          fetchUserProfile(session.user.id),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
+        ])
+        console.log('[initAuth] Profile result:', { hasProfile: !!profile, status: profile?.status })
+        if (profile && profile.status === 'ACTIVE') {
+          setUser(profile)
+          localStorage.setItem('thien_an_user', JSON.stringify(profile))
+          saveCurrentSession(profile, session)
+          refreshAccountList()
+        } else {
+          try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
+          clearAuthState()
+        }
+      } catch (err) {
+        console.error('[initAuth] Error:', err)
+        clearAuthState()
       } finally {
+        console.log('[initAuth] Done, setting loading=false')
         setLoading(false)
       }
     }
@@ -165,15 +194,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Skip events during account switch — switchAccount handles state itself
-      if (isSwitchingRef.current) return
+      // Skip events during account switch or explicit logout — those paths
+      // handle cleanup themselves to avoid double redirects
+      if (isSwitchingRef.current || isLoggingOutRef.current) return
 
       try {
         if (event === 'SIGNED_OUT') {
-          setUser(null)
-          localStorage.removeItem('thien_an_user')
+          clearAuthState()
+          queryClient.cancelQueries()
           queryClient.clear()
-          router.push('/login')
+          // Use window.location.href for hard redirect — router.push can
+          // conflict with other redirects and lock up the Next.js router.
+          // Only redirect if not already on a public route.
+          const currentPath = window.location.pathname
+          if (!publicRoutes.includes(currentPath)) {
+            window.location.href = '/login'
+          }
+          return
         } else if (event === 'SIGNED_IN' && session?.user) {
           const profile = await fetchUserProfile(session.user.id)
           if (profile && profile.status === 'ACTIVE') {
@@ -184,8 +221,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             refreshAccountList()
           }
         } else if (event === 'TOKEN_REFRESHED' && session) {
-          // Token was auto-refreshed by Supabase — refetch any stale/errored queries
-          // so they pick up the new token
+          // Token was auto-refreshed by Supabase — session is alive
+          resetAuthDead()
+          // Refetch any stale/errored queries so they pick up the new token
           queryClient.refetchQueries({ type: 'active' })
           // Update tokens in account store
           if (session.user) {
@@ -247,6 +285,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (authError || !authData.user) {
         return { success: false, error: 'Số điện thoại hoặc mật khẩu không đúng' }
       }
+
+      // Successful auth — reset dead flag so queries/refresh work normally
+      resetAuthDead()
 
       // Fetch user profile from public.users table
       const profile = await fetchUserProfile(authData.user.id)
@@ -355,17 +396,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
-    // Keep account in stored list (user can still switch back)
-    // Only sign out the current Supabase session
+    // Prevent onAuthStateChange SIGNED_OUT handler from double-processing
+    isLoggingOutRef.current = true
     try {
       await supabase.auth.signOut()
     } catch {
       // Session already expired — ignore API error
     }
-    setUser(null)
-    localStorage.removeItem('thien_an_user')
+    clearAuthState()
+    queryClient.cancelQueries()
     queryClient.clear()
-    router.push('/login')
+    // Hard redirect to ensure clean state
+    window.location.href = '/login'
   }
 
   const switchAccount = async (userId: string): Promise<{ success: boolean; error?: string }> => {
