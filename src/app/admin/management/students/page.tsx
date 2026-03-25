@@ -59,7 +59,7 @@ export default function StudentsPage() {
   })
   const [isSaving, setIsSaving] = useState(false)
 
-  const { data: queryData, isLoading: loading } = useStudentsWithDetails()
+  const { data: queryData, isLoading: loading, isError, error } = useStudentsWithDetails()
   const students = queryData?.students || []
   const classes = queryData?.classes || []
   const { invalidateStudents } = useInvalidateQueries()
@@ -427,7 +427,19 @@ export default function StudentsPage() {
 
           {/* Table Body */}
           <tbody>
-            {loading ? (
+            {isError ? (
+              <tr>
+                <td colSpan={14} className="py-16 text-center bg-white dark:bg-white/10">
+                  <div className="flex flex-col items-center gap-3 text-red-500">
+                    <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                    </svg>
+                    <p className="text-sm">{(error as Error)?.message || 'Không thể tải dữ liệu. Vui lòng thử lại.'}</p>
+                    <button onClick={() => window.location.reload()} className="px-4 py-2 text-xs bg-brand text-white rounded-lg hover:opacity-90">Tải lại trang</button>
+                  </div>
+                </td>
+              </tr>
+            ) : loading ? (
               <tr>
                 <td colSpan={14} className="py-16 text-center bg-white dark:bg-white/10">
                   <div className="flex items-center justify-center">

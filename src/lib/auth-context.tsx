@@ -140,18 +140,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Auth initialization - runs ONCE on mount, not on every pathname change
+  // Guard against double-init from React Strict Mode — prevents navigator.locks
+  // deadlock where the first mount's getSession() holds the lock, Strict Mode
+  // unmounts, and the second mount's getSession() blocks for 5s+ per lock.
   useEffect(() => {
+    let cancelled = false
+
     const initAuth = async () => {
       try {
         console.log('[initAuth] Starting getSession...')
-        // Race getSession against a 5s timeout — getSession() in Supabase v2.90+
-        // uses navigator.locks which can hang if another lock holder is stuck.
         const sessionResult = await Promise.race([
           supabase.auth.getSession(),
           new Promise<{ data: { session: null }; error: Error }>((resolve) =>
             setTimeout(() => resolve({ data: { session: null }, error: new Error('getSession timeout after 5s') }), 5000)
           ),
         ])
+
+        if (cancelled) return
+
         const session = sessionResult.data.session
         const sessionError = sessionResult.error
         console.log('[initAuth] getSession done:', { hasSession: !!session, sessionError: sessionError?.message })
@@ -165,12 +171,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Session verified by Supabase's internal recovery — fetch profile
         resetAuthDead()
         console.log('[initAuth] Fetching profile for:', session.user.id)
-        // Race fetchUserProfile against 10s timeout — prevents initAuth from
-        // hanging forever if the DB query or navigator.locks gets stuck.
         const profile = await Promise.race([
           fetchUserProfile(session.user.id),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
         ])
+
+        if (cancelled) return
+
         console.log('[initAuth] Profile result:', { hasProfile: !!profile, status: profile?.status })
         if (profile && profile.status === 'ACTIVE') {
           setUser(profile)
@@ -182,11 +189,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           clearAuthState()
         }
       } catch (err) {
+        if (cancelled) return
         console.error('[initAuth] Error:', err)
         clearAuthState()
       } finally {
-        console.log('[initAuth] Done, setting loading=false')
-        setLoading(false)
+        if (!cancelled) {
+          console.log('[initAuth] Done, setting loading=false')
+          setLoading(false)
+        }
       }
     }
 
@@ -249,6 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // expiration for data queries.
 
     return () => {
+      cancelled = true
       subscription.unsubscribe()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

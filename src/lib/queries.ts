@@ -535,8 +535,10 @@ export function useStudentsWithDetails() {
 
       console.log('[useStudentsWithDetails] All queries done:', Date.now() - t0, 'ms')
 
+      if (schoolYearRes.error) throw schoolYearRes.error
       if (classesRes.error) throw classesRes.error
       if (studentsRes.error) throw studentsRes.error
+      if (allHolidaysRes.error) throw allHolidaysRes.error
 
       const schoolYear = schoolYearRes.data
       const classesData = classesRes.data || []
