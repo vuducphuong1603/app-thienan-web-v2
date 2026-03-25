@@ -526,7 +526,7 @@ function BranchCard({
           <span
             className={`text-sm ${variant === 'primary' ? 'text-white/60' : 'text-black/40 dark:text-white/40'}`}
           >
-            -{total} HS
+            / {total} HS
           </span>
         </div>
 

@@ -785,13 +785,12 @@ export function usePerformanceTrendData(chartType: 'sunday' | 'thursday', enable
       const dayType: 'thu5' | 'cn' = chartType === 'sunday' ? 'cn' : 'thu5'
       const weeks = getLast3Weeks(dayType)
 
-      const [classesRes, studentsRes] = await Promise.all([
-        supabase.from('classes').select('id, name, branch').eq('status', 'ACTIVE'),
-        supabase.from('thieu_nhi').select('id, class_id').eq('status', 'ACTIVE'),
-      ])
-
+      const classesRes = await supabase.from('classes').select('id, name, branch').eq('status', 'ACTIVE')
       if (classesRes.error) throw classesRes.error
-      if (studentsRes.error) throw studentsRes.error
+
+      const allStudents = await fetchAllRows<{ id: string; class_id: string }>(
+        (from, to) => supabase.from('thieu_nhi').select('id, class_id').eq('status', 'ACTIVE').range(from, to)
+      )
 
       const classToBranch: Record<string, Branch> = {}
       classesRes.data?.forEach(cls => {
@@ -801,7 +800,7 @@ export function usePerformanceTrendData(chartType: 'sunday' | 'thursday', enable
       const studentCountByBranch: Record<string, number> = {
         'Chiên Con': 0, 'Ấu Nhi': 0, 'Thiếu Nhi': 0, 'Nghĩa Sĩ': 0,
       }
-      studentsRes.data?.forEach(student => {
+      allStudents.forEach(student => {
         if (student.class_id && classToBranch[student.class_id]) {
           const branch = classToBranch[student.class_id]
           studentCountByBranch[branch] = (studentCountByBranch[branch] || 0) + 1
