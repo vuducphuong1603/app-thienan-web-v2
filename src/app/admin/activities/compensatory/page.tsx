@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, SchoolYear } from '@/lib/supabase'
+import { useActiveClasses, useSchoolYears } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
 import { Search, Calendar, Check, X, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
@@ -19,9 +20,10 @@ export default function CompensatoryAttendancePage() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
-  const [classes, setClasses] = useState<Class[]>([])
+  const { data: classes = [] } = useActiveClasses()
   const [students, setStudents] = useState<StudentWithCompensatoryStatus[]>([])
-  const [schoolYear, setSchoolYear] = useState<SchoolYear | null>(null)
+  const { data: schoolYearsData = [] } = useSchoolYears()
+  const schoolYear = schoolYearsData.find(y => y.is_current) || schoolYearsData[0] || null
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
 
   // QR modal states
@@ -111,31 +113,6 @@ export default function CompensatoryAttendancePage() {
     setTimeout(() => setNotification(null), 3000)
   }
 
-  // Fetch school year
-  const fetchSchoolYear = useCallback(async () => {
-    const { data } = await supabase
-      .from('school_years')
-      .select('*')
-      .eq('is_current', true)
-      .single()
-
-    if (data) {
-      setSchoolYear(data)
-    }
-  }, [])
-
-  // Fetch classes
-  const fetchClasses = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('classes')
-      .select('*')
-      .eq('status', 'ACTIVE')
-      .order('display_order', { ascending: true })
-
-    if (!error && data) {
-      setClasses(data)
-    }
-  }, [])
 
   // Fetch students and check their compensatory status for the week
   const fetchStudents = useCallback(async () => {
@@ -222,11 +199,6 @@ export default function CompensatoryAttendancePage() {
       setLoading(false)
     }
   }, [selectedClassId, isValidDay, classes, thursdayOfWeek, weekStart, weekEnd])
-
-  useEffect(() => {
-    fetchClasses()
-    fetchSchoolYear()
-  }, [fetchClasses, fetchSchoolYear])
 
   useEffect(() => {
     fetchStudents()

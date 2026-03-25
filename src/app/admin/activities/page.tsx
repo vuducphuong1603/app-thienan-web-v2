@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear, Holiday } from '@/lib/supabase'
+import { useActiveClasses, useSchoolYears } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
 import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarDays, Bell, ShieldAlert, History, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
@@ -420,10 +421,11 @@ export default function ActivitiesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('attendance')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState<string | null>(null) // studentId being saved
-  const [classes, setClasses] = useState<Class[]>([])
+  const { data: classes = [] } = useActiveClasses()
   const [students, setStudents] = useState<StudentWithAttendance[]>([])
-  const [schoolYear, setSchoolYear] = useState<SchoolYear | null>(null)
-  const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([])
+  const { data: schoolYearsData = [] } = useSchoolYears()
+  const schoolYears = schoolYearsData
+  const schoolYear = schoolYearsData.find(y => y.is_current) || schoolYearsData[0] || null
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
 
   // Filter states
@@ -510,6 +512,8 @@ export default function ActivitiesPage() {
   const [isReportTypeDropdownOpen, setIsReportTypeDropdownOpen] = useState(false)
   const [isReportAttendanceTypeDropdownOpen, setIsReportAttendanceTypeDropdownOpen] = useState(false)
   const [isReportSchoolYearDropdownOpen, setIsReportSchoolYearDropdownOpen] = useState(false)
+  const [reportSchoolYearId, setReportSchoolYearId] = useState<string>('')
+  const reportSchoolYear = reportSchoolYearId ? schoolYears.find(sy => sy.id === reportSchoolYearId) || schoolYear : schoolYear
   const [isReportFromDatePickerOpen, setIsReportFromDatePickerOpen] = useState(false)
   const [isReportToDatePickerOpen, setIsReportToDatePickerOpen] = useState(false)
   const [isReportWeekPickerOpen, setIsReportWeekPickerOpen] = useState(false)
@@ -597,35 +601,12 @@ export default function ActivitiesPage() {
     setTimeout(() => setNotification(null), 3000)
   }
 
-  // Fetch school years
-  const fetchSchoolYear = useCallback(async () => {
-    const { data: allYears } = await supabase
-      .from('school_years')
-      .select('*')
-      .order('start_date', { ascending: false })
-
-    if (allYears && allYears.length > 0) {
-      setSchoolYears(allYears)
-      const current = allYears.find(y => y.is_current) || allYears[0]
-      setSchoolYear(current)
-      setPriestSchoolYearId(current.id)
+  // Sync priestSchoolYearId when schoolYear changes
+  useEffect(() => {
+    if (schoolYear) {
+      setPriestSchoolYearId(schoolYear.id)
     }
-  }, [])
-
-  // Fetch classes
-  const fetchClasses = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('classes')
-      .select('*')
-      .eq('status', 'ACTIVE')
-      .order('display_order', { ascending: true })
-
-    if (!error && data) {
-      setClasses(data)
-    } else if (error) {
-      console.error('[activities] fetchClasses ERROR:', error)
-    }
-  }, [])
+  }, [schoolYear])
 
   // Fetch students and their attendance for selected class and date
   const fetchStudents = useCallback(async () => {
@@ -862,11 +843,6 @@ export default function ActivitiesPage() {
       setLoading(false)
     }
   }, [selectedClassId, selectedDate, classes, isCompensatoryMode, weekStart, weekEnd, thursdayOfWeek])
-
-  useEffect(() => {
-    fetchClasses()
-    fetchSchoolYear()
-  }, [fetchClasses, fetchSchoolYear])
 
   // Auto-select class for GLV
   useEffect(() => {
@@ -3615,7 +3591,7 @@ export default function ActivitiesPage() {
                     }}
                     className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-sm text-black dark:text-white">{schoolYear?.name || 'Chọn năm học'}</span>
+                    <span className="text-sm text-black dark:text-white">{reportSchoolYear?.name || 'Chọn năm học'}</span>
                     <svg className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isReportSchoolYearDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
                       <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="currentColor" transform="translate(-4, -2)" />
                     </svg>
@@ -3626,10 +3602,10 @@ export default function ActivitiesPage() {
                         <button
                           key={sy.id}
                           onClick={() => {
-                            setSchoolYear(sy)
+                            setReportSchoolYearId(sy.id)
                             setIsReportSchoolYearDropdownOpen(false)
                           }}
-                          className={`w-full px-5 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${schoolYear?.id === sy.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
+                          className={`w-full px-5 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${reportSchoolYear?.id === sy.id ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'}`}
                         >
                           {sy.name}
                         </button>
