@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, ThieuNhiProfile, Class, BRANCHES, SchoolYear } from '@/lib/supabase'
+import { supabase, ThieuNhiProfile, Class, BRANCHES } from '@/lib/supabase'
 import { useActiveClasses, useSchoolYears } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
 import { Search, Calendar, Check, X, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react'
