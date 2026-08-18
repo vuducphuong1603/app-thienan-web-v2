@@ -24,6 +24,8 @@ export interface ReportStudentScore {
   average_hk1: number | null
   average_hk2: number | null
   average_year: number | null
+  avg_thu5: number | null
+  avg_gl: number | null
 }
 
 export type TimeFilterMode = 'week' | 'dateRange' | 'month'

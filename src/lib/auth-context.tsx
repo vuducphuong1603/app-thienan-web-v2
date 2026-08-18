@@ -203,11 +203,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth()
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // CRITICAL: supabase-js holds its auth lock (navigator.locks) while awaiting
+    // this callback. Awaiting any other supabase call here (fetchUserProfile runs
+    // a PostgREST query that needs the same lock for its access token) deadlocks
+    // the client — every later query hangs BEFORE fetch, so no timeout can save it.
+    // Per Supabase docs: return synchronously and defer work with setTimeout(0).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // Skip events during account switch or explicit logout — those paths
       // handle cleanup themselves to avoid double redirects
       if (isSwitchingRef.current || isLoggingOutRef.current) return
 
+      setTimeout(async () => {
       try {
         if (event === 'SIGNED_OUT') {
           clearAuthState()
@@ -249,6 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.error('onAuthStateChange error:', err)
       }
+      }, 0)
     })
 
     // NOTE: Supabase v2.90+ has built-in auto-refresh with navigator.locks

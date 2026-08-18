@@ -22,6 +22,8 @@ interface ScoreReportStudent {
   average_hk1: number | null
   average_hk2: number | null
   average_year: number | null
+  avg_thu5: number | null
+  avg_gl: number | null
 }
 
 interface AttendanceReportProps {
@@ -211,15 +213,6 @@ function AttendanceTable({ students, dates, holidayMap }: { students: Attendance
 
 // Score Table Component
 function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[], scoreColumns?: ScoreColumns }) {
-  // Get classification
-  const getClassification = (avgYear: number | null) => {
-    if (avgYear === null) return { text: '-', color: 'text-gray-500' }
-    if (avgYear >= 8.0) return { text: 'Giỏi', color: 'text-green-600' }
-    if (avgYear >= 6.5) return { text: 'Khá', color: 'text-blue-600' }
-    if (avgYear >= 5.0) return { text: 'TB', color: 'text-yellow-600' }
-    return { text: 'Yếu', color: 'text-red-600' }
-  }
-
   // Determine which columns to show
   const anySelected = scoreColumns ? Object.values(scoreColumns).some(v => v) : false
   const showAll = !anySelected
@@ -270,6 +263,8 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
           <th className="border border-gray-400 px-1 py-2 text-center" colSpan={2}>Họ và tên</th>
           {showDiLeT5 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Đi Lễ<br/>T5</th>}
           {showHocGL && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Học<br/>GL</th>}
+          <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>Thứ 5</th>
+          <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>Giáo lý</th>
           {show45HK1 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">45p<br/>HK1</th>}
           {showExamHK1 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Thi<br/>HK1</th>}
           {(show45HK1 || showExamHK1) && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>HK1</th>}
@@ -277,7 +272,6 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
           {showExamHK2 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Thi<br/>HK2</th>}
           {(show45HK2 || showExamHK2) && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>HK2</th>}
           {showDiemTong && <th className="border border-gray-400 px-1 py-2 text-center w-[55px] bg-[#ffecb3]">TB<br/>Năm</th>}
-          <th className="border border-gray-400 px-1 py-2 text-center w-[60px]">Xếp<br/>loại</th>
           {showKetQua && <th className="border border-gray-400 px-1 py-2 text-center w-[60px] bg-[#e3f2fd]">Kết<br/>quả</th>}
         </tr>
       </thead>
@@ -286,7 +280,6 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
           const nameParts = student.full_name.split(' ')
           const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
           const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
-          const classification = getClassification(student.average_year)
 
           return (
             <tr key={student.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
@@ -304,6 +297,12 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
                   {student.score_hoc_gl !== null ? student.score_hoc_gl : '-'}
                 </td>
               )}
+              <td className="border border-gray-400 px-1 py-2 text-center font-semibold bg-[#e8f5e9]">
+                {student.avg_thu5 !== null ? student.avg_thu5 : '-'}
+              </td>
+              <td className="border border-gray-400 px-1 py-2 text-center font-semibold bg-[#e8f5e9]">
+                {student.avg_gl !== null ? student.avg_gl : '-'}
+              </td>
               {show45HK1 && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
                   {student.score_45_hk1 !== null ? student.score_45_hk1 : '-'}
@@ -339,9 +338,6 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
                   {student.average_year !== null ? student.average_year : '-'}
                 </td>
               )}
-              <td className={`border border-gray-400 px-1 py-2 text-center font-semibold ${classification.color}`}>
-                {classification.text}
-              </td>
               {showKetQua && (() => {
                 const kq = getKetQua(student)
                 return (
