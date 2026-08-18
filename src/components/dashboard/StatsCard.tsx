@@ -19,7 +19,7 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
     if (chart === 'line') {
       // Double line chart matching the design - for "Tổng số ngành"
       return (
-        <div className="relative w-28 h-14">
+        <div className="relative w-20 sm:w-28 h-10 sm:h-14">
           <svg className="absolute inset-0 w-full h-full" viewBox="0 0 115 60" fill="none">
             {/* First line (orange solid) */}
             <path
@@ -68,11 +68,11 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
         { height: 4.8, color: '#E5E1DC' },
       ]
       return (
-        <div className="flex items-end gap-1 h-10">
+        <div className="flex items-end gap-0.5 sm:gap-1 h-10">
           {bars.map((bar, i) => (
             <div
               key={i}
-              className="w-4 rounded-md"
+              className="w-2 sm:w-4 rounded-md"
               style={{
                 height: `${bar.height}px`,
                 backgroundColor: bar.color,
@@ -102,7 +102,7 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
       const emptyColor = '#ffffff'
 
       return (
-        <svg width="130" height="34" viewBox="0 0 145 34" fill="none">
+        <svg className="w-16 sm:w-[130px] h-auto" viewBox="0 0 145 34" fill="none">
           {people.map((p, i) => {
             const x = 5 + i * 13
             const mainColor = p.filled ? fillColor : emptyColor
@@ -140,7 +140,7 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
     if (chart === 'wave') {
       // Wave/line chart for "Giáo lý viên"
       return (
-        <div className="relative w-28 h-10">
+        <div className="relative w-20 sm:w-28 h-7 sm:h-10">
           <svg className="w-full h-full" viewBox="0 0 115 40" fill="none">
             {/* Gradient fill under the line */}
             <defs>
@@ -275,11 +275,13 @@ export default function StatsCard({ title, value, icon = 'branch', variant = 'de
       </div>
 
       {/* Bottom row: Value and Chart */}
-      <div className="flex items-end justify-between">
-        <span className={`text-4xl font-bold ${isPrimary ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+      <div className="flex items-end justify-between gap-2 min-w-0">
+        <span className={`text-3xl sm:text-4xl font-bold whitespace-nowrap ${isPrimary ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
           {value}
         </span>
-        {renderChart()}
+        <div className="flex-shrink min-w-0 overflow-hidden flex justify-end">
+          {renderChart()}
+        </div>
       </div>
     </div>
   )
