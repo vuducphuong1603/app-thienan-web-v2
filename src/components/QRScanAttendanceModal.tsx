@@ -64,6 +64,7 @@ export default function QRScanAttendanceModal({
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number>(0)
@@ -495,6 +496,45 @@ export default function QRScanAttendanceModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, retryKey])
 
+  // Giữ modal cố định khi bàn phím ảo mở (iOS Safari đẩy trang lên gây trống màn hình):
+  // khoá cuộn body, co panel theo chiều cao visualViewport và kéo về vị trí 0
+  useEffect(() => {
+    if (!isOpen) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const vv = window.visualViewport
+    const syncViewport = () => {
+      window.scrollTo(0, 0)
+      const panel = panelRef.current
+      if (!panel) return
+      if (window.innerWidth < 640 && vv) {
+        panel.style.height = `${vv.height}px`
+        panel.style.transform = `translateY(${vv.offsetTop}px)`
+      } else {
+        panel.style.height = ''
+        panel.style.transform = ''
+      }
+    }
+    vv?.addEventListener('resize', syncViewport)
+    vv?.addEventListener('scroll', syncViewport)
+    window.addEventListener('resize', syncViewport)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      vv?.removeEventListener('resize', syncViewport)
+      vv?.removeEventListener('scroll', syncViewport)
+      window.removeEventListener('resize', syncViewport)
+    }
+  }, [isOpen])
+
+  const handleSearchFocus = () => {
+    setSearchFocused(true)
+    // Sau khi bàn phím mở, kéo panel về đầu để ô tìm kiếm + kết quả luôn hiện phía trên bàn phím
+    setTimeout(() => {
+      window.scrollTo(0, 0)
+      panelRef.current?.scrollTo({ top: 0 })
+    }, 300)
+  }
+
   const handleClose = () => {
     if (successCountRef.current > 0) onAttendanceMarked?.()
     onClose()
@@ -518,7 +558,7 @@ export default function QRScanAttendanceModal({
     <div className="fixed inset-0 z-50 flex sm:items-center sm:justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
 
-      <div className="relative bg-[#0F172A] w-full h-full overflow-y-auto p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:rounded-[24px] sm:w-[520px] sm:h-auto sm:max-w-[calc(100vw-32px)] sm:max-h-[calc(100vh-32px)] sm:p-6 shadow-2xl">
+      <div ref={panelRef} className="relative bg-[#0F172A] w-full h-full overflow-y-auto overscroll-contain p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:rounded-[24px] sm:w-[520px] sm:h-auto sm:max-w-[calc(100vw-32px)] sm:max-h-[calc(100vh-32px)] sm:p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -630,7 +670,7 @@ export default function QRScanAttendanceModal({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
-                  onFocus={() => setSearchFocused(true)}
+                  onFocus={handleSearchFocus}
                   onBlur={() => setSearchFocused(false)}
                   placeholder="Tìm tên, tên thánh, mã thiếu nhi..."
                   autoCorrect="off"
