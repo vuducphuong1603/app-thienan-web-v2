@@ -4,10 +4,11 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear, Holiday } from '@/lib/supabase'
 import { useActiveClasses, useSchoolYears, countWeekdays } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
-import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarDays, Bell, ShieldAlert, History, ChevronDown } from 'lucide-react'
+import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarDays, Bell, ShieldAlert, History, ChevronDown, ScanLine } from 'lucide-react'
 import Link from 'next/link'
 import CustomCalendar from '@/components/ui/CustomCalendar'
 import QRAttendanceModal from '@/components/QRAttendanceModal'
+import QRScanAttendanceModal from '@/components/QRScanAttendanceModal'
 import AttendanceConfirmModal from '@/components/AttendanceConfirmModal'
 import ImportExcelModal from '@/components/ImportExcelModal'
 import ExportSuccessModal from '@/components/ExportSuccessModal'
@@ -441,6 +442,7 @@ export default function ActivitiesPage() {
 
   // QR Modal states
   const [isQRModalOpen, setIsQRModalOpen] = useState(false)
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false)
   const [selectedStudentForQR, setSelectedStudentForQR] = useState<StudentWithAttendance | null>(null)
   const [isQRForCompensatory, setIsQRForCompensatory] = useState(false)
 
@@ -2365,17 +2367,26 @@ export default function ActivitiesPage() {
           <>
             {/* Header Section */}
             <div className="px-6 pt-6 pb-4">
-              <div className="flex flex-col gap-1">
-                <h1 className="text-[26px] font-semibold text-black dark:text-white">Điểm danh</h1>
-                <p className="text-sm font-medium text-[#666d80]">
-                  {selectedClassId ? `LỚP ${getClassName(selectedClassId).toUpperCase()}` : 'Chọn lớp để bắt đầu điểm danh'}
-                  {!dayType && selectedClassId && !isCompensatoryMode && (
-                    <span className="text-orange-500 ml-2">(Chỉ điểm danh Thứ 5 hoặc Chủ nhật)</span>
-                  )}
-                  {isCompensatoryMode && selectedClassId && (
-                    <span className="text-blue-600 ml-2">(Bổ sung cho Thứ 5 ngày {formatDate(thursdayOfWeek)})</span>
-                  )}
-                </p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <h1 className="text-[26px] font-semibold text-black dark:text-white">Điểm danh</h1>
+                  <p className="text-sm font-medium text-[#666d80]">
+                    {selectedClassId ? `LỚP ${getClassName(selectedClassId).toUpperCase()}` : 'Quét QR để điểm danh ngay, hoặc chọn lớp để điểm danh thủ công'}
+                    {!dayType && selectedClassId && !isCompensatoryMode && (
+                      <span className="text-orange-500 ml-2">(Chỉ điểm danh Thứ 5 hoặc Chủ nhật)</span>
+                    )}
+                    {isCompensatoryMode && selectedClassId && (
+                      <span className="text-blue-600 ml-2">(Bổ sung cho Thứ 5 ngày {formatDate(thursdayOfWeek)})</span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsScanModalOpen(true)}
+                  className="h-[52px] px-8 bg-[#0F172A] rounded-full flex items-center gap-3 hover:bg-[#1E293B] transition-colors shrink-0"
+                >
+                  <ScanLine className="w-5 h-5 text-white" />
+                  <span className="text-base font-medium text-white">Quét QR điểm danh</span>
+                </button>
               </div>
             </div>
 
@@ -4455,6 +4466,15 @@ export default function ActivitiesPage() {
           />
         )}
       </div>
+
+      {/* QR Scan (camera) Attendance Modal */}
+      <QRScanAttendanceModal
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        schoolYear={schoolYear}
+        user={user}
+        onAttendanceMarked={fetchStudents}
+      />
 
       {/* QR Attendance Modal */}
       <QRAttendanceModal
