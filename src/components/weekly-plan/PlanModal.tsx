@@ -180,8 +180,8 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
     : 'Chưa chọn'
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-[16px] w-[506px] max-h-[90vh] overflow-hidden shadow-xl flex flex-col relative">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-[16px] w-full max-w-[506px] max-h-[90vh] overflow-hidden shadow-xl flex flex-col relative">
         {/* Close button */}
         <button
           onClick={onClose}
@@ -192,7 +192,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
         </button>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-8 pt-[25px] pb-[10px] flex flex-col gap-[10px] items-center">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-8 pt-[25px] pb-[10px] flex flex-col gap-[10px] items-center">
           {/* Icon */}
           <div className="flex items-center justify-center w-[85px] h-[85px]">
             <div className="bg-gradient-to-b from-[rgba(250,134,94,0.16)] to-transparent border border-[#fff0f3] rounded-full p-4">
@@ -203,7 +203,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
           </div>
 
           {/* Title & Subtitle */}
-          <div className="text-center w-[442px]">
+          <div className="text-center w-full max-w-[442px]">
             <h2 className="text-[22px] font-semibold text-black dark:text-white">
               {mode === 'add' ? 'Thêm kế hoạch' : 'Sửa kế hoạch'}
             </h2>
@@ -213,7 +213,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
           </div>
 
           {/* Plan Name Card */}
-          <div className="w-[442px] border border-[#E5E1DC] dark:border-white/10 rounded-[16px] overflow-hidden">
+          <div className="w-full max-w-[442px] border border-[#E5E1DC] dark:border-white/10 rounded-[16px] overflow-hidden">
             {/* Name Input */}
             <div className="border-b border-[#E5E1DC] dark:border-white/10 px-4 h-[41px] flex items-center">
               <input
@@ -227,7 +227,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
               />
             </div>
             {/* Date & Time Summary */}
-            <div className="px-4 pt-3 pb-4 flex gap-1">
+            <div className="px-4 pt-3 pb-4 flex flex-col sm:flex-row gap-1">
               <div className="flex items-center gap-2 flex-1">
                 <div className="w-4 h-4 rounded-full bg-brand/20 flex items-center justify-center flex-shrink-0">
                   <Check className="w-2.5 h-2.5 text-brand" />
@@ -242,12 +242,12 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
               </div>
             </div>
           </div>
-          {errors.title && <p className="text-xs text-red-500 w-[442px] -mt-1">{errors.title}</p>}
+          {errors.title && <p className="text-xs text-red-500 w-full max-w-[442px] -mt-1">{errors.title}</p>}
 
           {/* Date & Time Inputs (collapsible detail) */}
-          <div className="w-[442px] flex flex-col gap-[6px]">
+          <div className="w-full max-w-[442px] flex flex-col gap-[6px]">
             <p className="text-[12px] text-[#666D80]">Ngày & Giờ <span className="text-[#DF1C41]">*</span></p>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <div className="flex-1">
                 <CustomDatePicker
                   value={planDate}
@@ -286,7 +286,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
           </div>
 
           {/* Category */}
-          <div className="w-[442px] flex flex-col gap-[6px]">
+          <div className="w-full max-w-[442px] flex flex-col gap-[6px]">
             <p className="text-[12px] text-[#666D80]">Loại hoạt động</p>
             <select
               value={categoryId}
@@ -301,7 +301,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
           </div>
 
           {/* Người tham dự (Assignment) */}
-          <div className="w-[442px] flex flex-col gap-[6px]">
+          <div className="w-full max-w-[442px] flex flex-col gap-[6px]">
             <p className="text-[12px]">
               <span className="text-[#666D80]">Người tham dự </span>
               <span className="text-[#DF1C41]">*</span>
@@ -392,7 +392,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
           </div>
 
           {/* Mô tả */}
-          <div className="w-[442px] flex flex-col gap-[6px]">
+          <div className="w-full max-w-[442px] flex flex-col gap-[6px]">
             <p className="text-[12px] text-[#666D80]">Mô tả</p>
             <input
               type="text"
@@ -404,7 +404,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
           </div>
 
           {/* Link đính kèm */}
-          <div className="w-[442px] flex flex-col gap-[6px]">
+          <div className="w-full max-w-[442px] flex flex-col gap-[6px]">
             <p className="text-[12px] text-[#666D80]">Link đính kèm</p>
             <input
               type="text"
@@ -417,13 +417,13 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
 
           {/* Submit error */}
           {submitError && (
-            <div className="w-[442px] p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-[12px]">
+            <div className="w-full max-w-[442px] p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-[12px]">
               <p className="text-[12px] text-red-600 dark:text-red-400">{submitError}</p>
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-4 w-[442px] cursor-pointer pt-1 pb-2">
+          <div className="flex gap-4 w-full max-w-[442px] cursor-pointer pt-1 pb-2">
             <button
               onClick={onClose}
               disabled={isSubmitting}

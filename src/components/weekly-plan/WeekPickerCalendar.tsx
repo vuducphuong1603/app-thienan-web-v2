@@ -139,7 +139,7 @@ export default function WeekPickerCalendar({ isOpen, onClose, currentWeekStart, 
   return (
     <div
       ref={popoverRef}
-      className="absolute top-full right-0 mt-2 z-50 w-[297px] bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-[15px] shadow-[1px_3px_4px_0px_rgba(0,0,0,0.25)]"
+      className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 z-50 w-[297px] max-w-[calc(100vw-2.5rem)] bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-[15px] shadow-[1px_3px_4px_0px_rgba(0,0,0,0.25)]"
     >
       {/* Month Header */}
       <div className="flex items-center justify-center gap-2 pt-[19px] pb-[14px] px-[13px]">

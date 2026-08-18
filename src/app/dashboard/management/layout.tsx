@@ -21,7 +21,7 @@ export default function GLVManagementLayout({ children }: { children: React.Reac
         onLogout={logout}
         userAvatar={user.avatar_url}
       />
-      <main className="px-6 pb-6">
+      <main className="px-4 sm:px-6 pb-6">
         {children}
       </main>
     </div>

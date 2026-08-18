@@ -199,7 +199,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
           </button>
 
           {/* Title */}
-          <h1 className="text-[40px] font-bold text-black dark:text-white leading-none">Chỉnh sửa lớp học</h1>
+          <h1 className="text-2xl sm:text-3xl lg:text-[40px] font-bold text-black dark:text-white leading-none">Chỉnh sửa lớp học</h1>
 
           {/* Subtitle */}
           <p className="text-sm text-primary-1">
@@ -208,9 +208,9 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
         </div>
 
         {/* Form Fields Row */}
-        <div className="flex gap-3 mt-4">
+        <div className="flex flex-col sm:flex-row gap-3 mt-4">
           {/* Class Name Input */}
-          <div className="flex flex-col gap-1.5 w-[400px]">
+          <div className="flex flex-col gap-1.5 w-full sm:w-[400px]">
             <label className="text-sm font-medium text-black dark:text-white">Tên lớp</label>
             <div
               className={`h-[43px] px-4 bg-white dark:bg-white/10 rounded-full flex items-center ${

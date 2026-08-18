@@ -136,9 +136,9 @@ function ClassesPageContent() {
   return (
     <div className="flex flex-col gap-4">
       {/* Search and Actions Bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Search Input */}
-        <div className="flex items-center gap-2 h-[42px] px-3 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl w-[320px]">
+        <div className="flex items-center gap-2 h-[42px] px-3 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl w-full sm:w-[320px]">
           <Search className="w-5 h-5 text-primary-3" />
           <input
             type="text"
@@ -150,7 +150,7 @@ function ClassesPageContent() {
         </div>
 
         {/* Filter and Action Buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Branch Filter */}
           <div className="relative">
             <button
@@ -199,7 +199,7 @@ function ClassesPageContent() {
       </div>
 
       {/* Stats Bar */}
-      <div className="flex items-center gap-8">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-8">
         <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl">
           <span className="text-sm font-semibold text-brand">{totalClasses}</span>
           <span className="text-sm text-primary-3">lớp</span>
@@ -251,6 +251,8 @@ function ClassesPageContent() {
                 </span>
               </div>
 
+              <div className="overflow-x-auto">
+              <div className="min-w-[560px]">
               {/* Table Header */}
               <div className="grid grid-cols-[1fr_1.5fr_100px_120px] gap-4 px-4 py-3 bg-[#FAFAFA] dark:bg-white/5 border-b border-[#E5E1DC]">
                 <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Tên lớp</div>
@@ -315,6 +317,8 @@ function ClassesPageContent() {
                     </div>
                   </div>
                 ))}
+              </div>
+              </div>
               </div>
             </div>
           ))}

@@ -104,17 +104,17 @@ export default function ManagementLayout({ children }: ManagementLayoutProps) {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex px-5 pb-5 gap-5">
+      <div className="flex-1 flex flex-col lg:flex-row px-3 sm:px-5 pb-5 gap-4 lg:gap-5">
         {/* Left Sidebar */}
-        <aside className="w-[208px] flex-shrink-0">
-          <nav className="flex flex-col gap-2.5">
+        <aside className="w-full lg:w-[208px] flex-shrink-0">
+          <nav className="flex flex-row lg:flex-col gap-2.5 overflow-x-auto lg:overflow-x-visible">
             {sidebarItems.map((item) => {
               const isActive = activeItem === item.id
               return (
                 <Link
                   key={item.id}
                   href={item.href}
-                  className={`flex items-center gap-3 pl-2 pr-4 h-14 rounded-full transition-all shadow-sm ${
+                  className={`flex items-center gap-3 pl-2 pr-4 h-14 rounded-full transition-all shadow-sm flex-shrink-0 lg:flex-shrink ${
                     isActive
                       ? 'bg-brand text-white'
                       : 'bg-[#F6F6F6] dark:bg-white/10 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-white/20'
@@ -138,7 +138,7 @@ export default function ManagementLayout({ children }: ManagementLayoutProps) {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1">
+        <main className="flex-1 min-w-0">
           {children}
         </main>
       </div>

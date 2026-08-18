@@ -81,6 +81,8 @@ export default function WeeklyPlanCalendar({
 
   return (
     <div className="bg-white dark:bg-white/5 rounded-[20px] border border-[#E5E1DC] dark:border-white/10 overflow-hidden">
+      <div className="overflow-x-auto">
+      <div className="min-w-[760px]">
       {/* Header Row: GMT+7 + Day columns */}
       <div className="grid grid-cols-[72px_repeat(7,1fr)]">
         {/* Timezone cell */}
@@ -194,6 +196,8 @@ export default function WeeklyPlanCalendar({
           </div>
         </div>
       )}
+      </div>
+      </div>
     </div>
   )
 }

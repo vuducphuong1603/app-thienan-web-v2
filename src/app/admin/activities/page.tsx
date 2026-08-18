@@ -146,12 +146,12 @@ function AttendanceHistoryContent({ classId, className }: { classId: string; cla
   }
 
   return (
-    <div className="px-6 py-6">
+    <div className="px-4 sm:px-6 py-6">
       <h1 className="text-[26px] font-semibold text-black dark:text-white mb-1">Lịch sử điểm danh</h1>
       <p className="text-sm font-medium text-[#666d80] mb-5">LỚP {className.toUpperCase()}</p>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 mb-5">
+      <div className="flex flex-wrap items-center gap-3 mb-5">
         {/* View mode toggle */}
         <div className="flex items-center bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/10 rounded-full overflow-hidden">
           <button
@@ -2232,7 +2232,7 @@ export default function ActivitiesPage() {
   }, [])
 
   return (
-    <div className="flex gap-[17px]">
+    <div className="flex flex-col lg:flex-row gap-4 lg:gap-[17px]">
       {/* Notification Toast */}
       {notification && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
@@ -2248,11 +2248,11 @@ export default function ActivitiesPage() {
       )}
 
       {/* Left Sidebar - Tab Navigation */}
-      <div className="w-[208px] flex flex-col gap-2">
+      <div className="w-full lg:w-[208px] flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible">
         {/* Điểm danh Tab - Active */}
         <button
           onClick={() => setActiveTab('attendance')}
-          className={`h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors ${
+          className={`h-[56px] shrink-0 lg:w-full rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-4 lg:pr-2 whitespace-nowrap shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors ${
             activeTab === 'attendance'
               ? 'bg-brand'
               : 'bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10'
@@ -2276,7 +2276,7 @@ export default function ActivitiesPage() {
         {!isAdmin && (
           <button
             onClick={() => setActiveTab('attendance-history')}
-            className={`h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors ${
+            className={`h-[56px] shrink-0 lg:w-full rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-4 lg:pr-2 whitespace-nowrap shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors ${
               activeTab === 'attendance-history'
                 ? 'bg-brand'
                 : 'bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10'
@@ -2300,7 +2300,7 @@ export default function ActivitiesPage() {
         {/* Báo cáo Tab */}
         <button
           onClick={() => setActiveTab('report')}
-          className={`h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors ${
+          className={`h-[56px] shrink-0 lg:w-full rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-4 lg:pr-2 whitespace-nowrap shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors ${
             activeTab === 'report'
               ? 'bg-brand'
               : 'bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10'
@@ -2323,7 +2323,7 @@ export default function ActivitiesPage() {
         {/* Kế hoạch Tab */}
         <Link
           href="/admin/activities/weekly-plan"
-          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
+          className="h-[56px] shrink-0 lg:w-full rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-4 lg:pr-2 whitespace-nowrap shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
         >
           <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
             <CalendarDays className="w-5 h-5 text-brand" />
@@ -2336,7 +2336,7 @@ export default function ActivitiesPage() {
         {/* Thông báo Tab */}
         <Link
           href="/admin/notifications"
-          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
+          className="h-[56px] shrink-0 lg:w-full rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-4 lg:pr-2 whitespace-nowrap shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
         >
           <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
             <Bell className="w-5 h-5 text-brand" />
@@ -2349,7 +2349,7 @@ export default function ActivitiesPage() {
         {/* Hệ thống cảnh báo Tab */}
         <Link
           href="/admin/alerts"
-          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
+          className="h-[56px] shrink-0 lg:w-full rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-4 lg:pr-2 whitespace-nowrap shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
         >
           <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
             <ShieldAlert className="w-5 h-5 text-brand" />
@@ -2366,8 +2366,8 @@ export default function ActivitiesPage() {
         {activeTab === 'attendance' ? (
           <>
             {/* Header Section */}
-            <div className="px-6 pt-6 pb-4">
-              <div className="flex items-start justify-between gap-4">
+            <div className="px-4 sm:px-6 pt-6 pb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-4">
                 <div className="flex flex-col gap-1">
                   <h1 className="text-[26px] font-semibold text-black dark:text-white">Điểm danh</h1>
                   <p className="text-sm font-medium text-[#666d80]">
@@ -2391,8 +2391,8 @@ export default function ActivitiesPage() {
             </div>
 
             {/* Filter Row */}
-            <div className="px-6 pb-5">
-              <div className="flex items-center gap-4">
+            <div className="px-4 sm:px-6 pb-5">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                 {/* Class Selector - hidden for GLV (auto-selected) */}
                 {isAdmin ? (
                   <div className="relative flex-1" data-dropdown>
@@ -2525,7 +2525,7 @@ export default function ActivitiesPage() {
 
             {/* Holiday Warning Banner */}
             {currentDateHoliday && selectedClassId && (
-              <div className="mx-6 mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3">
+              <div className="mx-4 sm:mx-6 mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
                   <Calendar className="w-4 h-4 text-red-600" />
                 </div>
@@ -2547,7 +2547,7 @@ export default function ActivitiesPage() {
             )}
 
             {/* Content Area */}
-            <div className="px-6 pb-6">
+            <div className="px-4 sm:px-6 pb-6">
               <div className="bg-white dark:bg-white/10 rounded-3xl min-h-[580px]">
                 {loading ? (
                   /* Loading State */
@@ -2582,9 +2582,9 @@ export default function ActivitiesPage() {
                   </div>
                 ) : (
                   /* Student List */
-                  <div className="p-6">
+                  <div className="p-4 sm:p-6">
                     {/* Stats Row */}
-                    <div className="flex items-stretch gap-4 mb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:flex xl:items-stretch gap-4 mb-6">
                       {/* Có mặt / Đã bổ sung Card */}
                       <div className={`h-[130px] flex-1 rounded-[18px] p-5 flex flex-col justify-between relative overflow-hidden ${
                         isCompensatoryMode ? 'bg-blue-500' : 'bg-brand'
@@ -2756,7 +2756,7 @@ export default function ActivitiesPage() {
                     </div>
 
                     {/* Student List */}
-                    <div className="space-y-0">
+                    <div className="space-y-0 overflow-x-auto">
                       {loading ? (
                         <div className="flex items-center justify-center py-16">
                           <svg className="animate-spin h-8 w-8 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -2769,7 +2769,7 @@ export default function ActivitiesPage() {
                         students.map((student, index) => (
                           <div
                             key={student.id}
-                            className={`flex items-center py-5 ${index !== students.length - 1 ? 'border-b border-[#f0f0f0]' : ''} ${saving === student.id ? 'opacity-50' : ''}`}
+                            className={`min-w-[760px] flex items-center py-5 ${index !== students.length - 1 ? 'border-b border-[#f0f0f0]' : ''} ${saving === student.id ? 'opacity-50' : ''}`}
                           >
                             {/* Checkbox Column */}
                             <div className="w-[60px] flex items-center justify-center">
@@ -2919,7 +2919,7 @@ export default function ActivitiesPage() {
                         students.map((student, index) => (
                           <div
                             key={student.id}
-                            className={`flex items-center py-5 ${index !== students.length - 1 ? 'border-b border-[#f0f0f0]' : ''} ${saving === student.id ? 'opacity-50' : ''}`}
+                            className={`min-w-[760px] flex items-center py-5 ${index !== students.length - 1 ? 'border-b border-[#f0f0f0]' : ''} ${saving === student.id ? 'opacity-50' : ''}`}
                           >
                             {/* Checkbox Column */}
                             <div className="w-[60px] flex items-center justify-center">
@@ -3102,9 +3102,9 @@ export default function ActivitiesPage() {
           />
         ) : (
           /* Reports Tab */
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {/* Report Style Selector */}
-            <div className="flex items-center gap-6 mb-6">
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-6">
               <span className="text-base font-semibold text-black dark:text-white">Kiểu báo cáo</span>
               <div className="flex items-center gap-4">
                 <button
@@ -3138,18 +3138,18 @@ export default function ActivitiesPage() {
             {reportStyle === 'parent' ? (
             <>
             {/* Header Section */}
-            <div className="flex items-start gap-6 mb-6">
+            <div className="flex flex-col lg:flex-row lg:items-start gap-4 lg:gap-6 mb-6">
               {/* Title */}
-              <div className="w-[300px]">
+              <div className="w-full lg:w-[300px]">
                 <h1 className="text-[26px] font-semibold text-black dark:text-white">Tạo báo cáo mới</h1>
                 <p className="text-sm font-medium text-[#666d80] mt-1">Tạo và xuất báo cáo</p>
               </div>
 
               {/* Time Filter Mode Selector - chỉ hiển thị khi báo cáo điểm danh */}
               {reportType !== 'score' && <div className="flex-1 bg-white dark:bg-white/10 border border-[#e5e1dc] rounded-2xl overflow-hidden">
-                <div className="flex items-center h-12 px-4">
+                <div className="flex flex-wrap items-center gap-y-2 py-2 lg:py-0 lg:h-12 px-4">
                   <span className="flex-1 text-base font-semibold text-black dark:text-white">Cách chọn lọc thời gian</span>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     {/* Chọn tháng option */}
                     <button
                       onClick={() => setReportTimeFilterMode('month')}
@@ -3203,11 +3203,11 @@ export default function ActivitiesPage() {
             <div className="h-px bg-[#e5e1dc] mb-6" />
 
             {/* Form Row 1 - Date Selection + Report Type */}
-            <div className="flex items-start gap-3 mb-6">
+            <div className="flex flex-col md:flex-row md:items-start gap-3 mb-6">
               {reportType !== 'score' && (reportTimeFilterMode === 'dateRange' ? (
                 <>
                   {/* Từ ngày */}
-                  <div className="w-[27%]">
+                  <div className="w-full md:w-[27%]">
                     <label className="block text-sm font-medium text-[#666d80] mb-2">Từ ngày</label>
                     <div className="relative" data-dropdown>
                       <button
@@ -3235,7 +3235,7 @@ export default function ActivitiesPage() {
                   </div>
 
                   {/* Đến ngày */}
-                  <div className="w-[27%]">
+                  <div className="w-full md:w-[27%]">
                     <label className="block text-sm font-medium text-[#666d80] mb-2">Đến ngày</label>
                     <div className="relative" data-dropdown>
                       <button
@@ -3265,7 +3265,7 @@ export default function ActivitiesPage() {
                 </>
               ) : reportTimeFilterMode === 'month' ? (
                 /* Chọn tháng */
-                <div className="w-[55%]">
+                <div className="w-full md:w-[55%]">
                   <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn tháng</label>
                   <div className="flex items-center gap-3">
                     {/* Month dropdown */}
@@ -3326,7 +3326,7 @@ export default function ActivitiesPage() {
                 </div>
               ) : (
                 /* Chọn tuần */
-                <div className="w-[55%]">
+                <div className="w-full md:w-[55%]">
                   <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn tuần</label>
                   <div className="relative" data-dropdown>
                     <button
@@ -3409,7 +3409,7 @@ export default function ActivitiesPage() {
             </div>
 
             {/* Form Row 2 - Filters */}
-            <div className="flex items-start gap-3 mb-6">
+            <div className="flex flex-col md:flex-row md:items-start gap-3 mb-6">
               {/* Ngành (tùy chọn) */}
               <div className="flex-[1.28]">
                 <label className="block text-sm font-medium text-[#666d80] mb-2">Ngành (tùy chọn)</label>
@@ -3576,7 +3576,7 @@ export default function ActivitiesPage() {
                 <label className="block text-sm font-medium text-[#666d80] mb-3">
                   Chọn cột điểm số để xuất ảnh (để trống sẽ xuất tất cả)
                 </label>
-                <div className="grid grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -3703,10 +3703,10 @@ export default function ActivitiesPage() {
 
             {/* Report Result Section */}
             {isReportGenerated && (
-              <div className="bg-white dark:bg-white/10 rounded-[24px] p-6 overflow-hidden">
+              <div className="bg-white dark:bg-white/10 rounded-[24px] p-4 sm:p-6 overflow-hidden">
                 {/* Report Preview Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
+                  <div className="flex flex-wrap items-center gap-3">
                     {/* Eye Icon */}
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M12.0001 12C15.0793 12 18.0179 13.8185 20.1133 17.1592C20.8187 18.2839 20.8187 19.7161 20.1133 20.8408C18.0179 24.1815 15.0793 26 12.0001 26C8.92077 26 5.98224 24.1815 3.88678 20.8408C3.18144 19.7161 3.18144 18.2839 3.88678 17.1592C5.98224 13.8185 8.92077 12 12.0001 12ZM12.0001 14C9.77455 14 7.40822 15.3088 5.58112 18.2217C5.28324 18.6966 5.28324 19.3034 5.58112 19.7783C7.40822 22.6912 9.77455 24 12.0001 24C14.2256 24 16.5919 22.6912 18.419 19.7783C18.7169 19.3034 18.7169 18.6966 18.419 18.2217C16.5919 15.3088 14.2256 14 12.0001 14ZM12.0001 15C14.2092 15 16.0001 16.7909 16.0001 19C16.0001 21.2091 14.2092 23 12.0001 23C9.79092 23 8.00006 21.2091 8.00006 19C8.00006 16.7909 9.79092 15 12.0001 15ZM11.9141 17.0039C11.9687 17.1594 12.0001 17.3259 12.0001 17.5C12.0001 18.3284 11.3285 19 10.5001 19C10.326 19 10.1594 18.9686 10.004 18.9141C10.0028 18.9426 10.0001 18.9712 10.0001 19C10.0001 20.1046 10.8955 21 12.0001 21C13.1046 21 14.0001 20.1045 14.0001 19C14.0001 17.8955 13.1046 17 12.0001 17C11.9713 17 11.9426 17.0027 11.9141 17.0039Z" fill="#8A8C90" transform="translate(0, -7)"/>
@@ -3744,7 +3744,7 @@ export default function ActivitiesPage() {
 
                 {/* Stats Cards */}
                 {reportType === 'attendance' ? (
-                  <div className="flex items-stretch gap-[3px] mb-6">
+                  <div className="grid grid-cols-2 xl:flex xl:items-stretch gap-[3px] mb-6">
                     {/* Có mặt thứ 5 */}
                     <div className="flex-1 h-[130px] bg-brand rounded-[15px] px-4 py-4 flex flex-col justify-between relative overflow-hidden">
                       <div className="flex items-center justify-between">
@@ -3806,7 +3806,7 @@ export default function ActivitiesPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-stretch gap-[3px] mb-6">
+                  <div className="grid grid-cols-2 xl:flex xl:items-stretch gap-[3px] mb-6">
                     {/* TB HK1 */}
                     <div className="flex-1 h-[130px] bg-brand rounded-[15px] px-4 py-4 flex flex-col justify-between relative overflow-hidden">
                       <div className="flex items-center justify-between">
@@ -4073,17 +4073,17 @@ export default function ActivitiesPage() {
             /* Priest Report */
             <>
               {/* Header Section */}
-              <div className="flex items-start gap-6 mb-6">
-                <div className="w-[300px]">
+              <div className="flex flex-col lg:flex-row lg:items-start gap-4 lg:gap-6 mb-6">
+                <div className="w-full lg:w-[300px]">
                   <h1 className="text-[26px] font-semibold text-black dark:text-white">Báo cáo tổng hợp</h1>
                   <p className="text-sm font-medium text-[#666d80] mt-1">Báo cáo cho Cha - tổng hợp tất cả các lớp</p>
                 </div>
 
                 {/* Priest Time Filter Mode Selector */}
                 <div className="flex-1 bg-white dark:bg-white/10 border border-[#e5e1dc] rounded-2xl overflow-hidden">
-                  <div className="flex items-center h-12 px-4">
+                  <div className="flex flex-wrap items-center gap-y-2 py-2 lg:py-0 lg:h-12 px-4">
                     <span className="flex-1 text-base font-semibold text-black dark:text-white">Chọn thời gian</span>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                       <button onClick={() => setPriestTimeFilterMode('month')} className="flex items-center gap-2">
                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${priestTimeFilterMode === 'month' ? 'border-brand' : 'border-gray-300 dark:border-white/30'}`}>
                           {priestTimeFilterMode === 'month' && <div className="w-2 h-2 rounded-full bg-brand" />}
@@ -4111,9 +4111,9 @@ export default function ActivitiesPage() {
               <div className="h-px bg-[#e5e1dc] mb-6" />
 
               {/* Priest Report Form */}
-              <div className="flex items-start gap-3 mb-6">
+              <div className="flex flex-col md:flex-row md:items-start gap-3 mb-6">
                 {priestTimeFilterMode === 'month' ? (
-                  <div className="w-[40%]">
+                  <div className="w-full md:w-[40%]">
                     <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn tháng</label>
                     <div className="relative" data-dropdown>
                       <button
@@ -4150,7 +4150,7 @@ export default function ActivitiesPage() {
                     </div>
                   </div>
                 ) : priestTimeFilterMode === 'week' ? (
-                  <div className="w-[40%]">
+                  <div className="w-full md:w-[40%]">
                     <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn tuần</label>
                     <div className="relative" data-dropdown>
                       <button
@@ -4189,7 +4189,7 @@ export default function ActivitiesPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="w-[40%]">
+                  <div className="w-full md:w-[40%]">
                     <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn năm học</label>
                     <div className="relative" data-dropdown>
                       <button
@@ -4221,7 +4221,7 @@ export default function ActivitiesPage() {
                 )}
 
                 {/* Day type filter */}
-                <div className="w-[30%]">
+                <div className="w-full md:w-[30%]">
                   <label className="block text-sm font-medium text-[#666d80] mb-2">Loại buổi</label>
                   <div className="relative" data-dropdown>
                     <button
@@ -4281,10 +4281,10 @@ export default function ActivitiesPage() {
 
               {/* Priest Report Result Section */}
               {isPriestReportGenerated && priestReportData && (
-                <div className="bg-white dark:bg-white/10 rounded-[24px] p-6 overflow-hidden">
+                <div className="bg-white dark:bg-white/10 rounded-[24px] p-4 sm:p-6 overflow-hidden">
                   {/* Report Preview Header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
+                    <div className="flex flex-wrap items-center gap-3">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12.0001 12C15.0793 12 18.0179 13.8185 20.1133 17.1592C20.8187 18.2839 20.8187 19.7161 20.1133 20.8408C18.0179 24.1815 15.0793 26 12.0001 26C8.92077 26 5.98224 24.1815 3.88678 20.8408C3.18144 19.7161 3.18144 18.2839 3.88678 17.1592C5.98224 13.8185 8.92077 12 12.0001 12ZM12.0001 14C9.77455 14 7.40822 15.3088 5.58112 18.2217C5.28324 18.6966 5.28324 19.3034 5.58112 19.7783C7.40822 22.6912 9.77455 24 12.0001 24C14.2256 24 16.5919 22.6912 18.419 19.7783C18.7169 19.3034 18.7169 18.6966 18.419 18.2217C16.5919 15.3088 14.2256 14 12.0001 14ZM12.0001 15C14.2092 15 16.0001 16.7909 16.0001 19C16.0001 21.2091 14.2092 23 12.0001 23C9.79092 23 8.00006 21.2091 8.00006 19C8.00006 16.7909 9.79092 15 12.0001 15ZM11.9141 17.0039C11.9687 17.1594 12.0001 17.3259 12.0001 17.5C12.0001 18.3284 11.3285 19 10.5001 19C10.326 19 10.1594 18.9686 10.004 18.9141C10.0028 18.9426 10.0001 18.9712 10.0001 19C10.0001 20.1046 10.8955 21 12.0001 21C13.1046 21 14.0001 20.1045 14.0001 19C14.0001 17.8955 13.1046 17 12.0001 17C11.9713 17 11.9426 17.0027 11.9141 17.0039Z" fill="#8A8C90" transform="translate(0, -7)"/>
                       </svg>
@@ -4318,7 +4318,7 @@ export default function ActivitiesPage() {
                   </div>
 
                   {/* Stats Cards */}
-                  <div className="flex items-stretch gap-[3px] mb-6">
+                  <div className="grid grid-cols-2 xl:flex xl:items-stretch gap-[3px] mb-6">
                     {/* Tổng sĩ số */}
                     <div className="flex-1 h-[130px] bg-brand rounded-[15px] px-4 py-4 flex flex-col justify-between relative overflow-hidden">
                       <div className="flex items-center justify-between">

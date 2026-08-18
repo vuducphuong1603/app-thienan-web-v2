@@ -202,7 +202,7 @@ export default function ViewStudentPage() {
               <span className="text-xs">Quay trở lại</span>
             </button>
             {/* Title */}
-            <h1 className="text-[40px] font-bold text-black dark:text-white leading-tight">Thông tin thiếu nhi</h1>
+            <h1 className="text-2xl sm:text-3xl lg:text-[40px] font-bold text-black dark:text-white leading-tight">Thông tin thiếu nhi</h1>
           </div>
 
           {/* Action Buttons */}
@@ -220,9 +220,9 @@ export default function ViewStudentPage() {
       {/* Content */}
       <div className="bg-white dark:bg-white/10 mx-6 mb-6 rounded-3xl p-6">
         {/* Personal Information Section */}
-        <div className="flex gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
+        <div className="flex flex-col lg:flex-row gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
           {/* Left side - Section title */}
-          <div className="w-[280px] flex-shrink-0">
+          <div className="w-full lg:w-[280px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black dark:text-white">Thông tin cá nhân</h2>
             <p className="text-xs text-[#666d80] mt-1">
               Thông tin chi tiết về thiếu nhi
@@ -349,8 +349,8 @@ export default function ViewStudentPage() {
         </div>
 
         {/* Contact Section */}
-        <div className="flex gap-6 py-6 border-b border-[#E5E1DC] dark:border-white/10">
-          <div className="w-[280px] flex-shrink-0">
+        <div className="flex flex-col lg:flex-row gap-6 py-6 border-b border-[#E5E1DC] dark:border-white/10">
+          <div className="w-full lg:w-[280px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black dark:text-white">Thông tin liên hệ</h2>
             <p className="text-xs text-[#666d80] mt-1">Thông tin phụ huynh</p>
           </div>
@@ -382,8 +382,8 @@ export default function ViewStudentPage() {
         </div>
 
         {/* Notes Section */}
-        <div className="flex gap-6 py-6 border-b border-[#E5E1DC] dark:border-white/10">
-          <div className="w-[280px] flex-shrink-0">
+        <div className="flex flex-col lg:flex-row gap-6 py-6 border-b border-[#E5E1DC] dark:border-white/10">
+          <div className="w-full lg:w-[280px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black dark:text-white">Ghi chú</h2>
             <p className="text-xs text-[#666d80] mt-1">Ghi chú về thiếu nhi</p>
           </div>
@@ -395,8 +395,8 @@ export default function ViewStudentPage() {
         </div>
 
         {/* Scores Section */}
-        <div className="flex gap-6 pt-6">
-          <div className="w-[280px] flex-shrink-0">
+        <div className="flex flex-col lg:flex-row gap-6 pt-6">
+          <div className="w-full lg:w-[280px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black dark:text-white">Điểm số giáo lý</h2>
             <div className="text-xs text-[#666d80] mt-1">
               <p>Điểm học tập và điểm danh</p>

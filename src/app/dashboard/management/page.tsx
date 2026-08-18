@@ -151,7 +151,7 @@ export default function GLVManagementPage() {
     <div>
       {/* Title */}
       <div className="mb-6">
-        <h1 className="text-[40px] font-bold text-black dark:text-white">Quản lý Thiếu nhi</h1>
+        <h1 className="text-2xl sm:text-3xl lg:text-[40px] font-bold text-black dark:text-white">Quản lý Thiếu nhi</h1>
         <p className="text-sm font-medium text-[#666d80]">
           LỚP {(className || '').toUpperCase()} — {filteredStudents.length} thiếu nhi
         </p>
@@ -160,17 +160,17 @@ export default function GLVManagementPage() {
       {/* Table Container */}
       <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 rounded-2xl">
         {/* Header with Search and Filters */}
-        <div className="px-6 py-4 border-b border-[#E5E1DC]">
-          <div className="flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-4 border-b border-[#E5E1DC]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Search Input */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-1 sm:flex-none items-center gap-2">
               <Search className="w-5 h-5 text-primary-3" />
               <input
                 type="text"
                 placeholder="Tìm kiếm theo tên, mã thiếu nhi,..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-[280px] h-[38px] bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"
+                className="w-full sm:w-[280px] h-[38px] bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"
               />
             </div>
 
@@ -208,7 +208,8 @@ export default function GLVManagementPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto px-6 pb-4">
+        <div className="overflow-x-auto px-4 sm:px-6 pb-4">
+          <div className="min-w-[1060px]">
           {/* Header Bar */}
           <div className="bg-[#E5E1DC] rounded-[15px] h-12 border border-white/60 flex items-center">
             <div className="w-[18%] min-w-[200px] px-4 flex items-center">
@@ -527,6 +528,7 @@ export default function GLVManagementPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

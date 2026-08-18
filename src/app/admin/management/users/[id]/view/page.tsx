@@ -109,9 +109,9 @@ export default function ViewUserPage() {
       {/* Content */}
       <div className="bg-white dark:bg-white/10 rounded-3xl p-6">
         {/* User Info Section */}
-        <div className="flex gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
+        <div className="flex flex-col lg:flex-row gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
           {/* Left Label */}
-          <div className="w-[300px] flex-shrink-0">
+          <div className="w-full lg:w-[300px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black dark:text-white">Thông tin tài khoản</h2>
             <p className="text-sm text-primary-3">Thông tin chi tiết người dùng</p>
           </div>
@@ -210,9 +210,9 @@ export default function ViewUserPage() {
         </div>
 
         {/* Assignment Section */}
-        <div className="flex gap-6 pt-6">
+        <div className="flex flex-col lg:flex-row gap-6 pt-6">
           {/* Left Label */}
-          <div className="w-[300px] flex-shrink-0">
+          <div className="w-full lg:w-[300px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black dark:text-white">Phân công & phụ trách</h2>
             <p className="text-sm text-primary-3">Thông tin ngành và lớp phụ trách</p>
           </div>

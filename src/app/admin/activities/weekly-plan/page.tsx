@@ -104,12 +104,12 @@ export default function WeeklyPlanPage() {
   }
 
   return (
-    <div className="flex gap-5">
+    <div className="flex flex-col lg:flex-row gap-5">
       {/* Left Sidebar - Tab Navigation */}
-      <div className="w-[208px] flex flex-col gap-2">
+      <div className="w-full lg:w-[208px] flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible">
         <Link
           href="/admin/activities"
-          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
+          className="h-[56px] flex-shrink-0 whitespace-nowrap rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-5 lg:pr-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
         >
           <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
             <List className="w-5 h-5 text-brand" />
@@ -119,7 +119,7 @@ export default function WeeklyPlanPage() {
 
         <Link
           href="/admin/activities"
-          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
+          className="h-[56px] flex-shrink-0 whitespace-nowrap rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-5 lg:pr-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
         >
           <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
             <FileText className="w-5 h-5 text-brand" />
@@ -127,7 +127,7 @@ export default function WeeklyPlanPage() {
           <span className="text-base font-semibold text-black dark:text-white opacity-80">Báo cáo</span>
         </Link>
 
-        <div className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] bg-brand">
+        <div className="h-[56px] flex-shrink-0 whitespace-nowrap rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-5 lg:pr-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] bg-brand">
           <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-white/20">
             <CalendarDays className="w-5 h-5 text-white" />
           </div>
@@ -136,7 +136,7 @@ export default function WeeklyPlanPage() {
 
         <Link
           href="/admin/notifications"
-          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
+          className="h-[56px] flex-shrink-0 whitespace-nowrap rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-5 lg:pr-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
         >
           <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
             <Bell className="w-5 h-5 text-brand" />
@@ -146,7 +146,7 @@ export default function WeeklyPlanPage() {
 
         <Link
           href="/admin/alerts"
-          className="h-[56px] rounded-full flex items-center gap-5 px-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
+          className="h-[56px] flex-shrink-0 whitespace-nowrap rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-5 lg:pr-2 shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
         >
           <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
             <ShieldAlert className="w-5 h-5 text-brand" />
@@ -167,7 +167,7 @@ export default function WeeklyPlanPage() {
         </Link>
 
         {/* Title */}
-        <h1 className="text-[40px] font-bold italic text-gray-900 dark:text-white mb-5 leading-tight">
+        <h1 className="text-2xl sm:text-3xl lg:text-[40px] font-bold italic text-gray-900 dark:text-white mb-5 leading-tight">
           Kế hoạch tuần này
         </h1>
 
@@ -194,9 +194,9 @@ export default function WeeklyPlanPage() {
         )}
 
         {/* Controls Row */}
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
           {/* Left: Date + Today Button */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <span className="text-sm font-medium text-gray-900 dark:text-white">
               {formattedDate}
             </span>
@@ -209,7 +209,7 @@ export default function WeeklyPlanPage() {
           </div>
 
           {/* Right: View Toggle + Navigation + Date Range + Add Button */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {/* View Toggle */}
             <div className="flex items-center bg-white dark:bg-white/10 border border-[#E5E1DC] dark:border-white/10 rounded-full overflow-hidden">
               <span className="px-5 py-2 text-sm font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-white/10">

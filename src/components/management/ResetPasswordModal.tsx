@@ -29,7 +29,7 @@ export default function ResetPasswordModal({ isOpen, onClose, onConfirm }: Reset
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl w-[400px] overflow-hidden shadow-xl">
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl w-full max-w-[400px] mx-4 overflow-hidden shadow-xl">
         {/* Body */}
         <div className="p-6 flex flex-col items-center">
           {/* Icon */}

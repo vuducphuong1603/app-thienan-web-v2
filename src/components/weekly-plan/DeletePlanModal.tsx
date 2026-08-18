@@ -36,8 +36,8 @@ export default function DeletePlanModal({ isOpen, onClose, onConfirm, planTitle 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl w-[400px] overflow-hidden shadow-xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl w-full max-w-[400px] overflow-hidden shadow-xl">
         <div className="p-6 flex flex-col items-center">
           {/* Icon */}
           <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">

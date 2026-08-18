@@ -194,7 +194,7 @@ export default function AddStudentPage() {
               <span className="text-xs">Quay trở lại</span>
             </button>
             {/* Title */}
-            <h1 className="text-[40px] font-bold text-black dark:text-white leading-tight">Thêm thiếu nhi</h1>
+            <h1 className="text-2xl sm:text-3xl lg:text-[40px] font-bold text-black dark:text-white leading-tight">Thêm thiếu nhi</h1>
           </div>
 
           {/* Action Buttons */}
@@ -219,9 +219,9 @@ export default function AddStudentPage() {
       {/* Content */}
       <div className="bg-white dark:bg-white/10 mx-6 mb-6 rounded-3xl p-6">
         {/* Personal Information Section */}
-        <div className="flex gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
+        <div className="flex flex-col lg:flex-row gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
           {/* Left side - Section title */}
-          <div className="w-[280px] flex-shrink-0">
+          <div className="w-full lg:w-[280px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black dark:text-white">Thông tin cá nhân</h2>
             <p className="text-xs text-[#666d80] mt-1">
               Xem và cập nhật chi tiết tài khoản, thông tin và nhiều hơn thế nữa
@@ -429,8 +429,8 @@ export default function AddStudentPage() {
         </div>
 
         {/* Notes Section */}
-        <div className="flex gap-6 py-6 border-b border-[#E5E1DC] dark:border-white/10">
-          <div className="w-[280px] flex-shrink-0">
+        <div className="flex flex-col lg:flex-row gap-6 py-6 border-b border-[#E5E1DC] dark:border-white/10">
+          <div className="w-full lg:w-[280px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black dark:text-white">Ghi chú</h2>
             <p className="text-xs text-[#666d80] mt-1">Ghi chú về thiếu nhi</p>
           </div>
@@ -446,8 +446,8 @@ export default function AddStudentPage() {
         </div>
 
         {/* Scores Section */}
-        <div className="flex gap-6 pt-6">
-          <div className="w-[280px] flex-shrink-0">
+        <div className="flex flex-col lg:flex-row gap-6 pt-6">
+          <div className="w-full lg:w-[280px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black dark:text-white">Điểm số giáo lý</h2>
             <div className="text-xs text-[#666d80] mt-1">
               <p>Lưu ý: Điểm điểm danh và điểm tổng sẽ được tính tự động dựa trên:</p>

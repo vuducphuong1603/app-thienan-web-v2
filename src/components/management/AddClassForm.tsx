@@ -82,7 +82,7 @@ export default function AddClassForm({ onBack, onSuccess }: AddClassFormProps) {
         </button>
 
         {/* Title */}
-        <h1 className="text-[40px] font-bold text-black dark:text-white leading-none">Thêm lớp mới</h1>
+        <h1 className="text-2xl sm:text-3xl lg:text-[40px] font-bold text-black dark:text-white leading-none">Thêm lớp mới</h1>
 
         {/* Subtitle */}
         <p className="text-sm text-primary-1">
@@ -96,9 +96,9 @@ export default function AddClassForm({ onBack, onSuccess }: AddClassFormProps) {
         <div className="h-px bg-[#E5E1DC] dark:bg-white/10 w-full" />
 
         {/* Form Fields Row */}
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           {/* Class Name Input */}
-          <div className="flex flex-col gap-1.5 w-[511px]">
+          <div className="flex flex-col gap-1.5 w-full sm:w-[511px]">
             <label className="text-sm font-medium text-black dark:text-white">Tên lớp</label>
             <div
               className={`h-[43px] px-4 bg-white dark:bg-white/10 rounded-full flex items-center ${

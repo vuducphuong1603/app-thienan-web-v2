@@ -165,9 +165,9 @@ export default function UsersPage() {
   return (
     <div className="flex flex-col gap-4">
       {/* Search and Actions Bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Search Input */}
-        <div className="flex items-center gap-2 h-[42px] px-3 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl w-[320px]">
+        <div className="flex items-center gap-2 h-[42px] px-3 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl w-full sm:w-[320px]">
           <Search className="w-5 h-5 text-primary-3" />
           <input
             type="text"
@@ -179,7 +179,7 @@ export default function UsersPage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => setIsImportModalOpen(true)}
             className="flex items-center gap-2 h-[42px] px-4 bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-xl text-sm font-medium text-primary-3 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
@@ -198,7 +198,7 @@ export default function UsersPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         {/* Role Filter */}
         <div className="relative">
           <button
@@ -354,6 +354,8 @@ export default function UsersPage() {
 
       {/* Users Table */}
       <div className="bg-white dark:bg-white/10 border border-[#E5E1DC] rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+        <div className="min-w-[900px]">
         {/* Table Header */}
         <div className="grid grid-cols-[1fr_140px_140px_140px_100px_120px] gap-4 px-4 py-3 bg-[#FAFAFA] dark:bg-white/5 border-b border-[#E5E1DC]">
           <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Người dùng</div>
@@ -460,6 +462,8 @@ export default function UsersPage() {
             ))}
           </div>
         )}
+        </div>
+        </div>
       </div>
 
       {/* Delete User Modal */}

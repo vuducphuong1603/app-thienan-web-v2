@@ -553,7 +553,7 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
     <>
       {/* Notification Toast */}
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
+        <div className={`fixed top-4 left-4 right-4 sm:left-auto z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
           notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
         }`}>
           {notification.type === 'success' ? (
@@ -566,10 +566,10 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
       )}
 
       {/* Header Section */}
-      <div className="px-6 pt-6 pb-4">
-        <div className="flex items-start justify-between gap-4">
+      <div className="px-4 pt-4 pb-4 sm:px-6 sm:pt-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex flex-col gap-1">
-            <h1 className="text-[26px] font-semibold text-black dark:text-white">Điểm danh</h1>
+            <h1 className="text-xl sm:text-[26px] font-semibold text-black dark:text-white">Điểm danh</h1>
             <p className="text-sm font-medium text-[#666d80]">
               {selectedClassId ? `LỚP ${getClassName(selectedClassId).toUpperCase()}` : 'Quét QR để điểm danh ngay, hoặc chọn lớp để điểm danh thủ công'}
               {!dayType && selectedClassId && !isCompensatoryMode && (
@@ -582,7 +582,7 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
           </div>
           <button
             onClick={() => setIsScanModalOpen(true)}
-            className="h-[52px] px-8 bg-[#0F172A] rounded-full flex items-center gap-3 hover:bg-[#1E293B] transition-colors shrink-0"
+            className="h-[52px] px-8 bg-[#0F172A] rounded-full flex items-center justify-center sm:justify-start gap-3 hover:bg-[#1E293B] transition-colors shrink-0"
           >
             <ScanLine className="w-5 h-5 text-white" />
             <span className="text-base font-medium text-white">Quét QR điểm danh</span>
@@ -591,8 +591,8 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
       </div>
 
       {/* Filter Row */}
-      <div className="px-6 pb-5">
-        <div className="flex items-center gap-4">
+      <div className="px-4 sm:px-6 pb-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
           {/* Class Selector */}
           <div className="relative flex-1" data-dropdown>
             <button
@@ -710,7 +710,7 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
 
       {/* Holiday Warning Banner */}
       {currentDateHoliday && selectedClassId && (
-        <div className="mx-6 mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3">
+        <div className="mx-4 sm:mx-6 mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
             <Calendar className="w-4 h-4 text-red-600" />
           </div>
@@ -732,12 +732,12 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
       )}
 
       {/* Content Area */}
-      <div className="px-6 pb-6">
+      <div className="px-4 sm:px-6 pb-6">
         <div className="bg-white dark:bg-white/10 rounded-3xl min-h-[580px]">
           {!selectedClassId || students.length === 0 ? (
             /* Empty State */
             <div className="flex flex-col items-center justify-center h-[580px]">
-              <div className="bg-[#f6f6f6] dark:bg-white/5 rounded-2xl px-10 py-6 flex flex-col items-center gap-2">
+              <div className="bg-[#f6f6f6] dark:bg-white/5 rounded-2xl px-6 sm:px-10 py-6 mx-4 flex flex-col items-center gap-2">
                 <svg className="w-12 h-12" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <rect x="3" y="6" width="30" height="27" rx="3" stroke="#f6f6f6" strokeWidth="2" fill="#f6f6f6"/>
                   <path d="M3 12H33" stroke="#666d80" strokeWidth="2"/>
@@ -751,16 +751,16 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
                   <rect x="22" y="22" width="6" height="4" rx="1" fill="#666d80"/>
                   <rect x="8" y="28" width="6" height="4" rx="1" fill="#666d80"/>
                 </svg>
-                <p className="text-sm text-black dark:text-white">
+                <p className="text-sm text-black dark:text-white text-center">
                   {selectedClassId ? 'Nhấn "Tải dữ liệu" hoặc chọn ngày trên lịch để xem danh sách' : 'Chọn lớp để bắt đầu điểm danh'}
                 </p>
               </div>
             </div>
           ) : (
             /* Student List */
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {/* Stats Row */}
-              <div className="flex items-stretch gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 items-stretch gap-4 mb-6">
                 {/* Có mặt / Đã bổ sung Card */}
                 <div className={`h-[130px] flex-1 rounded-[18px] p-5 flex flex-col justify-between relative overflow-hidden ${
                   isCompensatoryMode ? 'bg-blue-500' : 'bg-brand'
@@ -921,7 +921,8 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
               </div>
 
               {/* Student List */}
-              <div className="space-y-0">
+              <div className="overflow-x-auto">
+              <div className="space-y-0 min-w-[760px]">
                 {loading ? (
                   <div className="flex items-center justify-center py-16">
                     <svg className="animate-spin h-8 w-8 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1196,6 +1197,7 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
                     </div>
                   ))
                 )}
+              </div>
               </div>
             </div>
           )}

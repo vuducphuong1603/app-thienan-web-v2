@@ -197,8 +197,8 @@ export default function StudentsPage() {
   return (
     <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 rounded-2xl">
       {/* Header with Search and Filters */}
-      <div className="px-6 py-4 border-b border-[#E5E1DC]">
-        <div className="flex items-center justify-between">
+      <div className="px-4 sm:px-6 py-4 border-b border-[#E5E1DC]">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {/* Search Input */}
           <div className="flex items-center gap-2">
             <Search className="w-5 h-5 text-primary-3" />
@@ -207,12 +207,12 @@ export default function StudentsPage() {
               placeholder="Tìm kiếm theo tên, mã thiếu nhi,..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-[280px] h-[38px] bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"
+              className="w-full lg:w-[280px] h-[38px] bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"
             />
           </div>
 
           {/* Filters and Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Class Filter */}
             <div className="relative">
               <button
@@ -331,7 +331,8 @@ export default function StudentsPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto px-6 pb-4">
+      <div className="overflow-x-auto px-4 sm:px-6 pb-4">
+        <div className="min-w-[1200px]">
         {/* Header Bar */}
         <div className="bg-[#E5E1DC] rounded-[15px] h-12 border border-white/60 flex items-center">
           <div className="w-[15%] min-w-[180px] px-4 flex items-center">
@@ -722,6 +723,7 @@ export default function StudentsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Import Modal */}

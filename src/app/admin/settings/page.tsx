@@ -650,9 +650,9 @@ export default function SettingsPage() {
   const renderPersonalInfoContent = () => (
     <>
       {/* Personal Information Section */}
-      <div className="border-b border-primary-4 dark:border-white/10 p-6 flex gap-6">
+      <div className="border-b border-primary-4 dark:border-white/10 p-4 sm:p-6 flex flex-col lg:flex-row gap-6">
         {/* Section Header */}
-        <div className="w-[300px] flex-shrink-0">
+        <div className="w-full lg:w-[300px] flex-shrink-0">
           <h2 className="text-lg font-bold text-white mb-2">Thông tin cá nhân</h2>
           <p className="text-xs text-primary-3 leading-relaxed">
             Xem và cập nhật chi tiết tài khoản, thông tin và nhiều hơn thế nữa
@@ -719,8 +719,8 @@ export default function SettingsPage() {
           </div>
 
           {/* Form Row 1: Saint Name + Full Name */}
-          <div className="flex gap-3">
-            <div className="w-[297px] flex flex-col gap-1.5">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="w-full sm:w-[297px] flex flex-col gap-1.5">
               <label className="text-sm font-medium">
                 <span className="text-primary-3">Tên thánh </span>
                 <span className="text-complementary-1">*</span>
@@ -749,8 +749,8 @@ export default function SettingsPage() {
           </div>
 
           {/* Form Row 2: Phone + Role */}
-          <div className="flex gap-3">
-            <div className="w-[297px] flex flex-col gap-1.5">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="w-full sm:w-[297px] flex flex-col gap-1.5">
               <label className="text-sm font-medium">
                 <span className="text-primary-3">Số điện thoại </span>
                 <span className="text-complementary-1">*</span>
@@ -795,9 +795,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Privacy Section */}
-      <div className="p-6 flex gap-6">
+      <div className="p-4 sm:p-6 flex flex-col lg:flex-row gap-6">
         {/* Section Header */}
-        <div className="w-[300px] flex-shrink-0">
+        <div className="w-full lg:w-[300px] flex-shrink-0">
           <h2 className="text-lg font-bold text-black dark:text-white">Quyền riêng tư</h2>
         </div>
 
@@ -851,9 +851,9 @@ export default function SettingsPage() {
 
   // Render Password Change Content
   const renderPasswordContent = () => (
-    <div className="p-6 flex gap-6">
+    <div className="p-4 sm:p-6 flex flex-col lg:flex-row gap-6">
       {/* Section Header */}
-      <div className="w-[300px] flex-shrink-0">
+      <div className="w-full lg:w-[300px] flex-shrink-0">
         <h2 className="text-lg font-bold text-black mb-2">Đổi mật khẩu</h2>
         <p className="text-xs text-primary-3 leading-relaxed">
           Xem và thay đổi mật khẩu của bạn
@@ -960,9 +960,9 @@ export default function SettingsPage() {
 
     return (
       <>
-      <div className="p-6 flex gap-6">
+      <div className="p-4 sm:p-6 flex flex-col lg:flex-row gap-6">
         {/* Section Header */}
-        <div className="w-[300px] flex-shrink-0">
+        <div className="w-full lg:w-[300px] flex-shrink-0">
           <h2 className="text-lg font-bold text-black mb-2">Quản lý năm học</h2>
           <p className="text-xs text-primary-3 leading-relaxed">
             Xem và chỉnh sửa thông tin năm học
@@ -1006,7 +1006,7 @@ export default function SettingsPage() {
           ) : (
             <div className="bg-white border border-primary-4 rounded-2xl overflow-hidden">
               {/* Card Header */}
-              <div className="bg-white border-b border-primary-4 p-4 flex items-center justify-between">
+              <div className="bg-white border-b border-primary-4 p-4 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-base font-semibold text-black">Năm học hiện tại</h3>
                 {isEditingSchoolYear ? (
                   <div className="flex items-center gap-2">
@@ -1069,7 +1069,7 @@ export default function SettingsPage() {
                     </div>
 
                     {/* Date Fields */}
-                    <div className="flex gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3">
                       <div className="flex-1 flex flex-col gap-1.5">
                         <label className="text-sm font-medium text-primary-3">
                           Ngày bắt đầu
@@ -1097,7 +1097,7 @@ export default function SettingsPage() {
 
                     {/* Calculated Info */}
                     {schoolYearForm.startDate && schoolYearForm.endDate && (
-                      <div className="pt-2 border-t border-primary-4 flex gap-6">
+                      <div className="pt-2 border-t border-primary-4 flex flex-col sm:flex-row gap-2 sm:gap-6">
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 rounded-full bg-brand/20 flex items-center justify-center">
                             <Check className="w-3 h-3 text-brand" />
@@ -1129,7 +1129,7 @@ export default function SettingsPage() {
                     <div className="h-px bg-primary-4" />
 
                     {/* Features */}
-                    <div className="flex gap-6">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-6">
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded-full bg-brand/20 flex items-center justify-center">
                           <Check className="w-3 h-3 text-brand" />
@@ -1170,9 +1170,9 @@ export default function SettingsPage() {
 
       {/* Holiday Management Section */}
       {currentSchoolYear && (
-        <div className="p-6 flex gap-6 border-t border-primary-4">
+        <div className="p-4 sm:p-6 flex flex-col lg:flex-row gap-6 border-t border-primary-4">
           {/* Section Header */}
-          <div className="w-[300px] flex-shrink-0">
+          <div className="w-full lg:w-[300px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black mb-2">Ngày nghỉ lễ</h2>
             <p className="text-xs text-primary-3 leading-relaxed">
               Xem và quản lý các ngày nghỉ lễ trong năm học. Ngày nghỉ sẽ được trừ khi tính điểm chuyên cần.
@@ -1208,7 +1208,7 @@ export default function SettingsPage() {
           <div className="flex-1">
             <div className="bg-white border border-primary-4 rounded-2xl overflow-hidden">
               {/* Card Header */}
-              <div className="bg-white border-b border-primary-4 p-4 flex items-center justify-between">
+              <div className="bg-white border-b border-primary-4 p-4 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-base font-semibold text-black">Danh sách ngày nghỉ ({holidays.length})</h3>
                 {!isAddingHoliday && (
                   <button
@@ -1225,7 +1225,7 @@ export default function SettingsPage() {
               {isAddingHoliday && (
                 <div className="p-4 bg-gray-50 border-b border-primary-4">
                   <div className="flex flex-col gap-3">
-                    <div className="flex gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3">
                       <div className="flex-1 flex flex-col gap-1.5">
                         <label className="text-xs font-medium text-primary-3">Ngày nghỉ</label>
                         <CustomDatePicker
@@ -1245,7 +1245,7 @@ export default function SettingsPage() {
                           placeholder="VD: Tết Nguyên Đán"
                         />
                       </div>
-                      <div className="w-[140px] flex flex-col gap-1.5">
+                      <div className="w-full sm:w-[140px] flex flex-col gap-1.5">
                         <label className="text-xs font-medium text-primary-3">Loại ngày</label>
                         <select
                           value={holidayForm.dayType}
@@ -1313,7 +1313,7 @@ export default function SettingsPage() {
                       return (
                         <div
                           key={holiday.id}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group cursor-pointer"
+                          className="flex flex-wrap items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group cursor-pointer"
                           onClick={() => startEditHoliday(holiday)}
                         >
                           <div className="w-[90px] text-sm font-medium text-black">{dateFormatted}</div>
@@ -1346,9 +1346,9 @@ export default function SettingsPage() {
 
   // Render Notifications Content
   const renderNotificationsContent = () => (
-    <div className="p-6 flex gap-6">
+    <div className="p-4 sm:p-6 flex flex-col lg:flex-row gap-6">
       {/* Section Header */}
-      <div className="w-[300px] flex-shrink-0">
+      <div className="w-full lg:w-[300px] flex-shrink-0">
         <h2 className="text-lg font-bold text-black mb-3">Cài đặt thông báo</h2>
         <p className="text-xs text-primary-3 leading-relaxed">
           Nhận thông báo về yêu cầu mới, cập nhật xử lý yêu cầu và các thông báo báo cáo định kỳ, báo cáo hệ thống
@@ -1454,7 +1454,7 @@ export default function SettingsPage() {
       {/* Security Settings Modal */}
       {isSecurityModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl w-[480px] max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-[480px] mx-4 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="p-6 border-b border-primary-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-black dark:text-white">Cài đặt bảo mật</h3>
@@ -1549,9 +1549,9 @@ export default function SettingsPage() {
       )}
 
       {/* Top Section */}
-      <div className="p-6 flex gap-6 border-b border-primary-4">
+      <div className="p-4 sm:p-6 flex flex-col lg:flex-row gap-6 border-b border-primary-4">
         {/* Section Header */}
-        <div className="w-[300px] flex-shrink-0">
+        <div className="w-full lg:w-[300px] flex-shrink-0">
           <h2 className="text-lg font-bold text-black dark:text-white mb-2">Cài đặt hệ thống</h2>
           <p className="text-xs text-primary-3 leading-relaxed">
             Xem và cài đặt chế độ, thông tin bảo mật và sao lưu dữ liệu
@@ -1563,7 +1563,7 @@ export default function SettingsPage() {
           {/* Security Card */}
           <div className="bg-white dark:bg-gray-800 border border-primary-4 dark:border-gray-700 rounded-2xl overflow-hidden">
             {/* Card Header */}
-            <div className="bg-white dark:bg-gray-800 border-b border-primary-4 dark:border-gray-700 p-4 flex items-center justify-between rounded-t-lg">
+            <div className="bg-white dark:bg-gray-800 border-b border-primary-4 dark:border-gray-700 p-4 flex flex-wrap items-center justify-between gap-2 rounded-t-lg">
               <h3 className="text-base font-semibold text-black dark:text-white">Bảo mật</h3>
               <button
                 onClick={() => setIsSecurityModalOpen(true)}
@@ -1574,7 +1574,7 @@ export default function SettingsPage() {
             </div>
             {/* Card Body */}
             <div className="p-4">
-              <div className="flex gap-1">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-1">
                 <div className="flex-1 flex items-center gap-2">
                   <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
                     securitySettings.safeMode ? 'bg-brand/20' : 'bg-gray-200'
@@ -1585,7 +1585,7 @@ export default function SettingsPage() {
                     {securitySettings.safeMode ? 'Hệ thống đang chạy ở chế độ an toàn' : 'Chế độ an toàn đã tắt'}
                   </span>
                 </div>
-                <div className="w-[223px] flex items-center gap-2">
+                <div className="w-full sm:w-[223px] flex items-center gap-2">
                   <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
                     securitySettings.dataEncryption ? 'bg-brand/20' : 'bg-gray-200'
                   }`}>
@@ -1602,7 +1602,7 @@ export default function SettingsPage() {
           {/* Backup Card */}
           <div className="bg-white dark:bg-gray-800 border border-primary-4 dark:border-gray-700 rounded-2xl overflow-hidden">
             {/* Card Header */}
-            <div className="bg-white dark:bg-gray-800 border-b border-primary-4 dark:border-gray-700 p-4 flex items-center justify-between rounded-t-lg">
+            <div className="bg-white dark:bg-gray-800 border-b border-primary-4 dark:border-gray-700 p-4 flex flex-wrap items-center justify-between gap-2 rounded-t-lg">
               <h3 className="text-base font-semibold text-black dark:text-white">Sao lưu dữ liệu</h3>
               <button
                 onClick={handleBackupData}
@@ -1628,7 +1628,7 @@ export default function SettingsPage() {
               <div className="h-px bg-primary-4 dark:bg-gray-700" />
 
               {/* Features */}
-              <div className="flex gap-1">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-1">
                 <div className="flex-1 flex items-center gap-2">
                   <div className="w-4 h-4 rounded-full bg-brand/20 flex items-center justify-center flex-shrink-0">
                     <Check className="w-3 h-3 text-brand" />
@@ -1648,8 +1648,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Display Settings Section */}
-      <div className="p-6 flex gap-[143px]">
-        <h2 className="text-lg font-bold text-black dark:text-white w-[172px]">Cài đặt hiển thị</h2>
+      <div className="p-4 sm:p-6 flex flex-col lg:flex-row gap-6 lg:gap-[143px]">
+        <h2 className="text-lg font-bold text-black dark:text-white lg:w-[172px]">Cài đặt hiển thị</h2>
 
         <div className="flex-1">
           <div className="flex items-center justify-between">
@@ -1705,12 +1705,12 @@ export default function SettingsPage() {
       />
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center px-6 py-6">
+      <main className="flex-1 flex flex-col items-center px-4 sm:px-6 py-6">
         <div className="w-full max-w-[1104px] flex flex-col gap-6">
           {/* Title and Action Buttons */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-[22px] font-semibold text-black dark:text-white">Cài đặt</h1>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-4">
+              <h1 className="text-xl sm:text-[22px] font-semibold text-black dark:text-white">Cài đặt</h1>
               {/* Save Message */}
               {saveMessage && (
                 <div className={`px-4 py-2 rounded-lg text-sm font-medium ${
@@ -1747,15 +1747,15 @@ export default function SettingsPage() {
           </div>
 
           {/* Settings Card */}
-          <div className="bg-white dark:bg-gray-800 border border-primary-4 dark:border-gray-700 rounded-2xl overflow-hidden flex">
+          <div className="bg-white dark:bg-gray-800 border border-primary-4 dark:border-gray-700 rounded-2xl overflow-hidden flex flex-col lg:flex-row">
             {/* Sidebar */}
-            <div className="w-[200px] border-r border-primary-4 dark:border-gray-700 pt-7 pb-4 px-4 flex-shrink-0">
-              <nav className="flex flex-col">
+            <div className="w-full lg:w-[200px] border-b lg:border-b-0 lg:border-r border-primary-4 dark:border-gray-700 pt-4 lg:pt-7 pb-4 px-4 flex-shrink-0">
+              <nav className="flex lg:flex-col overflow-x-auto lg:overflow-x-visible gap-1 lg:gap-0">
                 {(isAdmin ? settingsTabs : settingsTabs.filter(t => t.id === 'personal' || t.id === 'password')).map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors ${
+                    className={`px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors whitespace-nowrap flex-shrink-0 ${
                       activeTab === tab.id
                         ? 'bg-[#f6f6f6] dark:bg-gray-700 border border-primary-4 dark:border-gray-600 text-primary-3 dark:text-gray-300'
                         : 'text-primary-3 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -1776,7 +1776,7 @@ export default function SettingsPage() {
       </main>
 
       {/* Footer */}
-      <footer className="px-8 py-8 flex items-center justify-between">
+      <footer className="px-4 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-0">
         <p className="text-xs text-black dark:text-white">
           &copy; 2025 Giáo Xứ Thiên Ân. All right reserved.
         </p>

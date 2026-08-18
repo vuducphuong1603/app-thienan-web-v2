@@ -349,7 +349,7 @@ export default function CompensatoryAttendancePage() {
 
       {/* Notification */}
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
+        <div className={`fixed top-4 right-4 left-4 sm:left-auto z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
           notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
         }`}>
           {notification.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
@@ -480,7 +480,7 @@ export default function CompensatoryAttendancePage() {
 
       {/* Stats */}
       {selectedClassId && isValidDay && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <div className="bg-white dark:bg-white/10 rounded-xl shadow-sm p-4">
             <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalStudents}</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">Tổng số thiếu nhi</p>
@@ -523,7 +523,7 @@ export default function CompensatoryAttendancePage() {
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-white/10">
             {filteredStudents.map((student) => (
-              <div key={student.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-white/5 gap-3">
+              <div key={student.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50 dark:hover:bg-white/5 gap-3">
                 <div className="flex items-center gap-3">
                   {/* Avatar */}
                   <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-white/20 flex items-center justify-center overflow-hidden">
@@ -550,7 +550,7 @@ export default function CompensatoryAttendancePage() {
                 </div>
 
                 {/* Status and action */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 self-end sm:self-auto">
                   {student.has_thursday_attendance ? (
                     <div className="flex items-center gap-2 text-green-600">
                       <CheckCircle2 className="w-5 h-5" />

@@ -229,9 +229,9 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
       {/* Form Container */}
       <div className="bg-white dark:bg-[#1a1a1a] rounded-3xl p-6">
         {/* Account Info Section */}
-        <div className="flex gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
+        <div className="flex flex-col lg:flex-row gap-6 pb-6 border-b border-[#E5E1DC] dark:border-white/10">
           {/* Left Label */}
-          <div className="w-[300px] flex-shrink-0">
+          <div className="w-full lg:w-[300px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black dark:text-white">Thông tin tài khoản</h2>
             <p className="text-sm text-primary-3">Cập nhật thông tin người dùng</p>
           </div>
@@ -425,9 +425,9 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
         </div>
 
         {/* Assignment Section */}
-        <div className="flex gap-6 pt-6">
+        <div className="flex flex-col lg:flex-row gap-6 pt-6">
           {/* Left Label */}
-          <div className="w-[300px] flex-shrink-0">
+          <div className="w-full lg:w-[300px] flex-shrink-0">
             <h2 className="text-lg font-bold text-black dark:text-white">Phân công & phụ trách</h2>
             <p className="text-sm text-primary-3">Vai trò</p>
           </div>
