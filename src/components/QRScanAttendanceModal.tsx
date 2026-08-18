@@ -56,6 +56,7 @@ export default function QRScanAttendanceModal({
 
   // Điểm danh thủ công
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
   const [searchResults, setSearchResults] = useState<ManualStudent[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [manualMarking, setManualMarking] = useState<string | null>(null)
@@ -394,6 +395,7 @@ export default function QRScanAttendanceModal({
     scanLockRef.current = false
     recentScansRef.current.clear()
     setSearchQuery('')
+    setSearchFocused(false)
     setSearchResults([])
     setSearchLoading(false)
     setManualMarking(null)
@@ -500,6 +502,9 @@ export default function QRScanAttendanceModal({
 
   if (!isOpen) return null
 
+  // Trên mobile: khi đang tìm kiếm thì thu gọn camera để ô tìm + kết quả không bị bàn phím che
+  const searchActive = searchFocused || searchQuery.trim().length > 0
+
   const { dateStr, dayType } = scanTarget.current
   const dateDisplay = dateStr.split('-').reverse().join('/')
 
@@ -510,10 +515,10 @@ export default function QRScanAttendanceModal({
     : 'border-white'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex sm:items-center sm:justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
 
-      <div className="relative bg-[#0F172A] rounded-[24px] w-[520px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] overflow-y-auto p-6 shadow-2xl">
+      <div className="relative bg-[#0F172A] w-full h-full overflow-y-auto p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:rounded-[24px] sm:w-[520px] sm:h-auto sm:max-w-[calc(100vw-32px)] sm:max-h-[calc(100vh-32px)] sm:p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -552,8 +557,8 @@ export default function QRScanAttendanceModal({
           </div>
         ) : (
           <>
-            {/* Camera */}
-            <div className="relative w-full aspect-[4/3] rounded-[16px] overflow-hidden bg-black mb-4">
+            {/* Camera - thu gọn trên mobile khi đang tìm kiếm để bàn phím không che kết quả */}
+            <div className={`relative w-full aspect-[4/3] rounded-[16px] overflow-hidden bg-black mb-4 ${searchActive ? 'hidden sm:block' : ''}`}>
               <video
                 ref={videoRef}
                 autoPlay
@@ -625,6 +630,8 @@ export default function QRScanAttendanceModal({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
                   placeholder="Tìm tên, tên thánh, mã thiếu nhi..."
                   autoCorrect="off"
                   className="flex-1 bg-transparent text-sm text-white placeholder-[#64748B] outline-none"
@@ -652,7 +659,7 @@ export default function QRScanAttendanceModal({
               )}
 
               {searchResults.length > 0 && (
-                <div className="space-y-2 mt-2 max-h-[240px] overflow-y-auto pr-1">
+                <div className="space-y-2 mt-2 max-h-[45dvh] sm:max-h-[240px] overflow-y-auto pr-1">
                   {searchResults.map((student) => {
                     const isMarked = markedStudents.has(student.id)
                     const isMarking = manualMarking === student.id
@@ -693,12 +700,12 @@ export default function QRScanAttendanceModal({
               )}
             </div>
 
-            {/* Lịch sử quét */}
-            <div className="flex items-center justify-between mb-2">
+            {/* Lịch sử quét - ẩn trên mobile khi đang tìm kiếm */}
+            <div className={`items-center justify-between mb-2 ${searchActive ? 'hidden sm:flex' : 'flex'}`}>
               <span className="text-sm font-bold text-white">Lịch sử điểm danh</span>
               <span className="text-xs text-[#94A3B8]">Hôm nay: {scanCount}</span>
             </div>
-            <div className="space-y-2">
+            <div className={`space-y-2 ${searchActive ? 'hidden sm:block' : ''}`}>
               {scanHistory.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-5">
                   <ScanLine className="w-6 h-6 text-[#475569]" />

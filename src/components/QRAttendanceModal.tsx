@@ -114,7 +114,7 @@ export default function QRAttendanceModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white dark:bg-[#1a1a1a] rounded-[20px] w-[400px] p-6 shadow-xl">
+      <div className="relative bg-white dark:bg-[#1a1a1a] rounded-[20px] w-full max-w-[400px] mx-4 p-6 shadow-xl">
         {/* Close button */}
         <button
           onClick={handleClose}
