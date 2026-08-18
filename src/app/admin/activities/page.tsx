@@ -1819,208 +1819,81 @@ export default function ActivitiesPage() {
     }
   }
 
-  // Export Excel
+  // Export Excel (định dạng theo file mẫu sổ điểm: logo, Times New Roman, header màu, viền)
   const handleExportExcel = async () => {
     try {
-      const XLSX = await import('xlsx')
-      const wb = XLSX.utils.book_new()
+      const {
+        buildScoreReportWorkbook,
+        buildAttendanceWorkbook,
+        listAttendanceDates,
+        fetchLogoBase64,
+      } = await import('@/lib/score-report-excel')
       const today = new Date().toISOString().split('T')[0]
       const clsName = getReportClassName(reportClassId)
+      const logoBase64 = await fetchLogoBase64()
+
+      const downloadBuffer = (buffer: ArrayBuffer, fileName: string) => {
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
 
       if (reportType === 'attendance') {
-        const header = ['STT', 'Tên thánh', 'Họ đệm', 'Tên']
-        reportDates.forEach(date => {
-          const holiday = reportHolidayMap.get(date)
-          header.push(holiday ? `${formatShortDate(date)} (Nghỉ ${holiday.name})` : formatShortDate(date))
-        })
+        const title = reportAttendanceType === 'thu5'
+          ? 'ĐIỂM DANH ĐI LỄ THỨ NĂM'
+          : reportAttendanceType === 'cn'
+            ? 'ĐIỂM DANH HỌC GIÁO LÝ CHÚA NHẬT'
+            : 'BẢNG ĐIỂM DANH'
+        const holidayNames = new Map<string, string>()
+        reportHolidayMap.forEach((holiday, date) => holidayNames.set(date, holiday.name))
 
-        const rows = reportStudents.map((student, index) => {
-          const nameParts = student.full_name.split(' ')
-          const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
-          const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
-          const row: (string | number)[] = [index + 1, student.saint_name || '', familyMiddleName, givenName]
-          reportDates.forEach(date => {
-            if (reportHolidayMap.has(date)) {
-              row.push('Nghỉ')
-            } else {
-              const status = student.attendance[date]
-              row.push(status === 'present' ? 'x' : status === 'absent' ? 'v' : '')
-            }
-          })
-          return row
-        })
+        // Hiện đủ mọi ngày T5/CN của cả kỳ đã chọn, kể cả ngày chưa điểm danh
+        let fromDate = reportFromDate
+        let toDate = reportToDate
+        if (reportTimeFilterMode === 'week' && reportWeekStart && reportWeekEnd) {
+          fromDate = reportWeekStart
+          toDate = reportWeekEnd
+        } else if (reportTimeFilterMode === 'month') {
+          fromDate = new Date(reportYear, reportMonth, 1).toISOString().split('T')[0]
+          toDate = new Date(reportYear, reportMonth + 1, 0).toISOString().split('T')[0]
+        }
+        const fullDates = (fromDate && toDate)
+          ? Array.from(new Set([
+              ...listAttendanceDates(fromDate, toDate, reportAttendanceType),
+              ...reportDates,
+            ])).sort()
+          : reportDates
 
-        const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
-        ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, ...reportDates.map(() => ({ wch: 8 }))]
-        XLSX.utils.book_append_sheet(wb, ws, 'Điểm danh')
+        const buffer = await buildAttendanceWorkbook({
+          className: clsName,
+          title,
+          dates: fullDates,
+          formatDate: (date) => {
+            const holiday = reportHolidayMap.get(date)
+            return holiday ? `${formatShortDate(date)} (Nghỉ ${holiday.name})` : formatShortDate(date)
+          },
+          holidayNames,
+          students: reportStudents,
+          logoBase64,
+        })
 
         const typeLabel = reportAttendanceType === 'thu5' ? '_thu5' : reportAttendanceType === 'cn' ? '_cn' : ''
-        const fileName = `diem_danh_${clsName}${typeLabel}_${today}.xlsx`
-
-        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = fileName
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+        downloadBuffer(buffer, `diem_danh_${clsName}${typeLabel}_${today}.xlsx`)
       } else {
-        const anySelected = Object.values(scoreColumns).some(v => v)
-        const showAll = !anySelected
-        const showDiLeT5 = showAll || scoreColumns.diLeT5
-        const showHocGL = showAll || scoreColumns.hocGL
-        const showTbThu5 = showAll || scoreColumns.tbThu5
-        const showTbGL = showAll || scoreColumns.tbGL
-        const show45HK1 = showAll || scoreColumns.score45HK1
-        const showExamHK1 = showAll || scoreColumns.scoreExamHK1
-        const show45HK2 = showAll || scoreColumns.score45HK2
-        const showExamHK2 = showAll || scoreColumns.scoreExamHK2
-        const showDiemTong = showAll || scoreColumns.diemTong
-        const showKetQua = scoreColumns.ketQua
-
-        const header: string[] = ['STT', 'Tên thánh', 'Họ và tên']
-        if (showDiLeT5) header.push('Đi Lễ T5')
-        if (showHocGL) header.push('Học GL')
-        if (showTbThu5) header.push('TB Thứ 5')
-        if (showTbGL) header.push('TB Giáo lý')
-        if (show45HK1) header.push('45p HK1')
-        if (showExamHK1) header.push('Thi HK1')
-        if (show45HK1 || showExamHK1) header.push('TB HK1')
-        if (show45HK2) header.push('45p HK2')
-        if (showExamHK2) header.push('Thi HK2')
-        if (show45HK2 || showExamHK2) header.push('TB HK2')
-        if (showDiemTong) header.push('TB Năm')
-        if (showKetQua) header.push('Kết quả')
-
-        const getKetQua = (s: ReportStudentScore) => {
-          const scoreThu5 = s.score_di_le_t5
-          const scoreCn = s.score_hoc_gl
-          const s45hk1 = s.score_45_hk1
-          const s45hk2 = s.score_45_hk2
-          const examHk1 = s.score_exam_hk1
-          const examHk2 = s.score_exam_hk2
-
-          const avgCatechism = (s45hk1 !== null && s45hk2 !== null && examHk1 !== null && examHk2 !== null)
-            ? (s45hk1 + s45hk2 + examHk1 * 2 + examHk2 * 2) / 6
-            : null
-          const avgAttendance = (scoreThu5 !== null && scoreCn !== null)
-            ? scoreThu5 + scoreCn
-            : null
-          const totalAvg = (avgCatechism !== null && avgAttendance !== null)
-            ? avgCatechism * 0.6 + avgAttendance * 0.4
-            : null
-
-          if (
-            (scoreThu5 !== null && scoreThu5 < 2.5) ||
-            (scoreCn !== null && scoreCn < 2.5) ||
-            (avgCatechism !== null && avgCatechism < 2.5) ||
-            (totalAvg !== null && totalAvg < 5)
-          ) {
-            return 'Ở lại'
-          }
-          return 'Đạt'
-        }
-
-        const rows = reportScoreStudents.map((student, index) => {
-          const row: (string | number)[] = [index + 1, student.saint_name || '', student.full_name]
-          if (showDiLeT5) row.push(student.score_di_le_t5 ?? '')
-          if (showHocGL) row.push(student.score_hoc_gl ?? '')
-          if (showTbThu5) row.push(student.avg_thu5 ?? '')
-          if (showTbGL) row.push(student.avg_gl ?? '')
-          if (show45HK1) row.push(student.score_45_hk1 ?? '')
-          if (showExamHK1) row.push(student.score_exam_hk1 ?? '')
-          if (show45HK1 || showExamHK1) row.push(student.average_hk1 ?? '')
-          if (show45HK2) row.push(student.score_45_hk2 ?? '')
-          if (showExamHK2) row.push(student.score_exam_hk2 ?? '')
-          if (show45HK2 || showExamHK2) row.push(student.average_hk2 ?? '')
-          if (showDiemTong) row.push(student.average_year ?? '')
-          if (showKetQua) row.push(getKetQua(student))
-          return row
+        const buffer = await buildScoreReportWorkbook({
+          className: clsName,
+          schoolYearName: reportSchoolYear?.name || '',
+          students: reportScoreStudents,
+          selection: scoreColumns,
+          logoBase64,
         })
-
-        const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
-
-        // Track column indices for Excel formulas
-        const colMap: Record<string, number> = {}
-        let ci = 3 // after STT(0), Tên thánh(1), Họ và tên(2)
-        if (showDiLeT5) colMap.diLeT5 = ci++
-        if (showHocGL) colMap.hocGL = ci++
-        if (showTbThu5) colMap.tbThu5 = ci++
-        if (showTbGL) colMap.tbGL = ci++
-        if (show45HK1) colMap.s45HK1 = ci++
-        if (showExamHK1) colMap.examHK1 = ci++
-        if (show45HK1 || showExamHK1) colMap.tbHK1 = ci++
-        if (show45HK2) colMap.s45HK2 = ci++
-        if (showExamHK2) colMap.examHK2 = ci++
-        if (show45HK2 || showExamHK2) colMap.tbHK2 = ci++
-        if (showDiemTong) colMap.tbNam = ci++
-        if (showKetQua) colMap.ketQua = ci++
-
-        // Column index to Excel letter (A, B, ... Z, AA, AB, ...)
-        const CL = (c: number): string => {
-          let s = '', n = c
-          while (n >= 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1 }
-          return s
-        }
-
-        // Add Excel formulas for calculated columns
-        reportScoreStudents.forEach((_, idx) => {
-          const row = idx + 2 // Excel row (header=1, first data=2)
-          const r = idx + 1   // 0-indexed sheet row
-
-          // TB HK1 = (45p_HK1 + Thi_HK1 * 2) / 3
-          if (colMap.tbHK1 !== undefined && colMap.s45HK1 !== undefined && colMap.examHK1 !== undefined) {
-            const ref = XLSX.utils.encode_cell({ r, c: colMap.tbHK1 })
-            ws[ref] = { f: `(${CL(colMap.s45HK1)}${row}+${CL(colMap.examHK1)}${row}*2)/3`, t: 'n' }
-          }
-
-          // TB HK2 = (45p_HK2 + Thi_HK2 * 2) / 3
-          if (colMap.tbHK2 !== undefined && colMap.s45HK2 !== undefined && colMap.examHK2 !== undefined) {
-            const ref = XLSX.utils.encode_cell({ r, c: colMap.tbHK2 })
-            ws[ref] = { f: `(${CL(colMap.s45HK2)}${row}+${CL(colMap.examHK2)}${row}*2)/3`, t: 'n' }
-          }
-
-          // TB Năm = (TB_HK1 + TB_HK2 * 2) / 3
-          if (colMap.tbNam !== undefined && colMap.tbHK1 !== undefined && colMap.tbHK2 !== undefined) {
-            const ref = XLSX.utils.encode_cell({ r, c: colMap.tbNam })
-            ws[ref] = { f: `(${CL(colMap.tbHK1)}${row}+${CL(colMap.tbHK2)}${row}*2)/3`, t: 'n' }
-          }
-
-          // Kết quả = IF(OR(T5<2.5, CN<2.5, avgCatechism<2.5, totalAvg<5), "Ở Lại", "")
-          if (colMap.ketQua !== undefined && colMap.diLeT5 !== undefined && colMap.hocGL !== undefined &&
-              colMap.s45HK1 !== undefined && colMap.examHK1 !== undefined &&
-              colMap.s45HK2 !== undefined && colMap.examHK2 !== undefined) {
-            const ref = XLSX.utils.encode_cell({ r, c: colMap.ketQua })
-            const t5 = `${CL(colMap.diLeT5)}${row}`
-            const cn = `${CL(colMap.hocGL)}${row}`
-            const f1 = `${CL(colMap.s45HK1)}${row}`
-            const e1 = `${CL(colMap.examHK1)}${row}`
-            const f2 = `${CL(colMap.s45HK2)}${row}`
-            const e2 = `${CL(colMap.examHK2)}${row}`
-            const avgCat = `(${f1}+${f2}+${e1}*2+${e2}*2)/6`
-            const totalAvg = `${avgCat}*0.6+(${t5}+${cn})*0.4`
-            ws[ref] = { f: `IF(OR(${t5}<2.5,${cn}<2.5,${avgCat}<2.5,${totalAvg}<5),"Ở Lại","")`, t: 's' }
-          }
-        })
-
-        ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 25 }, ...header.slice(3).map(() => ({ wch: 10 }))]
-        XLSX.utils.book_append_sheet(wb, ws, 'Điểm số')
-
-        const fileName = `diem_so_${clsName}_${today}.xlsx`
-
-        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = fileName
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+        downloadBuffer(buffer, `diem_so_${clsName}_${today}.xlsx`)
       }
 
       setExportSuccessMessage('Đã xuất Excel thành công!')
