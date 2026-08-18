@@ -39,6 +39,8 @@ interface AttendanceReportProps {
 interface ScoreColumns {
   diLeT5: boolean
   hocGL: boolean
+  tbThu5: boolean
+  tbGL: boolean
   diemTB: boolean
   score45HK1: boolean
   scoreExamHK1: boolean
@@ -218,6 +220,8 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
   const showAll = !anySelected
   const showDiLeT5 = showAll || scoreColumns?.diLeT5
   const showHocGL = showAll || scoreColumns?.hocGL
+  const showTbThu5 = showAll || scoreColumns?.tbThu5
+  const showTbGL = showAll || scoreColumns?.tbGL
   const show45HK1 = showAll || scoreColumns?.score45HK1
   const showExamHK1 = showAll || scoreColumns?.scoreExamHK1
   const show45HK2 = showAll || scoreColumns?.score45HK2
@@ -263,8 +267,8 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
           <th className="border border-gray-400 px-1 py-2 text-center" colSpan={2}>Họ và tên</th>
           {showDiLeT5 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Đi Lễ<br/>T5</th>}
           {showHocGL && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Học<br/>GL</th>}
-          <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>Thứ 5</th>
-          <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>Giáo lý</th>
+          {showTbThu5 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>Thứ 5</th>}
+          {showTbGL && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>Giáo lý</th>}
           {show45HK1 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">45p<br/>HK1</th>}
           {showExamHK1 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Thi<br/>HK1</th>}
           {(show45HK1 || showExamHK1) && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>HK1</th>}
@@ -297,12 +301,16 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
                   {student.score_hoc_gl !== null ? student.score_hoc_gl : '-'}
                 </td>
               )}
-              <td className="border border-gray-400 px-1 py-2 text-center font-semibold bg-[#e8f5e9]">
-                {student.avg_thu5 !== null ? student.avg_thu5 : '-'}
-              </td>
-              <td className="border border-gray-400 px-1 py-2 text-center font-semibold bg-[#e8f5e9]">
-                {student.avg_gl !== null ? student.avg_gl : '-'}
-              </td>
+              {showTbThu5 && (
+                <td className="border border-gray-400 px-1 py-2 text-center font-semibold bg-[#e8f5e9]">
+                  {student.avg_thu5 !== null ? student.avg_thu5 : '-'}
+                </td>
+              )}
+              {showTbGL && (
+                <td className="border border-gray-400 px-1 py-2 text-center font-semibold bg-[#e8f5e9]">
+                  {student.avg_gl !== null ? student.avg_gl : '-'}
+                </td>
+              )}
               {show45HK1 && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
                   {student.score_45_hk1 !== null ? student.score_45_hk1 : '-'}
