@@ -187,9 +187,9 @@ function groupFill(group: ColumnGroup): ReturnType<typeof fill> | undefined {
 function addSheetHeader(
   ws: import('exceljs').Worksheet,
   wb: import('exceljs').Workbook,
-  opts: { title: string; className: string; totalCols: number; logoBase64?: string; extraInfo?: string }
+  opts: { title: string; className: string; totalCols: number; logoBase64?: string; badgeBase64?: string; extraInfo?: string }
 ): number {
-  const { title, className, logoBase64, extraInfo } = opts
+  const { title, className, logoBase64, badgeBase64, extraInfo } = opts
   // Tiêu đề 20pt cần đủ chỗ: merge tối thiểu 9 cột kể cả khi bảng hẹp hơn
   const totalCols = Math.max(opts.totalCols, 9)
   const orgSpan = Math.min(Math.max(totalCols, 5), 8)
@@ -231,10 +231,20 @@ function addSheetHeader(
   }
   ws.getRow(5).height = 18
 
+  // Như file mẫu: huy hiệu TNTT (cờ đỏ chén thánh) ngoài cùng bên trái,
+  // logo tròn Xứ Đoàn ngay bên cạnh
+  if (badgeBase64) {
+    const badgeId = wb.addImage({ base64: badgeBase64, extension: 'png' })
+    ws.addImage(badgeId, {
+      tl: { col: 0.08, row: 0.15 },
+      ext: { width: 72, height: 90 },
+      editAs: 'absolute',
+    })
+  }
   if (logoBase64) {
     const imgId = wb.addImage({ base64: logoBase64, extension: 'png' })
     ws.addImage(imgId, {
-      tl: { col: 0.1, row: 0.1 },
+      tl: { col: badgeBase64 ? 1.65 : 0.1, row: 0.1 },
       ext: { width: 95, height: 95 },
       editAs: 'absolute',
     })
@@ -249,9 +259,10 @@ export async function buildScoreReportWorkbook(opts: {
   students: ScoreReportStudent[]
   selection: ScoreColumnSelection
   logoBase64?: string
+  badgeBase64?: string
 }): Promise<ArrayBuffer> {
   const ExcelJS = await loadExcelJS()
-  const { className, schoolYearName, students, selection, logoBase64 } = opts
+  const { className, schoolYearName, students, selection, logoBase64, badgeBase64 } = opts
 
   const cols = buildScoreColumns(selection)
   const wb = new ExcelJS.Workbook()
@@ -266,6 +277,7 @@ export async function buildScoreReportWorkbook(opts: {
     className,
     totalCols: cols.length,
     logoBase64,
+    badgeBase64,
     extraInfo: `Sĩ số: ${students.length}`,
   })
   const tier2Row = tier1Row + 1
@@ -372,9 +384,10 @@ export async function buildAttendanceWorkbook(opts: {
   holidayNames: Map<string, string>
   students: AttendanceReportStudent[]
   logoBase64?: string
+  badgeBase64?: string
 }): Promise<ArrayBuffer> {
   const ExcelJS = await loadExcelJS()
-  const { className, title, dates, formatDate, holidayNames, students, logoBase64 } = opts
+  const { className, title, dates, formatDate, holidayNames, students, logoBase64, badgeBase64 } = opts
 
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Điểm danh', {
@@ -393,6 +406,7 @@ export async function buildAttendanceWorkbook(opts: {
     className,
     totalCols: Math.min(totalCols, 14),
     logoBase64,
+    badgeBase64,
     extraInfo: `Tổng số buổi: ${dates.length}`,
   })
 

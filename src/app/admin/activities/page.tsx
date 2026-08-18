@@ -1830,7 +1830,10 @@ export default function ActivitiesPage() {
       } = await import('@/lib/score-report-excel')
       const today = new Date().toISOString().split('T')[0]
       const clsName = getReportClassName(reportClassId)
-      const logoBase64 = await fetchLogoBase64()
+      const [logoBase64, badgeBase64] = await Promise.all([
+        fetchLogoBase64('/logo-circle.png'),
+        fetchLogoBase64('/logo-tntt.png'),
+      ])
 
       const downloadBuffer = (buffer: ArrayBuffer, fileName: string) => {
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -1881,6 +1884,7 @@ export default function ActivitiesPage() {
           holidayNames,
           students: reportStudents,
           logoBase64,
+          badgeBase64,
         })
 
         const typeLabel = reportAttendanceType === 'thu5' ? '_thu5' : reportAttendanceType === 'cn' ? '_cn' : ''
@@ -1892,6 +1896,7 @@ export default function ActivitiesPage() {
           students: reportScoreStudents,
           selection: scoreColumns,
           logoBase64,
+          badgeBase64,
         })
         downloadBuffer(buffer, `diem_so_${clsName}_${today}.xlsx`)
       }
