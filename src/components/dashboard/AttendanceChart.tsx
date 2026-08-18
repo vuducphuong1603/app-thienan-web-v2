@@ -123,7 +123,7 @@ export default function AttendanceChart({ classId }: AttendanceChartProps) {
               <p className="text-[10px] font-medium text-gray-900 dark:text-white mb-1 flex-shrink-0">{day.label}</p>
 
               {/* Bars Container */}
-              <div className="flex gap-1 items-end h-[150px]">
+              <div className="flex gap-1 items-end flex-1 min-h-[120px]">
                 {/* Present Bar - Orange */}
                 <div
                   className="flex-1 bg-brand rounded-md p-1.5 flex flex-col justify-start transition-all duration-500"

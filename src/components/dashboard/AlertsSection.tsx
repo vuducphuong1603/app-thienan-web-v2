@@ -40,23 +40,23 @@ export default function AlertsSection() {
       </div>
 
       {/* Alerts List */}
-      <div className="px-3 pb-3 space-y-2">
+      <div className="px-3 pb-3 space-y-2 flex-1 flex flex-col min-h-0 overflow-y-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center py-6">
+          <div className="flex-1 flex items-center justify-center py-6">
             <svg className="animate-spin w-5 h-5 text-brand" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
           </div>
         ) : isError ? (
-          <div className="flex flex-col items-center justify-center py-6 gap-2">
+          <div className="flex-1 flex flex-col items-center justify-center py-6 gap-2">
             <p className="text-[10px] text-[#8a8c90]">Không tải được dữ liệu</p>
             <button onClick={() => refetch()} className="text-[10px] text-brand hover:underline">Thử lại</button>
           </div>
         ) : !alerts || alerts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-6">
-            <Bell className="w-5 h-5 text-[#8a8c90] mb-1" strokeWidth={1.5} />
-            <p className="text-[10px] text-[#8a8c90]">Không có cảnh báo</p>
+          <div className="flex-1 flex flex-col items-center justify-center py-6">
+            <Bell className="w-8 h-8 text-[#8a8c90] mb-2" strokeWidth={1.5} />
+            <p className="text-xs text-[#8a8c90]">Không có cảnh báo</p>
           </div>
         ) : (
           alerts.map((alert) => {
