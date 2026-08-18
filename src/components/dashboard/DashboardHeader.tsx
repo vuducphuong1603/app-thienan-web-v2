@@ -69,12 +69,12 @@ export default function DashboardHeader({
 
   return (
     <>
-      <header className="bg-transparent px-6 py-3">
-        <div className="flex items-center justify-between">
+      <header className="bg-transparent px-4 sm:px-6 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-y-3">
           {/* Left: Logo + Navigation */}
-          <div className="flex items-center gap-20">
+          <div className="flex items-center gap-4 lg:gap-20">
             {/* Logo */}
-            <Link href={homeHref} className="w-[52px] h-[52px] rounded-full overflow-hidden flex-shrink-0">
+            <Link href={homeHref} className="w-11 h-11 sm:w-[52px] sm:h-[52px] rounded-full overflow-hidden flex-shrink-0">
               <Image
                 src="/logo.png"
                 alt="Giáo Xứ Thiên Ân"
@@ -84,8 +84,8 @@ export default function DashboardHeader({
               />
             </Link>
 
-            {/* Navigation Tabs */}
-            <nav className="flex items-center gap-2">
+            {/* Navigation Tabs (desktop) */}
+            <nav className="hidden md:flex items-center gap-2">
               {navTabs.map((tab) => (
                 <Link
                   key={tab.id}
@@ -105,7 +105,7 @@ export default function DashboardHeader({
           {/* Right: Search + Actions + User */}
           <div className="flex items-center gap-2">
             {/* Search */}
-            <div className="flex items-center gap-4 h-[45px] px-1 bg-white dark:bg-white/10 border border-white/20 dark:border-white/10 rounded-full w-[324px] hover:shadow-[1px_2px_4px_0px_rgba(0,0,0,0.25)] transition-shadow">
+            <div className="hidden lg:flex items-center gap-4 h-[45px] px-1 bg-white dark:bg-white/10 border border-white/20 dark:border-white/10 rounded-full w-[220px] xl:w-[324px] hover:shadow-[1px_2px_4px_0px_rgba(0,0,0,0.25)] transition-shadow">
               <div className="w-[41px] h-[41px] bg-[#f6f6f6] dark:bg-white/10 rounded-full flex items-center justify-center flex-shrink-0">
                 <Search className="w-5 h-5 text-black dark:text-white" />
               </div>
@@ -117,7 +117,7 @@ export default function DashboardHeader({
             </div>
 
             {/* Add Button */}
-            <button className="w-[45px] h-[45px] bg-white dark:bg-white/10 border border-white/20 dark:border-white/10 rounded-full flex items-center justify-center hover:bg-[#e5e1dc] dark:hover:bg-white/20 transition-colors flex-shrink-0">
+            <button className="hidden sm:flex w-[45px] h-[45px] bg-white dark:bg-white/10 border border-white/20 dark:border-white/10 rounded-full items-center justify-center hover:bg-[#e5e1dc] dark:hover:bg-white/20 transition-colors flex-shrink-0">
               <Plus className="w-5 h-5 text-black dark:text-white" />
             </button>
 
@@ -139,7 +139,7 @@ export default function DashboardHeader({
                   )}
                 </div>
                 {/* Name and Role */}
-                <div className="flex flex-col gap-1 text-left w-[103px]">
+                <div className="hidden sm:flex flex-col gap-1 text-left w-[103px]">
                   <p className="text-sm font-medium text-black dark:text-white">{userName}</p>
                   <p className="text-xs text-black/40 dark:text-white/60">{userRole}</p>
                 </div>
@@ -160,6 +160,23 @@ export default function DashboardHeader({
               />
             </div>
           </div>
+
+          {/* Navigation Tabs (mobile) - full-width scrollable row */}
+          <nav className="flex md:hidden items-center gap-2 w-full overflow-x-auto pb-1 -mx-1 px-1">
+            {navTabs.map((tab) => (
+              <Link
+                key={tab.id}
+                href={tab.href}
+                className={`px-4 py-2.5 rounded-full text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+                  activeTab === tab.id
+                    ? 'bg-brand text-white'
+                    : 'bg-white dark:bg-white/10 border border-white/20 dark:border-white/10 text-black dark:text-white'
+                }`}
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </nav>
         </div>
       </header>
 

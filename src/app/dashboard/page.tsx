@@ -52,14 +52,14 @@ export default function UserDashboard() {
       <main className="p-4">
         <div className="space-y-4">
           {/* Welcome Section */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Chúc ngày tốt lành</p>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 Chào mừng, {firstName}. <span className="inline-block animate-wave">👋</span>
               </h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {/* Date Display */}
               <div className="flex items-center gap-2">
                 <span className="text-4xl font-bold text-gray-900 dark:text-white">{dayOfMonth}</span>
@@ -83,7 +83,7 @@ export default function UserDashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
             <StatsCard
               title="Ngành"
               value={glvStats?.branchName || '...'}
@@ -112,7 +112,7 @@ export default function UserDashboard() {
           </div>
 
           {/* Middle & Bottom Section - 3 columns, 2 rows layout (same as admin) */}
-          <div className="grid grid-cols-3 grid-rows-[1.4fr_1fr] gap-4 h-[calc(100vh-310px)]">
+          <div className="grid grid-cols-1 lg:grid-cols-3 lg:grid-rows-[1.4fr_1fr] gap-4 lg:h-[calc(100vh-310px)]">
             {/* Row 1, Col 1 - Notes */}
             <div className="space-y-4">
               <MyNotes />
@@ -120,7 +120,7 @@ export default function UserDashboard() {
             {/* Row 1, Col 2 - Weekly Calendar */}
             <WeeklyCalendar currentWeek={3} activitiesCount={3} />
             {/* Row 1-2, Col 3 - AbsentStudentsList spans 2 rows, overflow hidden so list scrolls internally */}
-            <div className="row-span-2 min-h-0 overflow-hidden">
+            <div className="lg:row-span-2 min-h-0 overflow-hidden h-[480px] lg:h-auto">
               <AbsentStudentsList
                 classId={user.class_id}
                 className={glvStats?.className}

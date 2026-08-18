@@ -54,17 +54,17 @@ export default function AdminDashboard() {
       />
 
       {/* Main Content */}
-      <main className="p-5">
-        <div className="space-y-5">
+      <main className="p-4 sm:p-5">
+        <div className="space-y-4 sm:space-y-5">
           {/* Welcome Section */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-base text-[#666D80] dark:text-gray-300 mb-1">Chúc ngày tốt lành</p>
-              <h1 className="text-[40px] font-bold text-black dark:text-white leading-tight">
+              <p className="text-sm sm:text-base text-[#666D80] dark:text-gray-300 mb-1">Chúc ngày tốt lành</p>
+              <h1 className="text-2xl sm:text-3xl lg:text-[40px] font-bold text-black dark:text-white leading-tight">
                 Chào mừng, {firstName}. <span className="inline-block animate-wave">👋</span>
               </h1>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3 lg:gap-4">
               {/* Date Display */}
               <div className="flex items-center gap-3">
                 <div className="w-[57px] h-[57px] rounded-full border border-[#E5E1DC] bg-white dark:bg-white/10 flex items-center justify-center">
@@ -76,11 +76,11 @@ export default function AdminDashboard() {
                 </div>
               </div>
               {/* Separator */}
-              <div className="w-px h-[34px] bg-black dark:bg-white/40" />
+              <div className="hidden sm:block w-px h-[34px] bg-black dark:bg-white/40" />
               {/* Notification Button */}
               <button
                 onClick={() => setIsNotificationListOpen(true)}
-                className="flex items-center gap-2 px-8 py-3.5 bg-[#FA865E] text-white rounded-full hover:bg-[#e8764f] transition-colors shadow-[0px_0px_14px_rgba(110,98,229,0.04)]"
+                className="flex items-center gap-2 px-5 sm:px-8 py-3 sm:py-3.5 bg-[#FA865E] text-white rounded-full hover:bg-[#e8764f] transition-colors shadow-[0px_0px_14px_rgba(110,98,229,0.04)]"
               >
                 <span className="text-base font-medium">Xem thông báo</span>
               </button>
@@ -92,7 +92,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
             <StatsCard
               title="Tổng số ngành"
               value={loadingStats ? '...' : stats?.totalBranches ?? 0}
@@ -124,7 +124,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Middle & Bottom Section - 3 columns, 2 rows layout */}
-          <div className="grid grid-cols-3 grid-rows-[1.4fr_1fr] gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 lg:grid-rows-[1.4fr_1fr] gap-4">
             {/* Row 1, Col 1 - Notes */}
             <div className="space-y-4">
               <MyNotes />
@@ -132,7 +132,7 @@ export default function AdminDashboard() {
             {/* Row 1, Col 2 - Weekly Calendar */}
             <WeeklyCalendar currentWeek={3} activitiesCount={3} />
             {/* Row 1-2, Col 3 - Class Stats spans 2 rows */}
-            <div className="row-span-2">
+            <div className="lg:row-span-2">
               <ClassStats />
             </div>
             {/* Row 2, Col 1 - Attendance Chart */}

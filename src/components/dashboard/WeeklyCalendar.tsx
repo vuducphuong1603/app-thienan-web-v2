@@ -59,7 +59,7 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
       </div>
 
       {/* Week Days Row */}
-      <div className="flex items-start gap-[18px] mb-6 flex-shrink-0">
+      <div className="flex items-start gap-[18px] mb-6 flex-shrink-0 overflow-x-auto pb-1">
         {daysData.map((item) => {
           if (item.hasRing) {
             // Day with progress ring
@@ -119,7 +119,7 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
       </div>
 
       {/* Main Content - Donut Chart and Stats */}
-      <div className="flex items-center gap-4 flex-1 justify-center">
+      <div className="flex flex-col sm:flex-row items-center gap-4 flex-1 justify-center">
         {/* Donut Chart */}
         <div className="relative w-[243px] h-[243px] flex-shrink-0">
           {/* SVG Donut Chart */}
@@ -157,7 +157,7 @@ export default function WeeklyCalendar({ currentWeek = 3, activitiesCount = 3 }:
         </div>
 
         {/* Stats */}
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-row flex-wrap justify-center sm:flex-col gap-5 sm:gap-8">
           {/* Hoàn thành */}
           <div className="flex items-center gap-4">
             <ProgressBars filled={14} total={14} filledColor="#FA865E" emptyColor="#E5E1DC" />
