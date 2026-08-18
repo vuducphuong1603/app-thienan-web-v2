@@ -674,7 +674,7 @@ export default function QRScanAttendanceModal({
                   onBlur={() => setSearchFocused(false)}
                   placeholder="Tìm tên, tên thánh, mã thiếu nhi..."
                   autoCorrect="off"
-                  className="flex-1 bg-transparent text-sm text-white placeholder-[#64748B] outline-none"
+                  className="flex-1 bg-transparent text-base sm:text-sm text-white placeholder-[#64748B] outline-none"
                 />
                 {searchQuery.length > 0 && (
                   <button
