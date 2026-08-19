@@ -598,19 +598,22 @@ export function useClassesWithDetails() {
     queryKey: ['classes', 'withDetails'],
     staleTime: 10 * 60 * 1000, // Class details rarely change
     queryFn: async () => {
-      const [classesRes, usersRes, studentsRes] = await Promise.all([
+      // Supabase chỉ trả tối đa 1000 dòng mỗi request nên phải lấy hết theo trang,
+      // nếu không sĩ số sẽ bị cắt cụt khi số thiếu nhi vượt 1000.
+      const [classesRes, usersRes, students] = await Promise.all([
         supabase.from('classes').select('*').order('display_order', { ascending: true }),
         supabase.from('users').select('id, full_name, saint_name, class_id, class_name').eq('role', 'giao_ly_vien'),
-        supabase.from('thieu_nhi').select('id, class_id'),
+        fetchAllRows<{ id: string; class_id: string }>(
+          (from, to) => supabase.from('thieu_nhi').select('id, class_id').eq('status', 'ACTIVE').order('id', { ascending: true }).range(from, to)
+        ),
       ])
 
       if (classesRes.error) throw classesRes.error
       if (usersRes.error) throw usersRes.error
-      if (studentsRes.error) throw studentsRes.error
 
-      // Build student count map - O(n) instead of sequential pagination
+      // Build student count map - O(n)
       const studentCountByClass: Record<string, number> = {}
-      ;(studentsRes.data || []).forEach((student) => {
+      students.forEach((student) => {
         if (student.class_id) {
           studentCountByClass[student.class_id] = (studentCountByClass[student.class_id] || 0) + 1
         }
