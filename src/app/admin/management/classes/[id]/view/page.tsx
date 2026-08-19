@@ -92,6 +92,7 @@ export default function ViewClassPage() {
   }
 
   const { classInfo, teachers, activeCount, inactiveCount, classAvg, attendance } = data
+  const totalCount = data.students.length
 
   return (
     <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 dark:border-white/10 rounded-2xl min-h-[calc(100vh-140px)]">
@@ -162,9 +163,13 @@ export default function ViewClassPage() {
                 <Users className="w-4 h-4" />
                 <span className="text-xs font-medium">Sĩ số</span>
               </div>
-              <span className="text-2xl font-bold text-black dark:text-white">{activeCount}</span>
+              <span className="text-2xl font-bold text-black dark:text-white">{totalCount}</span>
+              {/* Hiện đủ ba con số. Trước đây ô này chỉ hiện số em đang học, còn dòng
+                  "Hiển thị x/y thiếu nhi" ở khối danh sách lại đếm cả em nghỉ học — hai
+                  số lệch nhau mà không chỗ nào giải thích. Nay số lớn là tổng nên khớp
+                  với dòng đó, và phần tách đang học / nghỉ học nằm ngay bên dưới. */}
               <span className="text-xs text-[#8B8685]">
-                {inactiveCount > 0 ? `${inactiveCount} thiếu nhi nghỉ học` : 'thiếu nhi đang học'}
+                {activeCount} đang học · {inactiveCount} nghỉ học
               </span>
             </div>
 
