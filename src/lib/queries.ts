@@ -384,23 +384,24 @@ export function useClassStats(enabled = true) {
     staleTime: 10 * 60 * 1000, // Stats rarely change
     enabled,
     queryFn: async () => {
-      const [branchesRes, classesRes, studentsRes, teachersRes] = await Promise.all([
+      const [branchesRes, classesRes, students, teachersRes] = await Promise.all([
         supabase.from('branches').select('id, name, order_index').order('order_index'),
         supabase.from('classes').select('id, branch').eq('status', 'ACTIVE'),
-        supabase.from('thieu_nhi').select('id, class_id').eq('status', 'ACTIVE'),
+        // Phân trang: quá 1000 thiếu nhi thì sĩ số theo ngành bị cắt cụt
+        fetchAllRows<{ id: string; class_id: string }>(
+          (from, to) => supabase.from('thieu_nhi').select('id, class_id').eq('status', 'ACTIVE').order('id', { ascending: true }).range(from, to)
+        ),
         supabase.from('users').select('id, class_id').eq('role', 'giao_ly_vien').eq('status', 'ACTIVE'),
       ])
 
       if (branchesRes.error) throw branchesRes.error
       if (classesRes.error) throw classesRes.error
-      if (studentsRes.error) throw studentsRes.error
       if (teachersRes.error) throw teachersRes.error
 
       const branches = branchesRes.data
       if (!branches) return []
 
       const classes = classesRes.data
-      const students = studentsRes.data
       const teachers = teachersRes.data
 
       const classBranchMap = new Map<string, string>()
@@ -523,13 +524,18 @@ export function useStudentsWithDetails() {
       const t0 = Date.now()
 
       // Fetch everything in parallel - no waterfall
-      const [schoolYearRes, classesRes, studentsRes, allHolidaysRes] = await Promise.all([
+      const [schoolYearRes, classesRes, studentsData, allHolidaysRes] = await Promise.all([
         supabase.from('school_years').select('id, start_date, end_date').eq('is_current', true).single()
           .then(r => { console.log('[query] school_years done:', Date.now() - t0, 'ms', r.error?.message || 'OK'); return r }),
         supabase.from('classes').select('id, name, branch, display_order, status, created_at, updated_at').eq('status', 'ACTIVE').order('display_order', { ascending: true })
           .then(r => { console.log('[query] classes done:', Date.now() - t0, 'ms', r.error?.message || 'OK'); return r }),
-        supabase.from('thieu_nhi').select('id, full_name, saint_name, student_code, date_of_birth, gender, phone, address, parent_name, parent_phone, parent_name_2, parent_phone_2, class_id, status, avatar_url, notes, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn, created_at, updated_at').order('full_name', { ascending: true })
-          .then(r => { console.log('[query] thieu_nhi done:', Date.now() - t0, 'ms', r.error?.message || 'OK', 'rows:', r.data?.length); return r }),
+        // Supabase chỉ trả tối đa 1000 dòng mỗi request nên phải lấy hết theo trang,
+        // nếu không danh sách và ô tìm kiếm sẽ bỏ sót thiếu nhi khi vượt 1000 em.
+        // Kèm .order('id') làm khoá phụ để phân trang ổn định khi trùng full_name.
+        fetchAllRows<ThieuNhiProfile>(
+          (from, to) => supabase.from('thieu_nhi').select('id, full_name, saint_name, student_code, date_of_birth, gender, phone, address, parent_name, parent_phone, parent_name_2, parent_phone_2, class_id, status, avatar_url, notes, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn, created_at, updated_at')
+            .order('full_name', { ascending: true }).order('id', { ascending: true }).range(from, to)
+        ).then(rows => { console.log('[query] thieu_nhi done:', Date.now() - t0, 'ms', 'rows:', rows.length); return rows }),
         supabase.from('holidays').select('day_type')
           .then(r => { console.log('[query] holidays done:', Date.now() - t0, 'ms', r.error?.message || 'OK'); return r }),
       ])
@@ -538,12 +544,10 @@ export function useStudentsWithDetails() {
 
       if (schoolYearRes.error) throw schoolYearRes.error
       if (classesRes.error) throw classesRes.error
-      if (studentsRes.error) throw studentsRes.error
       if (allHolidaysRes.error) throw allHolidaysRes.error
 
       const schoolYear = schoolYearRes.data
       const classesData = classesRes.data || []
-      const studentsData = studentsRes.data || []
       const holidays = (allHolidaysRes.data || []) as Pick<Holiday, 'day_type'>[]
 
       // Count actual Thursdays (4) and Sundays (0) in school year
@@ -1063,8 +1067,11 @@ export function useClassAttendanceData(branch: Branch, date: string, dayType: 'c
 
       const classIds = classesData.map(c => c.id)
 
-      const [studentsRes, attendanceData] = await Promise.all([
-        supabase.from('thieu_nhi').select('id, class_id').in('class_id', classIds).eq('status', 'ACTIVE'),
+      const [students, attendanceData] = await Promise.all([
+        // Phân trang: gộp mọi lớp trong ngành nên vẫn có thể vượt 1000 dòng
+        fetchAllRows<{ id: string; class_id: string }>(
+          (from, to) => supabase.from('thieu_nhi').select('id, class_id').in('class_id', classIds).eq('status', 'ACTIVE').order('id', { ascending: true }).range(from, to)
+        ),
         fetchAllRows<{ id: string; student_id: string; class_id: string; status: string }>(
           (from, to) => supabase.from('attendance_records').select('id, student_id, class_id, status')
             .in('class_id', classIds).eq('attendance_date', date).eq('day_type', dayType).eq('status', 'present')
@@ -1072,11 +1079,9 @@ export function useClassAttendanceData(branch: Branch, date: string, dayType: 'c
         ),
       ])
 
-      if (studentsRes.error) throw studentsRes.error
-
       const studentsByClass: Record<string, number> = {}
       classIds.forEach(id => { studentsByClass[id] = 0 })
-      studentsRes.data?.forEach(student => {
+      students.forEach(student => {
         if (student.class_id) {
           studentsByClass[student.class_id] = (studentsByClass[student.class_id] || 0) + 1
         }
