@@ -64,6 +64,7 @@ export const queryKeys = {
   schoolYears: ['schoolYears'] as const,
   attendanceStudents: (classId: string, date: string) => ['attendanceStudents', classId, date] as const,
   holidayCheck: (schoolYearId: string, date: string) => ['holidayCheck', schoolYearId, date] as const,
+  classDetail: (classId: string) => ['classDetail', classId] as const,
 }
 
 // ============ Dashboard Stats ============
@@ -650,6 +651,169 @@ export function useClassesWithDetails() {
       })
 
       return classesWithDetails
+    },
+  })
+}
+
+// ============ Class Detail (xem chi tiết lớp) ============
+export interface ClassStudentDetail {
+  id: string
+  student_code: string | null
+  full_name: string
+  saint_name: string | null
+  date_of_birth: string | null
+  parent_name: string | null
+  parent_phone: string | null
+  status: 'ACTIVE' | 'INACTIVE'
+  avatar_url: string | null
+  score_45_hk1: number | null
+  score_exam_hk1: number | null
+  score_45_hk2: number | null
+  score_exam_hk2: number | null
+  attendance_thu5: number | null
+  attendance_cn: number | null
+  avgCatechism: number
+  avgAttendance: number
+  totalAvg: number
+}
+
+export interface ClassTeacherDetail {
+  id: string
+  full_name: string
+  saint_name: string | null
+  phone: string | null
+  email: string | null
+  avatar_url: string | null
+  status: 'ACTIVE' | 'INACTIVE'
+}
+
+export function useClassDetail(classId: string) {
+  return useQuery({
+    queryKey: queryKeys.classDetail(classId),
+    enabled: !!classId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data: classData, error: classError } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('id', classId)
+        .single()
+
+      if (classError) throw classError
+      const classInfo = classData as Class
+
+      // Buổi thứ 5 và Chúa nhật gần nhất để tính tỉ lệ điểm danh
+      const lastThu5 = getRecentDay('thu5')
+      const lastCN = getRecentDay('cn')
+      const recentDates = [lastThu5, lastCN].filter(Boolean) as string[]
+
+      const [teachersRes, students, schoolYearRes, attendanceRes] = await Promise.all([
+        supabase
+          .from('users')
+          .select('id, full_name, saint_name, phone, email, avatar_url, status, class_id, class_name')
+          .eq('role', 'giao_ly_vien'),
+        // Supabase trả tối đa 1000 dòng mỗi request nên phải lấy hết theo trang
+        fetchAllRows<Omit<ClassStudentDetail, 'avgCatechism' | 'avgAttendance' | 'totalAvg'>>(
+          (from, to) =>
+            supabase
+              .from('thieu_nhi')
+              .select(
+                'id, student_code, full_name, saint_name, date_of_birth, parent_name, parent_phone, status, avatar_url, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn'
+              )
+              .eq('class_id', classId)
+              .order('id', { ascending: true })
+              .range(from, to)
+        ),
+        supabase.from('school_years').select('id, start_date, end_date').eq('is_current', true).maybeSingle(),
+        supabase
+          .from('attendance_records')
+          .select('student_id, day_type')
+          .eq('class_id', classId)
+          .eq('status', 'present')
+          .in('attendance_date', recentDates),
+      ])
+
+      if (teachersRes.error) throw teachersRes.error
+
+      // Giáo lý viên khớp theo class_id hoặc class_name (dữ liệu cũ chỉ có tên lớp)
+      const teachers: ClassTeacherDetail[] = (teachersRes.data || [])
+        .filter((t) => t.class_id === classId || t.class_name === classInfo.name)
+        .map((t) => ({
+          id: t.id,
+          full_name: t.full_name,
+          saint_name: t.saint_name,
+          phone: t.phone,
+          email: t.email,
+          avatar_url: t.avatar_url,
+          status: t.status,
+        }))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name, 'vi'))
+
+      // Số buổi học thực tế (trừ ngày lễ) để quy đổi điểm danh ra thang 10
+      let effectiveThu5Days = 40
+      let effectiveCnDays = 40
+      const schoolYear = schoolYearRes.data
+      if (schoolYear) {
+        const totalThu5 = countWeekdays(schoolYear.start_date, schoolYear.end_date, 4)
+        const totalCn = countWeekdays(schoolYear.start_date, schoolYear.end_date, 0)
+        const { data: holidaysData } = await supabase
+          .from('holidays')
+          .select('day_type')
+          .eq('school_year_id', schoolYear.id)
+        const holidays = (holidaysData || []) as { day_type: string }[]
+        const thu5Holidays = holidays.filter((h) => h.day_type === 'thu5' || h.day_type === 'both').length
+        const cnHolidays = holidays.filter((h) => h.day_type === 'cn' || h.day_type === 'both').length
+        effectiveThu5Days = Math.max(1, totalThu5 - thu5Holidays)
+        effectiveCnDays = Math.max(1, totalCn - cnHolidays)
+      }
+
+      const studentList: ClassStudentDetail[] = students
+        .map((s) => {
+          const avgCatechism =
+            ((s.score_45_hk1 || 0) +
+              (s.score_45_hk2 || 0) +
+              (s.score_exam_hk1 || 0) * 2 +
+              (s.score_exam_hk2 || 0) * 2) /
+            6
+          const avgAttendance =
+            (s.attendance_thu5 || 0) * 0.4 * (10 / effectiveThu5Days) +
+            (s.attendance_cn || 0) * 0.6 * (10 / effectiveCnDays)
+          return {
+            ...s,
+            avgCatechism,
+            avgAttendance,
+            totalAvg: avgCatechism * 0.6 + avgAttendance * 0.4,
+          }
+        })
+        .sort((a, b) => a.full_name.localeCompare(b.full_name, 'vi'))
+
+      const activeStudents = studentList.filter((s) => s.status === 'ACTIVE')
+      const attendanceRows = (attendanceRes.data || []) as { student_id: string; day_type: string }[]
+      const presentThu5 = attendanceRows.filter((r) => r.day_type === 'thu5').length
+      const presentCn = attendanceRows.filter((r) => r.day_type === 'cn').length
+      const denominator = activeStudents.length
+
+      const classAvg =
+        activeStudents.length > 0
+          ? activeStudents.reduce((sum, s) => sum + s.totalAvg, 0) / activeStudents.length
+          : 0
+
+      return {
+        classInfo,
+        teachers,
+        students: studentList,
+        activeCount: activeStudents.length,
+        inactiveCount: studentList.length - activeStudents.length,
+        classAvg,
+        attendance: {
+          lastThu5,
+          lastCN,
+          presentThu5,
+          presentCn,
+          rateThu5: denominator > 0 ? Math.round((presentThu5 / denominator) * 100) : 0,
+          rateCn: denominator > 0 ? Math.round((presentCn / denominator) * 100) : 0,
+        },
+      }
     },
   })
 }
