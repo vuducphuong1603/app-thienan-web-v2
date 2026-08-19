@@ -57,18 +57,27 @@ export default function UsersPage() {
   const fetchUsers = invalidateUsers
 
   // Filter users based on search and filters
-  const searchNormalized = normalizeSearchText(searchQuery)
   // Chuẩn hoá một lần ngoài vòng lặp thay vì mỗi dòng
+  const trimmedQuery = searchQuery.trim()
+  const searchNormalized = normalizeSearchText(trimmedQuery)
   const filterBranchNormalized = normalizeSearchText(filterBranch)
+  // Chỉ dò số điện thoại khi người dùng gõ chuỗi dạng số, và bỏ mọi ký tự ngăn
+  // cách để "0901 000 001" khớp với "0901000001"
+  const searchDigits = /^[\d\s+.()-]+$/.test(trimmedQuery) ? trimmedQuery.replace(/\D/g, '') : ''
+
   const filteredUsers = users.filter((user) => {
+    // Ghép tên thánh + họ tên để gõ "Maria Trần Thị Mai" khớp đúng như bảng hiển thị
+    const fullNameWithSaint = normalizeSearchText(
+      `${user.saint_name ?? ''} ${user.full_name ?? ''}`.trim()
+    )
+
     // Search filter
     const matchesSearch =
-      searchQuery === '' ||
-      normalizeSearchText(user.full_name ?? '').includes(searchNormalized) ||
-      normalizeSearchText(user.saint_name ?? '').includes(searchNormalized) ||
+      searchNormalized === '' ||
+      fullNameWithSaint.includes(searchNormalized) ||
       normalizeSearchText(user.username ?? '').includes(searchNormalized) ||
-      user.phone?.includes(searchQuery) ||
-      normalizeSearchText(user.email ?? '').includes(searchNormalized)
+      normalizeSearchText(user.email ?? '').includes(searchNormalized) ||
+      (searchDigits.length >= 3 && (user.phone ?? '').replace(/\D/g, '').includes(searchDigits))
 
     // Role filter
     const matchesRole = filterRole === 'all' || user.role === filterRole

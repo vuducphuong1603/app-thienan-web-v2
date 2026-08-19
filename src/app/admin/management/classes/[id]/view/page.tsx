@@ -33,19 +33,28 @@ export default function ViewClassPage() {
 
   const { data, isLoading, isError, error, refetch } = useClassDetail(classId)
 
-  const searchNormalized = normalizeSearchText(searchQuery)
+  const trimmedQuery = searchQuery.trim()
+  const searchNormalized = normalizeSearchText(trimmedQuery)
+  // Chỉ dò số điện thoại khi người dùng gõ chuỗi dạng số, và bỏ mọi ký tự ngăn
+  // cách để "0901 000 001" khớp với "0901000001"
+  const searchDigits = /^[\d\s+.()-]+$/.test(trimmedQuery) ? trimmedQuery.replace(/\D/g, '') : ''
+
   const filteredStudents = useMemo(() => {
     const students = data?.students || []
-    if (!searchQuery) return students
-    return students.filter(
-      (s) =>
-        normalizeSearchText(s.full_name).includes(searchNormalized) ||
-        normalizeSearchText(s.saint_name || '').includes(searchNormalized) ||
+    if (searchNormalized === '') return students
+    return students.filter((s) => {
+      // Ghép tên thánh + họ tên để gõ "Maria Nguyễn" khớp đúng như bảng hiển thị
+      const fullNameWithSaint = normalizeSearchText(
+        `${s.saint_name ?? ''} ${s.full_name ?? ''}`.trim()
+      )
+      return (
+        fullNameWithSaint.includes(searchNormalized) ||
         normalizeSearchText(s.student_code || '').includes(searchNormalized) ||
         normalizeSearchText(s.parent_name || '').includes(searchNormalized) ||
-        (s.parent_phone || '').includes(searchQuery.trim())
-    )
-  }, [data?.students, searchQuery, searchNormalized])
+        (searchDigits.length >= 3 && (s.parent_phone || '').replace(/\D/g, '').includes(searchDigits))
+      )
+    })
+  }, [data?.students, searchNormalized, searchDigits])
 
   if (isLoading) {
     return (
