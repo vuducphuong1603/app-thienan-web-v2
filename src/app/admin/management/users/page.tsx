@@ -11,6 +11,7 @@ import ResetPasswordModal from '@/components/management/ResetPasswordModal'
 import AddUserForm from '@/components/management/AddUserForm'
 import EditUserForm from '@/components/management/EditUserForm'
 import { useUsers, useClassesByBranch, useInvalidateQueries } from '@/lib/queries'
+import { normalizeSearchText } from '@/lib/search'
 
 interface User extends UserProfile {
   class_name?: string
@@ -56,15 +57,16 @@ export default function UsersPage() {
   const fetchUsers = invalidateUsers
 
   // Filter users based on search and filters
+  const searchNormalized = normalizeSearchText(searchQuery)
   const filteredUsers = users.filter((user) => {
     // Search filter
-    const searchLower = searchQuery.toLowerCase()
     const matchesSearch =
       searchQuery === '' ||
-      user.full_name?.toLowerCase().includes(searchLower) ||
-      user.username?.toLowerCase().includes(searchLower) ||
+      normalizeSearchText(user.full_name ?? '').includes(searchNormalized) ||
+      normalizeSearchText(user.saint_name ?? '').includes(searchNormalized) ||
+      normalizeSearchText(user.username ?? '').includes(searchNormalized) ||
       user.phone?.includes(searchQuery) ||
-      user.email?.toLowerCase().includes(searchLower)
+      normalizeSearchText(user.email ?? '').includes(searchNormalized)
 
     // Role filter
     const matchesRole = filterRole === 'all' || user.role === filterRole
@@ -171,7 +173,7 @@ export default function UsersPage() {
           <Search className="w-5 h-5 text-primary-3" />
           <input
             type="text"
-            placeholder="Tìm kiếm theo tên, username,..."
+            placeholder="Tìm kiếm theo tên, tên thánh, username,..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 h-full bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"
