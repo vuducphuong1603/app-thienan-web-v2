@@ -58,6 +58,8 @@ export default function UsersPage() {
 
   // Filter users based on search and filters
   const searchNormalized = normalizeSearchText(searchQuery)
+  // Chuẩn hoá một lần ngoài vòng lặp thay vì mỗi dòng
+  const filterBranchNormalized = normalizeSearchText(filterBranch)
   const filteredUsers = users.filter((user) => {
     // Search filter
     const matchesSearch =
@@ -72,7 +74,12 @@ export default function UsersPage() {
     const matchesRole = filterRole === 'all' || user.role === filterRole
 
     // Branch filter
-    const matchesBranch = filterBranch === 'all' || user.branch === filterBranch
+    // So sánh chuẩn hoá: BRANCHES trong code ghi 'Ấu Nhi' còn users.branch trong DB
+    // ghi 'Ấu nhi', vài lớp lại ghi không dấu 'Au Nhi' — so sánh tuyệt đối thì
+    // không dòng nào khớp và bộ lọc ngành luôn trả về rỗng
+    const matchesBranch =
+      filterBranch === 'all' ||
+      normalizeSearchText(user.branch ?? '') === filterBranchNormalized
 
     // Class filter
     const matchesClass = filterClass === 'all' || user.class_id === filterClass
