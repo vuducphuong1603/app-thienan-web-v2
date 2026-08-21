@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase, Class, BRANCHES, Branch } from '@/lib/supabase'
 import { Search, ChevronDown, Plus, Edit2, Eye, Trash2 } from 'lucide-react'
 import AddClassForm from '@/components/management/AddClassForm'
 import EditClassForm from '@/components/management/EditClassForm'
 import { useClassesWithDetails, useInvalidateQueries } from '@/lib/queries'
+import { normalizeSearchText } from '@/lib/search'
 
 interface ClassWithDetails extends Class {
   teachers?: string[]
@@ -31,8 +32,10 @@ export default function ClassesPage() {
 }
 
 function ClassesPageContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const branchParam = searchParams.get('branch')
+  const editParam = searchParams.get('edit')
   const matchedBranch = branchParam
     ? BRANCHES.find(b => b.toLowerCase() === branchParam.toLowerCase())
     : undefined
@@ -46,19 +49,33 @@ function ClassesPageContent() {
   const [classToEdit, setClassToEdit] = useState<ClassWithDetails | null>(null)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [classToDelete, setClassToDelete] = useState<ClassWithDetails | null>(null)
+  const [handledEditParam, setHandledEditParam] = useState(false)
 
   const { data: classes = [], isLoading: loading, isError, error, refetch } = useClassesWithDetails()
   const { invalidateClasses } = useInvalidateQueries()
 
   const fetchClasses = invalidateClasses
 
+  // Mở sẵn form chỉnh sửa khi quay về từ trang chi tiết lớp (?edit=<classId>)
+  useEffect(() => {
+    if (!editParam || handledEditParam || classes.length === 0) return
+    const target = classes.find((cls) => cls.id === editParam)
+    if (target) {
+      setClassToEdit(target)
+      setShowEditClassForm(true)
+    }
+    setHandledEditParam(true)
+    router.replace('/admin/management/classes')
+  }, [editParam, handledEditParam, classes, router])
+
   // Filter classes based on search and branch filter
+  const searchNormalized = normalizeSearchText(searchQuery)
   const filteredClasses = classes.filter((cls) => {
-    const searchLower = searchQuery.toLowerCase()
     const matchesSearch =
       searchQuery === '' ||
-      cls.name.toLowerCase().includes(searchLower) ||
-      cls.branch.toLowerCase().includes(searchLower)
+      normalizeSearchText(cls.name).includes(searchNormalized) ||
+      normalizeSearchText(cls.branch).includes(searchNormalized) ||
+      (cls.teachers || []).some((teacher: string) => normalizeSearchText(teacher).includes(searchNormalized))
 
     const matchesBranch = filterBranch === 'all' || cls.branch === filterBranch
 
@@ -142,7 +159,7 @@ function ClassesPageContent() {
           <Search className="w-5 h-5 text-primary-3" />
           <input
             type="text"
-            placeholder="Tìm kiếm lớp..."
+            placeholder="Tìm kiếm theo tên lớp, ngành, giáo lý viên..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 h-full bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"
@@ -302,6 +319,7 @@ function ClassesPageContent() {
                         <Edit2 className="w-4 h-4 text-primary-3" />
                       </button>
                       <button
+                        onClick={() => router.push(`/admin/management/classes/${cls.id}/view`)}
                         className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
                         title="Xem chi tiết"
                       >

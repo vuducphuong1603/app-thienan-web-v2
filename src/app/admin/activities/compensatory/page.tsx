@@ -8,6 +8,7 @@ import { Search, Calendar, Check, X, ArrowLeft, AlertCircle, CheckCircle2 } from
 import Link from 'next/link'
 import CustomCalendar from '@/components/ui/CustomCalendar'
 import QRAttendanceModal from '@/components/QRAttendanceModal'
+import { normalizeSearchText } from '@/lib/search'
 
 interface StudentWithCompensatoryStatus extends ThieuNhiProfile {
   class_name?: string
@@ -220,13 +221,16 @@ export default function CompensatoryAttendancePage() {
   }
 
   // Filter students by search query
+  const searchNormalized = normalizeSearchText(searchQuery.trim())
   const filteredStudents = students.filter(student => {
-    if (!searchQuery) return true
-    const searchLower = searchQuery.toLowerCase()
+    if (searchNormalized === '') return true
+    // Ghép tên thánh + họ tên để gõ "Maria Nguyễn" khớp đúng như bảng hiển thị
+    const fullNameWithSaint = normalizeSearchText(
+      `${student.saint_name ?? ''} ${student.full_name ?? ''}`.trim()
+    )
     return (
-      student.full_name.toLowerCase().includes(searchLower) ||
-      student.saint_name?.toLowerCase().includes(searchLower) ||
-      student.student_code?.toLowerCase().includes(searchLower)
+      fullNameWithSaint.includes(searchNormalized) ||
+      normalizeSearchText(student.student_code ?? '').includes(searchNormalized)
     )
   })
 

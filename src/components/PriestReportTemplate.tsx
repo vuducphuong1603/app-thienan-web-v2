@@ -52,7 +52,10 @@ const PriestReportTemplate = forwardRef<HTMLDivElement, PriestReportTemplateProp
     <div
       ref={ref}
       className="bg-white p-8"
-      style={{ width: '800px', fontFamily: 'Arial, sans-serif' }}
+      // Ghim màu chữ đen: mẫu này ép nền trắng nhưng trước đây để chữ thừa hưởng
+      // màu của app, mà chế độ tối đặt --foreground là #e5e5e5 nên ảnh xuất ra bị
+      // chữ xám nhạt trên nền trắng, gần như không đọc được
+      style={{ width: '800px', fontFamily: 'Arial, sans-serif', color: '#000000' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-6">

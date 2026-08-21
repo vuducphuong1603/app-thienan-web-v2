@@ -11,6 +11,7 @@ import ResetPasswordModal from '@/components/management/ResetPasswordModal'
 import AddUserForm from '@/components/management/AddUserForm'
 import EditUserForm from '@/components/management/EditUserForm'
 import { useUsers, useClassesByBranch, useInvalidateQueries } from '@/lib/queries'
+import { normalizeSearchText } from '@/lib/search'
 
 interface User extends UserProfile {
   class_name?: string
@@ -56,21 +57,38 @@ export default function UsersPage() {
   const fetchUsers = invalidateUsers
 
   // Filter users based on search and filters
+  // Chuẩn hoá một lần ngoài vòng lặp thay vì mỗi dòng
+  const trimmedQuery = searchQuery.trim()
+  const searchNormalized = normalizeSearchText(trimmedQuery)
+  const filterBranchNormalized = normalizeSearchText(filterBranch)
+  // Chỉ dò số điện thoại khi người dùng gõ chuỗi dạng số, và bỏ mọi ký tự ngăn
+  // cách để "0901 000 001" khớp với "0901000001"
+  const searchDigits = /^[\d\s+.()-]+$/.test(trimmedQuery) ? trimmedQuery.replace(/\D/g, '') : ''
+
   const filteredUsers = users.filter((user) => {
+    // Ghép tên thánh + họ tên để gõ "Maria Trần Thị Mai" khớp đúng như bảng hiển thị
+    const fullNameWithSaint = normalizeSearchText(
+      `${user.saint_name ?? ''} ${user.full_name ?? ''}`.trim()
+    )
+
     // Search filter
-    const searchLower = searchQuery.toLowerCase()
     const matchesSearch =
-      searchQuery === '' ||
-      user.full_name?.toLowerCase().includes(searchLower) ||
-      user.username?.toLowerCase().includes(searchLower) ||
-      user.phone?.includes(searchQuery) ||
-      user.email?.toLowerCase().includes(searchLower)
+      searchNormalized === '' ||
+      fullNameWithSaint.includes(searchNormalized) ||
+      normalizeSearchText(user.username ?? '').includes(searchNormalized) ||
+      normalizeSearchText(user.email ?? '').includes(searchNormalized) ||
+      (searchDigits.length >= 3 && (user.phone ?? '').replace(/\D/g, '').includes(searchDigits))
 
     // Role filter
     const matchesRole = filterRole === 'all' || user.role === filterRole
 
     // Branch filter
-    const matchesBranch = filterBranch === 'all' || user.branch === filterBranch
+    // So sánh chuẩn hoá: BRANCHES trong code ghi 'Ấu Nhi' còn users.branch trong DB
+    // ghi 'Ấu nhi', vài lớp lại ghi không dấu 'Au Nhi' — so sánh tuyệt đối thì
+    // không dòng nào khớp và bộ lọc ngành luôn trả về rỗng
+    const matchesBranch =
+      filterBranch === 'all' ||
+      normalizeSearchText(user.branch ?? '') === filterBranchNormalized
 
     // Class filter
     const matchesClass = filterClass === 'all' || user.class_id === filterClass
@@ -171,7 +189,7 @@ export default function UsersPage() {
           <Search className="w-5 h-5 text-primary-3" />
           <input
             type="text"
-            placeholder="Tìm kiếm theo tên, username,..."
+            placeholder="Tìm kiếm theo tên, tên thánh, username,..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 h-full bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"

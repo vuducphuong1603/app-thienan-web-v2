@@ -6,6 +6,7 @@ import { supabase, ThieuNhiProfile } from '@/lib/supabase'
 import { Search } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { useStudentsWithDetails, useInvalidateQueries } from '@/lib/queries'
+import { normalizeSearchText } from '@/lib/search'
 
 interface StudentWithDetails extends ThieuNhiProfile {
   class_name?: string
@@ -62,13 +63,16 @@ export default function GLVManagementPage() {
   const className = students.length > 0 ? students[0].class_name : ''
 
   // Filter students
+  const searchNormalized = normalizeSearchText(searchQuery.trim())
   const filteredStudents = students.filter((student) => {
-    const searchLower = searchQuery.toLowerCase()
+    // Ghép tên thánh + họ tên để gõ "Maria Nguyễn" khớp đúng như bảng hiển thị
+    const fullNameWithSaint = normalizeSearchText(
+      `${student.saint_name ?? ''} ${student.full_name ?? ''}`.trim()
+    )
     const matchesSearch =
-      searchQuery === '' ||
-      student.full_name.toLowerCase().includes(searchLower) ||
-      (student.saint_name && student.saint_name.toLowerCase().includes(searchLower)) ||
-      (student.student_code && student.student_code.toLowerCase().includes(searchLower))
+      searchNormalized === '' ||
+      fullNameWithSaint.includes(searchNormalized) ||
+      normalizeSearchText(student.student_code ?? '').includes(searchNormalized)
 
     const matchesStatus = filterStatus === 'all' || student.status === filterStatus
 

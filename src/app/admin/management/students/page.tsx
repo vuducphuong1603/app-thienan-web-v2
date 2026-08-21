@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, ThieuNhiProfile, Class, BRANCHES } from '@/lib/supabase'
 import { Search, ChevronDown, Plus } from 'lucide-react'
 import ImportStudentsModal from '@/components/management/ImportStudentsModal'
 import DeleteStudentModal from '@/components/management/DeleteStudentModal'
 import { useStudentsWithDetails, useInvalidateQueries } from '@/lib/queries'
+import { normalizeSearchText } from '@/lib/search'
 
 interface StudentWithDetails extends ThieuNhiProfile {
   class_name?: string
@@ -35,6 +36,11 @@ interface EditingScores {
   score_exam_hk2: string
 }
 
+// Tham chiếu ổn định giữa các lần render: `|| []` sinh mảng mới mỗi render,
+// khiến useMemo lọc danh sách bị tính lại vô ích
+const EMPTY_STUDENTS: StudentWithDetails[] = []
+const EMPTY_CLASSES: Class[] = []
+
 type FilterClass = 'all' | string
 type FilterStatus = 'all' | 'ACTIVE' | 'INACTIVE'
 
@@ -60,26 +66,47 @@ export default function StudentsPage() {
   const [isSaving, setIsSaving] = useState(false)
 
   const { data: queryData, isLoading: loading, isError, error } = useStudentsWithDetails()
-  const students = queryData?.students || []
-  const classes = queryData?.classes || []
+  const students = queryData?.students ?? EMPTY_STUDENTS
+  const classes = queryData?.classes ?? EMPTY_CLASSES
   const { invalidateStudents } = useInvalidateQueries()
 
   const fetchData = invalidateStudents
 
   // Filter students
-  const filteredStudents = students.filter((student) => {
-    const searchLower = searchQuery.toLowerCase()
-    const matchesSearch =
-      searchQuery === '' ||
-      student.full_name.toLowerCase().includes(searchLower) ||
-      (student.saint_name && student.saint_name.toLowerCase().includes(searchLower)) ||
-      (student.student_code && student.student_code.toLowerCase().includes(searchLower))
+  const trimmedQuery = searchQuery.trim()
+  // Chuẩn hoá chuỗi tìm kiếm một lần ngoài vòng lặp thay vì mỗi dòng
+  const searchNormalized = normalizeSearchText(trimmedQuery)
+  // Chỉ dò số điện thoại khi người dùng gõ chuỗi dạng số, tránh "Ấu 1A" khớp
+  // mọi số điện thoại có chứa chữ số 1
+  const searchDigits = /^[\d\s+.()-]+$/.test(trimmedQuery) ? trimmedQuery.replace(/\D/g, '') : ''
 
-    const matchesClass = filterClass === 'all' || student.class_id === filterClass
-    const matchesStatus = filterStatus === 'all' || student.status === filterStatus
+  const filteredStudents = useMemo(() => {
+    const matchesPhone = (phone?: string) =>
+      searchDigits.length >= 3 && (phone ?? '').replace(/\D/g, '').includes(searchDigits)
 
-    return matchesSearch && matchesClass && matchesStatus
-  })
+    return students.filter((student) => {
+      // Ghép tên thánh + họ tên để gõ "Maria Nguyễn" khớp đúng như bảng hiển thị
+      const fullNameWithSaint = normalizeSearchText(
+        `${student.saint_name ?? ''} ${student.full_name ?? ''}`.trim()
+      )
+
+      const matchesSearch =
+        searchNormalized === '' ||
+        fullNameWithSaint.includes(searchNormalized) ||
+        normalizeSearchText(student.student_code ?? '').includes(searchNormalized) ||
+        normalizeSearchText(student.class_name ?? '').includes(searchNormalized) ||
+        normalizeSearchText(student.parent_name ?? '').includes(searchNormalized) ||
+        normalizeSearchText(student.parent_name_2 ?? '').includes(searchNormalized) ||
+        matchesPhone(student.parent_phone) ||
+        matchesPhone(student.parent_phone_2) ||
+        matchesPhone(student.phone)
+
+      const matchesClass = filterClass === 'all' || student.class_id === filterClass
+      const matchesStatus = filterStatus === 'all' || student.status === filterStatus
+
+      return matchesSearch && matchesClass && matchesStatus
+    })
+  }, [students, searchNormalized, searchDigits, filterClass, filterStatus])
 
   // Get class name by id
   const getClassName = (classId: string) => {
@@ -204,7 +231,7 @@ export default function StudentsPage() {
             <Search className="w-5 h-5 text-primary-3" />
             <input
               type="text"
-              placeholder="Tìm kiếm theo tên, mã thiếu nhi,..."
+              placeholder="Tìm theo tên, mã, lớp, phụ huynh, SĐT..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full lg:w-[280px] h-[38px] bg-transparent text-sm text-black dark:text-white placeholder:text-primary-3 border-none focus:outline-none"
