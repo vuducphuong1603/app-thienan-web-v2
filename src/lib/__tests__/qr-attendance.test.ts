@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter } from '../qr-attendance'
+import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry } from '../qr-attendance'
 
 describe('parseStudentCode', () => {
   it('trả về nguyên mã khi QR chỉ chứa mã', () => {
@@ -89,5 +89,38 @@ describe('studentSearchOrFilter', () => {
     expect(studentSearchOrFilter('An')).toBe(
       'full_name.ilike.%An%,saint_name.ilike.%An%,student_code.ilike.%An%'
     )
+  })
+})
+
+describe('mapRestoredScanEntry', () => {
+  it('khôi phục đầy đủ tên thánh, tên, mã, lớp và giờ', () => {
+    expect(mapRestoredScanEntry({
+      id: 'r1',
+      check_in_time: '08:15:30',
+      thieu_nhi: {
+        full_name: 'Nguyễn Văn A',
+        saint_name: 'Giuse',
+        student_code: 'TN0123',
+        classes: { name: 'Chiên Con 1' },
+      },
+    })).toEqual({
+      id: 'r1',
+      studentName: 'Giuse Nguyễn Văn A',
+      studentCode: 'TN0123',
+      className: 'Chiên Con 1',
+      time: '08:15',
+      status: 'success',
+    })
+  })
+
+  it('chịu được bản ghi thiếu thông tin (join null)', () => {
+    expect(mapRestoredScanEntry({ id: 'r2', check_in_time: null, thieu_nhi: null })).toEqual({
+      id: 'r2',
+      studentName: 'Không xác định',
+      studentCode: '',
+      className: '',
+      time: '',
+      status: 'success',
+    })
   })
 })

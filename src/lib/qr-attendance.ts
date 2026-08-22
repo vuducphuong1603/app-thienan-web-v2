@@ -53,3 +53,38 @@ export function shouldThrottleScan(
   recentScans.set(code, now)
   return false
 }
+
+/** Bản ghi điểm danh (kèm join thieu_nhi) đọc từ DB để khôi phục lịch sử quét */
+export type RestoredAttendanceRecord = {
+  id: string
+  check_in_time: string | null
+  thieu_nhi?: {
+    full_name?: string
+    saint_name?: string | null
+    student_code?: string
+    classes?: { name?: string } | null
+  } | null
+}
+
+/**
+ * Chuyển bản ghi DB thành mục lịch sử quét hiển thị trong modal.
+ * Dùng khi mở lại modal (sau reload) để dữ liệu đã điểm danh không "biến mất".
+ */
+export function mapRestoredScanEntry(record: RestoredAttendanceRecord): {
+  id: string
+  studentName: string
+  studentCode: string
+  className: string
+  time: string
+  status: 'success'
+} {
+  const tn = record.thieu_nhi
+  return {
+    id: record.id,
+    studentName: `${tn?.saint_name ? `${tn.saint_name} ` : ''}${tn?.full_name || 'Không xác định'}`,
+    studentCode: tn?.student_code || '',
+    className: tn?.classes?.name || '',
+    time: record.check_in_time?.substring(0, 5) || '',
+    status: 'success',
+  }
+}

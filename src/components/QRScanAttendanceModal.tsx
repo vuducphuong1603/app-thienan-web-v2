@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import jsQR from 'jsqr'
 import { X, Camera, CameraOff, CheckCircle2, Clock, XCircle, Users, ScanLine, Search, UserPlus, Phone, Loader2 } from 'lucide-react'
 import { supabase, SchoolYear, UserProfile } from '@/lib/supabase'
-import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter } from '@/lib/qr-attendance'
+import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, RestoredAttendanceRecord } from '@/lib/qr-attendance'
 
 type ScanEntry = {
   id: string
@@ -418,29 +418,36 @@ export default function QRScanAttendanceModal({
         return
       }
 
-      // Lịch sử quét gần nhất trong ngày
-      const { data: hist } = await supabase
-        .from('attendance_records')
-        .select('id, check_in_time, thieu_nhi(full_name, saint_name, student_code, classes(name))')
-        .eq('attendance_date', dateStr)
-        .eq('day_type', dayType)
-        .eq('check_in_method', 'qr_scan')
-        .order('created_at', { ascending: false })
-        .limit(5)
+      // Khôi phục dữ liệu điểm danh trong ngày (cả quét QR lẫn thủ công),
+      // để reload / mở lại modal không làm "mất" dữ liệu đã điểm danh
+      const [{ data: hist }, { count: todayCount }, { data: markedRows }] = await Promise.all([
+        supabase
+          .from('attendance_records')
+          .select('id, check_in_time, thieu_nhi(full_name, saint_name, student_code, classes(name))')
+          .eq('attendance_date', dateStr)
+          .eq('day_type', dayType)
+          .in('check_in_method', ['qr_scan', 'manual'])
+          .order('created_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('attendance_records')
+          .select('id', { count: 'exact', head: true })
+          .eq('attendance_date', dateStr)
+          .eq('day_type', dayType)
+          .in('check_in_method', ['qr_scan', 'manual']),
+        supabase
+          .from('attendance_records')
+          .select('student_id')
+          .eq('attendance_date', dateStr)
+          .eq('day_type', dayType),
+      ])
       if (cancelled) return
       if (hist) {
-        setScanHistory(hist.map((r) => {
-          const tn = r.thieu_nhi as unknown as { full_name?: string; saint_name?: string | null; student_code?: string; classes?: { name?: string } | null } | null
-          return {
-            id: r.id as string,
-            studentName: `${tn?.saint_name ? `${tn.saint_name} ` : ''}${tn?.full_name || 'Không xác định'}`,
-            studentCode: tn?.student_code || '',
-            className: tn?.classes?.name || '',
-            time: (r.check_in_time as string | null)?.substring(0, 5) || '',
-            status: 'success' as const,
-          }
-        }))
-        setScanCount(hist.length)
+        setScanHistory(hist.map((r) => mapRestoredScanEntry(r as unknown as RestoredAttendanceRecord)))
+      }
+      setScanCount(todayCount ?? hist?.length ?? 0)
+      if (markedRows) {
+        setMarkedStudents(new Set(markedRows.map((r) => r.student_id as string)))
       }
 
       // Khởi động camera
