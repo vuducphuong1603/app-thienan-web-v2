@@ -96,6 +96,7 @@ export default function UserDashboard() {
               value={glvStats?.studentCount ?? '...'}
               icon="student"
               chart="people"
+              href="/dashboard/management"
             />
             <StatsCard
               title="Tỉ lệ đi lễ thứ 5"

@@ -419,22 +419,28 @@ export default function QRScanAttendanceModal({
       }
 
       // Khôi phục dữ liệu điểm danh trong ngày (cả quét QR lẫn thủ công),
-      // để reload / mở lại modal không làm "mất" dữ liệu đã điểm danh
+      // để reload / mở lại modal không làm "mất" dữ liệu đã điểm danh.
+      // Lịch sử + bộ đếm chỉ lấy của CHÍNH người đang đăng nhập (created_by);
+      // markedStudents vẫn lấy toàn bộ để chặn điểm danh trùng.
+      let histQuery = supabase
+        .from('attendance_records')
+        .select('id, check_in_time, thieu_nhi(full_name, saint_name, student_code, classes(name))')
+        .eq('attendance_date', dateStr)
+        .eq('day_type', dayType)
+        .in('check_in_method', ['qr_scan', 'manual'])
+      let countQuery = supabase
+        .from('attendance_records')
+        .select('id', { count: 'exact', head: true })
+        .eq('attendance_date', dateStr)
+        .eq('day_type', dayType)
+        .in('check_in_method', ['qr_scan', 'manual'])
+      if (user?.id) {
+        histQuery = histQuery.eq('created_by', user.id)
+        countQuery = countQuery.eq('created_by', user.id)
+      }
       const [{ data: hist }, { count: todayCount }, { data: markedRows }] = await Promise.all([
-        supabase
-          .from('attendance_records')
-          .select('id, check_in_time, thieu_nhi(full_name, saint_name, student_code, classes(name))')
-          .eq('attendance_date', dateStr)
-          .eq('day_type', dayType)
-          .in('check_in_method', ['qr_scan', 'manual'])
-          .order('created_at', { ascending: false })
-          .limit(5),
-        supabase
-          .from('attendance_records')
-          .select('id', { count: 'exact', head: true })
-          .eq('attendance_date', dateStr)
-          .eq('day_type', dayType)
-          .in('check_in_method', ['qr_scan', 'manual']),
+        histQuery.order('created_at', { ascending: false }).limit(5),
+        countQuery,
         supabase
           .from('attendance_records')
           .select('student_id')
@@ -501,7 +507,7 @@ export default function QRScanAttendanceModal({
       if (videoEl) videoEl.srcObject = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, retryKey])
+  }, [isOpen, retryKey, user?.id])
 
   // Giữ modal cố định khi bàn phím ảo mở (iOS Safari đẩy trang lên gây trống màn hình):
   // khoá cuộn body, co panel theo chiều cao visualViewport và kéo về vị trí 0

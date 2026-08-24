@@ -229,7 +229,7 @@ export default function ForgotPasswordPage() {
 
       {/* Footer */}
       <footer className="w-full px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10">
-        <p className="text-xs text-gray-600 dark:text-gray-400">© 2025 Giáo Xứ Thiên Ân. All right reserved.</p>
+        <p className="text-xs text-gray-600 dark:text-gray-400">© {new Date().getFullYear()} Giáo Xứ Thiên Ân. All right reserved.</p>
         <div className="flex items-center gap-6">
           <Link
             href="/privacy"

@@ -2,7 +2,8 @@
 
 import { useAuth } from '@/lib/auth-context'
 import { ROLE_LABELS } from '@/lib/supabase'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 import DashboardHeader from '@/components/dashboard/DashboardHeader'
 import Link from 'next/link'
 
@@ -71,6 +72,17 @@ const sidebarItems = [
 export default function ManagementLayout({ children }: ManagementLayoutProps) {
   const { user, loading, logout } = useAuth()
   const pathname = usePathname()
+  const router = useRouter()
+  const isAdmin = user?.role === 'admin'
+
+  // Chỉ admin (Ban điều hành) mới được vào Người dùng / Lớp học
+  const isAdminOnlyPath =
+    pathname?.includes('/admin/management/users') || pathname?.includes('/admin/management/classes')
+  useEffect(() => {
+    if (user && !isAdmin && isAdminOnlyPath) {
+      router.replace('/dashboard/management')
+    }
+  }, [user, isAdmin, isAdminOnlyPath, router])
 
   if (!user && !loading) {
     return null
@@ -79,6 +91,16 @@ export default function ManagementLayout({ children }: ManagementLayoutProps) {
   if (!user) {
     return null
   }
+
+  if (!isAdmin && isAdminOnlyPath) {
+    return null
+  }
+
+  const visibleItems = isAdmin
+    ? sidebarItems
+    : sidebarItems
+        .filter((item) => item.id === 'students')
+        .map((item) => ({ ...item, href: '/dashboard/management' }))
 
   const firstName = user.full_name?.split(' ').pop() || user.full_name
 
@@ -108,7 +130,7 @@ export default function ManagementLayout({ children }: ManagementLayoutProps) {
         {/* Left Sidebar */}
         <aside className="w-full lg:w-[208px] flex-shrink-0">
           <nav className="flex flex-row lg:flex-col gap-2.5 overflow-x-auto lg:overflow-x-visible">
-            {sidebarItems.map((item) => {
+            {visibleItems.map((item) => {
               const isActive = activeItem === item.id
               return (
                 <Link

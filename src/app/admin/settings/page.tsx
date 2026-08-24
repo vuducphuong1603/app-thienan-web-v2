@@ -1778,7 +1778,7 @@ export default function SettingsPage() {
       {/* Footer */}
       <footer className="px-4 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-0">
         <p className="text-xs text-black dark:text-white">
-          &copy; 2025 Giáo Xứ Thiên Ân. All right reserved.
+          &copy; {new Date().getFullYear()} Giáo Xứ Thiên Ân. All right reserved.
         </p>
         <div className="flex items-center gap-6">
           <a href="#" className="flex items-center gap-1.5 text-xs text-black dark:text-white hover:text-brand transition-colors">

@@ -7,7 +7,6 @@ import { useAuth } from '@/lib/auth-context'
 import { Search, Calendar, Check, X, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import CustomCalendar from '@/components/ui/CustomCalendar'
-import QRAttendanceModal from '@/components/QRAttendanceModal'
 import { normalizeSearchText } from '@/lib/search'
 
 interface StudentWithCompensatoryStatus extends ThieuNhiProfile {
@@ -26,10 +25,6 @@ export default function CompensatoryAttendancePage() {
   const { data: schoolYearsData = [] } = useSchoolYears()
   const schoolYear = schoolYearsData.find(y => y.is_current) || schoolYearsData[0] || null
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
-
-  // QR modal states
-  const [isQRModalOpen, setIsQRModalOpen] = useState(false)
-  const [selectedStudentForQR, setSelectedStudentForQR] = useState<StudentWithCompensatoryStatus | null>(null)
 
   // Filter states
   const [selectedClassId, setSelectedClassId] = useState<string>('')
@@ -312,27 +307,6 @@ export default function CompensatoryAttendancePage() {
     }
   }
 
-  // Open QR modal for a student
-  const openQRModal = (student: StudentWithCompensatoryStatus) => {
-    setSelectedStudentForQR(student)
-    setIsQRModalOpen(true)
-  }
-
-  // Handle manual attendance from QR modal
-  const handleManualAttendanceFromModal = () => {
-    if (selectedStudentForQR) {
-      markCompensatoryAttendance(selectedStudentForQR.id)
-    }
-    setIsQRModalOpen(false)
-    setSelectedStudentForQR(null)
-  }
-
-  // Close QR modal
-  const closeQRModal = () => {
-    setIsQRModalOpen(false)
-    setSelectedStudentForQR(null)
-  }
-
   return (
     <div className="space-y-4">
       {/* Header with back button */}
@@ -567,17 +541,6 @@ export default function CompensatoryAttendancePage() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-3">
-                      {/* QR Scan Icon */}
-                      <button
-                        onClick={() => openQRModal(student)}
-                        disabled={saving === student.id}
-                        className="flex items-center justify-center hover:opacity-70 transition-opacity disabled:opacity-50"
-                        title="Quét QR điểm danh"
-                      >
-                        <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M15.2915 19.0834V17.1667H18.1665V14.2917H20.0832V17.6459C20.0832 18.0292 19.8915 18.3167 19.604 18.6042C19.3165 18.8917 18.9332 19.0834 18.6457 19.0834H15.2915ZM5.70825 19.0834H2.354C1.97067 19.0834 1.68317 18.8917 1.39567 18.6042C1.10817 18.3167 0.916504 17.9334 0.916504 17.6459V14.2917H2.83317V17.1667H5.70825V19.0834ZM15.2915 0.916748H18.6457C19.029 0.916748 19.3165 1.10841 19.604 1.39591C19.8915 1.68341 20.0832 1.97091 20.0832 2.35425V5.70841H18.1665V2.83341H15.2915V0.916748ZM5.70825 0.916748V2.83341H2.83317V5.70841H0.916504V2.35425C0.916504 1.97091 1.10817 1.68341 1.39567 1.39591C1.68317 1.10841 1.97067 0.916748 2.354 0.916748H5.70825ZM17.2082 9.54175H3.79159V11.4584H17.2082V9.54175Z" fill="#FA865E"/>
-                        </svg>
-                      </button>
                       {/* Manual attendance button */}
                       <button
                         onClick={() => markCompensatoryAttendance(student.id)}
@@ -608,14 +571,6 @@ export default function CompensatoryAttendancePage() {
         )}
       </div>
 
-      {/* QR Attendance Modal */}
-      <QRAttendanceModal
-        isOpen={isQRModalOpen}
-        onClose={closeQRModal}
-        onManualAttendance={handleManualAttendanceFromModal}
-        studentName={selectedStudentForQR ? `${selectedStudentForQR.saint_name || ''} ${selectedStudentForQR.full_name}`.trim() : undefined}
-        studentCode={selectedStudentForQR?.student_code}
-      />
     </div>
   )
 }
