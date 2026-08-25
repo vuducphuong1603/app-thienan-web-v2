@@ -1050,9 +1050,28 @@ export default function ActivitiesPage() {
         return
       }
 
-      // Update local state (Chủ nhật: tải lại để có đủ 2 buổi)
+      // Update local state (không tải lại trang để giữ vị trí cuộn)
       if (dayType === 'cn') {
-        await fetchStudents()
+        const byName = user?.full_name || 'Người dùng hiện tại'
+        const time = checkInTime.substring(0, 5)
+        const idOf = (dt: DayType) => upserted?.find(r => r.day_type === dt)?.id
+        setStudents(prev => prev.map(s => {
+          if (s.id !== studentId) return s
+          const next = { ...s }
+          if (targetTypes.includes('cn')) {
+            next.attendance_status = status
+            next.attendance_time = time
+            next.attendance_by = byName
+            next.attendance_record_id = idOf('cn') ?? s.attendance_record_id
+          }
+          if (targetTypes.includes('cn_le')) {
+            next.mass_status = status
+            next.mass_time = time
+            next.mass_by = byName
+            next.mass_record_id = idOf('cn_le') ?? s.mass_record_id
+          }
+          return next
+        }))
       } else {
         setStudents(prev => prev.map(s =>
           s.id === studentId
@@ -1124,11 +1143,12 @@ export default function ActivitiesPage() {
         created_by: user?.id,
       })))
 
-      const { error } = await supabase
+      const { data: upsertedAll, error } = await supabase
         .from('attendance_records')
         .upsert(records, {
           onConflict: 'student_id,attendance_date,day_type',
         })
+        .select('id, student_id, day_type')
 
       if (error) {
         console.error('Error saving attendance:', error)
@@ -1140,9 +1160,22 @@ export default function ActivitiesPage() {
         return
       }
 
-      // Update local state (Chủ nhật: tải lại để có đủ 2 buổi)
+      // Update local state (không tải lại trang để giữ vị trí cuộn)
       if (dayType === 'cn') {
-        await fetchStudents()
+        const byName = user?.full_name || 'Người dùng hiện tại'
+        const time = checkInTime.substring(0, 5)
+        const idOf = (sid: string, dt: DayType) => upsertedAll?.find(r => r.student_id === sid && r.day_type === dt)?.id
+        setStudents(prev => prev.map(s => ({
+          ...s,
+          attendance_status: 'present' as const,
+          attendance_time: s.attendance_status === 'present' ? s.attendance_time : time,
+          attendance_by: s.attendance_status === 'present' ? s.attendance_by : byName,
+          attendance_record_id: idOf(s.id, 'cn') ?? s.attendance_record_id,
+          mass_status: 'present' as const,
+          mass_time: s.mass_status === 'present' ? s.mass_time : time,
+          mass_by: s.mass_status === 'present' ? s.mass_by : byName,
+          mass_record_id: idOf(s.id, 'cn_le') ?? s.mass_record_id,
+        })))
       } else {
         setStudents(prev => prev.map(s => ({
           ...s,
@@ -1198,9 +1231,19 @@ export default function ActivitiesPage() {
         return
       }
 
-      // Update local state (Chủ nhật: tải lại để có đủ 2 buổi)
+      // Update local state (không tải lại trang để giữ vị trí cuộn)
       if (dayType === 'cn') {
-        await fetchStudents()
+        setStudents(prev => prev.map(s => {
+          if (s.id !== studentId) return s
+          const next = { ...s }
+          if (session !== 'cn_le') {
+            next.attendance_status = null; next.attendance_time = undefined; next.attendance_by = undefined; next.attendance_record_id = undefined
+          }
+          if (session !== 'cn') {
+            next.mass_status = null; next.mass_time = undefined; next.mass_by = undefined; next.mass_record_id = undefined
+          }
+          return next
+        }))
       } else {
         setStudents(prev => prev.map(s =>
           s.id === studentId
