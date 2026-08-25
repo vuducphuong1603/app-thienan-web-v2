@@ -2957,7 +2957,7 @@ export default function ActivitiesPage() {
                         students.map((student, index) => (
                           <div
                             key={student.id}
-                            className={`${isSunday ? 'min-w-[900px]' : 'min-w-[760px]'} flex items-center py-5 ${index !== students.length - 1 ? 'border-b border-[#f0f0f0]' : ''} ${saving === student.id ? 'opacity-50' : ''}`}
+                            className={`${isSunday ? 'flex-wrap md:flex-nowrap md:min-w-[900px]' : 'min-w-[760px]'} flex items-center py-5 ${index !== students.length - 1 ? 'border-b border-[#f0f0f0]' : ''} ${saving === student.id ? 'opacity-50' : ''}`}
                           >
                             {/* Checkbox Column */}
                             <div className="w-[60px] flex items-center justify-center">
@@ -3018,7 +3018,7 @@ export default function ActivitiesPage() {
                             </div>
 
                             {/* Name & Code Column */}
-                            <div className="w-[220px] flex flex-col pl-3">
+                            <div className={`${isSunday ? 'flex-1 min-w-0 md:flex-none md:w-[220px]' : 'w-[220px]'} flex flex-col pl-3`}>
                               <span className="text-base font-medium text-black dark:text-white leading-tight">
                                 {student.saint_name && `${student.saint_name} `}{student.full_name}
                               </span>
@@ -3029,15 +3029,15 @@ export default function ActivitiesPage() {
                               (() => {
                                 const st = sundayStatus(student.attendance_status, student.mass_status)
                                 return (
-                                  <>
-                                    <div className="w-[150px]">
+                                  <div className="basis-full order-2 md:order-none mt-3 pl-[60px] pr-3 flex flex-col gap-2 md:contents">
+                                    <div className="md:w-[150px]">
                                       <span className={`text-base font-medium ${
                                         st === 'full' ? 'text-[#00a86b]' : st === 'none' ? 'text-brand' : st === 'absent' ? 'text-[#666d80]' : 'text-[#d97706]'
                                       }`}>
                                         {SUNDAY_STATUS_LABELS[st]}
                                       </span>
                                     </div>
-                                    <div className="w-[260px] flex items-center gap-2">
+                                    <div className="md:w-[260px] flex items-center gap-2">
                                       {renderSundaySessionChip(student, 'cn')}
                                       {renderSundaySessionChip(student, 'cn_le')}
                                       {st === 'none' && (
@@ -3051,7 +3051,7 @@ export default function ActivitiesPage() {
                                         </button>
                                       )}
                                     </div>
-                                    <div className="flex-1 flex flex-col pl-5">
+                                    <div className="md:flex-1 flex flex-col md:pl-5">
                                       {student.attendance_status && (
                                         <span className="text-sm text-black dark:text-white leading-tight">
                                           Giáo lý: {student.attendance_status === 'present' ? `có mặt${student.attendance_time ? ` lúc ${student.attendance_time}` : ''}` : 'vắng'}
@@ -3065,7 +3065,7 @@ export default function ActivitiesPage() {
                                         </span>
                                       )}
                                     </div>
-                                  </>
+                                  </div>
                                 )
                               })()
                             ) : (
@@ -3164,7 +3164,7 @@ export default function ActivitiesPage() {
                             )}
 
                             {/* Actions Column */}
-                            <div className="w-[80px] flex items-center justify-end gap-3">
+                            <div className={`${isSunday ? 'w-10 md:w-[80px]' : 'w-[80px]'} flex items-center justify-end gap-3`}>
                               {/* X Icon - Clear attendance */}
                               <button
                                 onClick={() => clearAttendance(student.id)}
