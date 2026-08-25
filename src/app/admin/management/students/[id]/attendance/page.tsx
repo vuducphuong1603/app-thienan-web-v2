@@ -290,7 +290,7 @@ export default function StudentAttendancePage() {
       <div className="px-6 py-5">
         {/* Back Button */}
         <button
-          onClick={() => router.push('/admin/management/students')}
+          onClick={() => router.back()}
           className="flex items-center gap-2 text-sm text-[#8B8685] hover:text-black dark:hover:text-white transition-colors mb-2"
         >
           <ArrowLeft className="w-4 h-4" />
