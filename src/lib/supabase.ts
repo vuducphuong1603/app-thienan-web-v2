@@ -204,7 +204,7 @@ export interface AttendanceRecord {
   class_id: string
   school_year_id?: string
   attendance_date: string // YYYY-MM-DD
-  day_type: 'thu5' | 'cn' // thu5 = Thursday, cn = Sunday
+  day_type: 'thu5' | 'cn' | 'cn_le' // thu5 = Thứ 5, cn = CN học giáo lý, cn_le = CN đi lễ
   status: 'present' | 'absent'
   check_in_time?: string // HH:MM:SS
   check_in_method?: 'manual' | 'qr_scan'

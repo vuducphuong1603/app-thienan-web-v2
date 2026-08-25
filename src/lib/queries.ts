@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { sundayFullyPresentIds } from '@/lib/sunday-attendance'
 import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord, NotificationWithStatus, Notification, UserNote, Holiday, SchoolYear, AttendanceRecord, ThieuNhiProfile, BRANCHES } from './supabase'
 
 // ============ Helper: Count weekdays between two dates ============
@@ -140,13 +141,15 @@ export function useGLVDashboardStats(user: UserProfile | null) {
               .eq('class_id', user.class_id).eq('attendance_date', lastThu5).eq('day_type', 'thu5').eq('status', 'present')
           : Promise.resolve({ count: 0 }),
         lastCN
-          ? supabase.from('attendance_records').select('*', { count: 'exact', head: true })
-              .eq('class_id', user.class_id).eq('attendance_date', lastCN).eq('day_type', 'cn').eq('status', 'present')
-          : Promise.resolve({ count: 0 }),
+          ? supabase.from('attendance_records').select('student_id, day_type')
+              .eq('class_id', user.class_id).eq('attendance_date', lastCN).in('day_type', ['cn', 'cn_le']).eq('status', 'present')
+          : Promise.resolve({ data: [] as { student_id: string; day_type: string }[] }),
       ])
 
+      // Chủ nhật: có mặt = đủ cả học giáo lý lẫn đi lễ
+      const cnPresent = sundayFullyPresentIds(cnRes.data || []).size
       const thu5Rate = studentCount > 0 ? Math.round(((thu5Res.count || 0) / studentCount) * 100) : 0
-      const cnRate = studentCount > 0 ? Math.round(((cnRes.count || 0) / studentCount) * 100) : 0
+      const cnRate = studentCount > 0 ? Math.round((cnPresent / studentCount) * 100) : 0
 
       return { branchName, className, studentCount, thu5Rate, cnRate }
     },
@@ -353,15 +356,19 @@ export function useAbsentStudents(classId: string | undefined, dayType: 'cn' | '
       const [studentsRes, attendanceRes] = await Promise.all([
         supabase.from('thieu_nhi').select('id, full_name, saint_name, student_code, date_of_birth, avatar_url')
           .eq('class_id', classId).eq('status', 'ACTIVE').order('full_name'),
-        supabase.from('attendance_records').select('student_id')
-          .eq('class_id', classId).eq('attendance_date', date).eq('day_type', dayType).eq('status', 'present'),
+        supabase.from('attendance_records').select('student_id, day_type')
+          .eq('class_id', classId).eq('attendance_date', date)
+          .in('day_type', dayType === 'cn' ? ['cn', 'cn_le'] : ['thu5']).eq('status', 'present'),
       ])
 
       if (studentsRes.error) throw studentsRes.error
       if (attendanceRes.error) throw attendanceRes.error
 
       const students = (studentsRes.data || []) as AbsentStudent[]
-      const presentIds = new Set((attendanceRes.data || []).map(r => r.student_id))
+      // Chủ nhật: có mặt = đủ cả học giáo lý lẫn đi lễ
+      const presentIds = dayType === 'cn'
+        ? sundayFullyPresentIds(attendanceRes.data || [])
+        : new Set((attendanceRes.data || []).map(r => r.student_id))
 
       const absentStudents = students.filter(s => !presentIds.has(s.id))
 
@@ -985,15 +992,22 @@ export function usePerformanceTrendData(chartType: 'sunday' | 'thursday', enable
         (from, to) => supabase
           .from('attendance_records')
           .select('id, student_id, class_id, attendance_date, day_type, status')
-          .eq('day_type', dayType)
+          .in('day_type', dayType === 'cn' ? ['cn', 'cn_le'] : ['thu5'])
           .eq('status', 'present')
           .gte('attendance_date', startDate)
           .lte('attendance_date', endDate)
           .range(from, to)
       )
 
+      // Chủ nhật: chỉ tính em có mặt đủ cả giáo lý lẫn đi lễ (giữ 1 bản ghi đại diện / em)
+      const toFullyPresent = (rows: typeof attendanceData) => {
+        if (dayType !== 'cn') return rows
+        const full = sundayFullyPresentIds(rows)
+        return rows.filter(r => r.day_type === 'cn' && full.has(r.student_id))
+      }
+
       const chartData = weeks.map(week => {
-        const weekAttendance = attendanceData.filter(r => r.attendance_date === week.date)
+        const weekAttendance = toFullyPresent(attendanceData.filter(r => r.attendance_date === week.date))
         const countByBranch: Record<string, number> = {
           'Chiên Con': 0, 'Ấu Nhi': 0, 'Thiếu Nhi': 0, 'Nghĩa Sĩ': 0,
         }
@@ -1072,12 +1086,18 @@ export function useClassAttendanceData(branch: Branch, date: string, dayType: 'c
         fetchAllRows<{ id: string; class_id: string }>(
           (from, to) => supabase.from('thieu_nhi').select('id, class_id').in('class_id', classIds).eq('status', 'ACTIVE').order('id', { ascending: true }).range(from, to)
         ),
-        fetchAllRows<{ id: string; student_id: string; class_id: string; status: string }>(
-          (from, to) => supabase.from('attendance_records').select('id, student_id, class_id, status')
-            .in('class_id', classIds).eq('attendance_date', date).eq('day_type', dayType).eq('status', 'present')
+        fetchAllRows<{ id: string; student_id: string; class_id: string; status: string; day_type: string }>(
+          (from, to) => supabase.from('attendance_records').select('id, student_id, class_id, status, day_type')
+            .in('class_id', classIds).eq('attendance_date', date)
+            .in('day_type', dayType === 'cn' ? ['cn', 'cn_le'] : ['thu5']).eq('status', 'present')
             .range(from, to)
         ),
-      ])
+      ]).then(([students, rows]) => {
+        // Chủ nhật: có mặt = đủ cả học giáo lý lẫn đi lễ
+        if (dayType !== 'cn') return [students, rows] as const
+        const full = sundayFullyPresentIds(rows)
+        return [students, rows.filter(r => r.day_type === 'cn' && full.has(r.student_id))] as const
+      })
 
       const studentsByClass: Record<string, number> = {}
       classIds.forEach(id => { studentsByClass[id] = 0 })
@@ -1662,6 +1682,11 @@ export interface StudentWithAttendance extends ThieuNhiProfile {
   attendance_time?: string
   attendance_by?: string
   attendance_record_id?: string
+  /** Chủ nhật – buổi đi lễ (day_type 'cn_le'); attendance_* ở trên là buổi học giáo lý ('cn') */
+  mass_status?: 'present' | 'absent' | null
+  mass_time?: string
+  mass_by?: string
+  mass_record_id?: string
   has_thursday_attendance?: boolean
   has_compensatory_attendance?: boolean
   compensatory_record_id?: string
@@ -1831,15 +1856,17 @@ export function useAttendanceStudents(
 
         // Build attendance map (exclude compensatory)
         const attendanceMap = new Map<string, AttendanceRecord>()
+        const massMap = new Map<string, AttendanceRecord>()
         if (attendanceData) {
           attendanceData.forEach(record => {
             if ((record as unknown as { is_compensatory?: boolean }).is_compensatory === true) return
-            attendanceMap.set(record.student_id, record)
+            if (record.day_type === 'cn_le') massMap.set(record.student_id, record)
+            else attendanceMap.set(record.student_id, record)
           })
         }
 
         // Resolve attendance user names
-        const attendanceUserIds = Array.from(attendanceMap.values()).map(r => r.created_by).filter((id): id is string => !!id)
+        const attendanceUserIds = [...Array.from(attendanceMap.values()), ...Array.from(massMap.values())].map(r => r.created_by).filter((id): id is string => !!id)
         const attendanceUserNameMap = new Map<string, string>()
         if (attendanceUserIds.length > 0) {
           const { data: usersData } = await supabase.from('users').select('id, full_name').in('id', Array.from(new Set(attendanceUserIds)))
@@ -1848,6 +1875,7 @@ export function useAttendanceStudents(
 
         return (studentsData || []).map(student => {
           const attendance = attendanceMap.get(student.id)
+          const mass = massMap.get(student.id)
           const compensatory = compensatoryMap.get(student.id)
           return {
             ...student,
@@ -1856,6 +1884,10 @@ export function useAttendanceStudents(
             attendance_time: attendance?.check_in_time?.substring(0, 5) || undefined,
             attendance_by: attendance?.created_by ? attendanceUserNameMap.get(attendance.created_by) : undefined,
             attendance_record_id: attendance?.id || undefined,
+            mass_status: mass?.status || null,
+            mass_time: mass?.check_in_time?.substring(0, 5) || undefined,
+            mass_by: mass?.created_by ? attendanceUserNameMap.get(mass.created_by) : undefined,
+            mass_record_id: mass?.id || undefined,
             has_compensatory_attendance: !!compensatory,
             compensatory_record_id: compensatory?.id,
             compensatory_time: compensatory?.check_in_time?.substring(0, 5),

@@ -1,10 +1,13 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { todayForAttendance } from '@/lib/debug-date'
+import { mergeSundayRecords, isSundayDate, countSundayReport, DayType, SundaySession, SUNDAY_SESSION_SHORT_LABELS, sundayStatus, SUNDAY_STATUS_LABELS } from '@/lib/sunday-attendance'
+import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear, Holiday } from '@/lib/supabase'
 import { useActiveClasses, useSchoolYears, countWeekdays } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
-import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarDays, Bell, ShieldAlert, History, ChevronDown, ScanLine } from 'lucide-react'
+import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarDays, Bell, ShieldAlert, History, ChevronDown, ScanLine, BookOpen, Church } from 'lucide-react'
 import Link from 'next/link'
 import CustomCalendar from '@/components/ui/CustomCalendar'
 import QRScanAttendanceModal from '@/components/QRScanAttendanceModal'
@@ -16,6 +19,8 @@ import PriestReportTemplate from '@/components/PriestReportTemplate'
 import type { PriestReportData, PriestReportBranchData, PriestReportClassData } from '@/components/PriestReportTemplate'
 import html2canvas from 'html2canvas'
 
+const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
 // Report related interfaces
 interface ReportStudent {
   id: string
@@ -23,7 +28,9 @@ interface ReportStudent {
   full_name: string
   saint_name?: string
   avatar_url?: string
-  attendance: Record<string, 'present' | 'absent' | null> // date -> status
+  attendance: Record<string, 'present' | 'absent' | null>
+  /** Chủ nhật buổi đi lễ ('cn_le'); attendance là giáo lý */
+  attendance_mass?: Record<string, 'present' | 'absent' | null> // date -> status
 }
 
 // Score report interface
@@ -61,6 +68,11 @@ interface StudentWithAttendance extends ThieuNhiProfile {
   attendance_time?: string
   attendance_by?: string
   attendance_record_id?: string
+  /** Chủ nhật – buổi đi lễ (day_type 'cn_le'); attendance_* là buổi học giáo lý ('cn') */
+  mass_status?: 'present' | 'absent' | null
+  mass_time?: string
+  mass_by?: string
+  mass_record_id?: string
   // Compensatory attendance fields
   has_thursday_attendance?: boolean
   has_compensatory_attendance?: boolean
@@ -435,7 +447,7 @@ export default function ActivitiesPage() {
 
   // Filter states
   const [selectedClassId, setSelectedClassId] = useState<string>('')
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState<string>(toLocalDateStr(todayForAttendance()))
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
 
@@ -451,8 +463,8 @@ export default function ActivitiesPage() {
 
   // Report states
   const [reportTimeFilterMode, setReportTimeFilterMode] = useState<TimeFilterMode>('month')
-  const [reportFromDate, setReportFromDate] = useState<string>(new Date().toISOString().split('T')[0])
-  const [reportToDate, setReportToDate] = useState<string>(new Date().toISOString().split('T')[0])
+  const [reportFromDate, setReportFromDate] = useState<string>(toLocalDateStr(todayForAttendance()))
+  const [reportToDate, setReportToDate] = useState<string>(toLocalDateStr(todayForAttendance()))
   const [reportWeekStart, setReportWeekStart] = useState<string>('')
   const [reportWeekEnd, setReportWeekEnd] = useState<string>('')
   const [reportType, setReportType] = useState<ReportType>('attendance')
@@ -469,6 +481,7 @@ export default function ActivitiesPage() {
   const [reportStats, setReportStats] = useState({
     presentThu5: 0,
     presentCn: 0,
+    partialCn: 0,
     notChecked: 0,
     totalAttendance: 0,
   })
@@ -488,6 +501,8 @@ export default function ActivitiesPage() {
   const [exportSuccessMessage, setExportSuccessMessage] = useState('')
   // Holiday map for report (date string -> holiday info)
   const [reportHolidayMap, setReportHolidayMap] = useState<Map<string, { name: string; day_type: string }>>(new Map())
+  // Số Chủ nhật (không nghỉ lễ) trong báo cáo — mỗi ngày tách 2 cột con GL / Lễ
+  const reportSundayCount = reportDates.filter(d => isSundayDate(d) && !reportHolidayMap.has(d)).length
   // Current attendance date holiday warning
   const [currentDateHoliday, setCurrentDateHoliday] = useState<{ name: string; day_type: string } | null>(null)
 
@@ -797,16 +812,18 @@ export default function ActivitiesPage() {
 
         // Map attendance records to students (exclude compensatory records from regular attendance)
         const attendanceMap = new Map<string, AttendanceRecord>()
+        const massMap = new Map<string, AttendanceRecord>() // Chủ nhật – buổi đi lễ
         if (attendanceData) {
           attendanceData.forEach(record => {
             // Skip compensatory records - they are handled separately via compensatoryMap
             if ((record as unknown as { is_compensatory?: boolean }).is_compensatory === true) return
-            attendanceMap.set(record.student_id, record)
+            if (record.day_type === 'cn_le') massMap.set(record.student_id, record)
+            else attendanceMap.set(record.student_id, record)
           })
         }
 
         // Resolve created_by user IDs to names for regular attendance records
-        const attendanceUserIds = Array.from(attendanceMap.values())
+        const attendanceUserIds = [...Array.from(attendanceMap.values()), ...Array.from(massMap.values())]
           .map(r => r.created_by)
           .filter((id): id is string => !!id)
         const attendanceUserNameMap = new Map<string, string>()
@@ -824,6 +841,7 @@ export default function ActivitiesPage() {
         // Combine students with attendance data
         const studentsWithAttendance: StudentWithAttendance[] = (studentsData || []).map(student => {
           const attendance = attendanceMap.get(student.id)
+          const mass = massMap.get(student.id)
           const compensatory = compensatoryMap.get(student.id)
           return {
             ...student,
@@ -832,6 +850,10 @@ export default function ActivitiesPage() {
             attendance_time: attendance?.check_in_time?.substring(0, 5) || undefined,
             attendance_by: attendance?.created_by ? attendanceUserNameMap.get(attendance.created_by) : undefined,
             attendance_record_id: attendance?.id || undefined,
+            mass_status: mass?.status || null,
+            mass_time: mass?.check_in_time?.substring(0, 5) || undefined,
+            mass_by: mass?.created_by ? attendanceUserNameMap.get(mass.created_by) : undefined,
+            mass_record_id: mass?.id || undefined,
             has_compensatory_attendance: !!compensatory,
             compensatory_record_id: compensatory?.id,
             compensatory_time: compensatory?.check_in_time?.substring(0, 5),
@@ -924,46 +946,26 @@ export default function ActivitiesPage() {
 
   // Stats calculations
   const totalStudents = students.length
-  const presentCount = students.filter(s => s.attendance_status === 'present').length
-  const notCheckedCount = students.filter(s => s.attendance_status === null).length
+  const isSunday = dayType === 'cn'
+  // Chủ nhật: có mặt = đủ cả giáo lý lẫn đi lễ; chưa điểm danh = chưa có buổi nào
+  const presentCount = isSunday
+    ? students.filter(s => sundayStatus(s.attendance_status, s.mass_status) === 'full').length
+    : students.filter(s => s.attendance_status === 'present').length
+  const notCheckedCount = isSunday
+    ? students.filter(s => sundayStatus(s.attendance_status, s.mass_status) === 'none').length
+    : students.filter(s => s.attendance_status === null).length
 
-  // Helper function to update attendance count in thieu_nhi table
+  // Số buổi T5/CN trong thieu_nhi (CN = (giáo lý + đi lễ) / 2)
   const updateAttendanceCount = async (studentId: string) => {
-    try {
-      // Count present days for thu5
-      const { count: thu5Count } = await supabase
-        .from('attendance_records')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_id', studentId)
-        .eq('day_type', 'thu5')
-        .eq('status', 'present')
-        .eq('school_year_id', schoolYear?.id)
-
-      // Count present days for cn (Sunday)
-      const { count: cnCount } = await supabase
-        .from('attendance_records')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_id', studentId)
-        .eq('day_type', 'cn')
-        .eq('status', 'present')
-        .eq('school_year_id', schoolYear?.id)
-
-      // Update thieu_nhi table
-      await supabase
-        .from('thieu_nhi')
-        .update({
-          attendance_thu5: thu5Count || 0,
-          attendance_cn: cnCount || 0,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', studentId)
-    } catch (error) {
-      console.error('Error updating attendance count:', error)
-    }
+    await recalcAttendanceCount(studentId, schoolYear?.id)
   }
 
   // Handle attendance marking - save to database
-  const markAttendance = async (studentId: string, status: 'present' | 'absent') => {
+  /**
+   * @param session Chủ nhật: buổi cần ghi ('cn' giáo lý / 'cn_le' đi lễ).
+   *                Bỏ trống vào Chủ nhật = ghi cả 2 buổi (dùng cho "Vắng mặt" / tick nhanh).
+   */
+  const markAttendance = async (studentId: string, status: 'present' | 'absent', session?: SundaySession) => {
     if (!dayType) {
       showNotification('error', 'Chỉ điểm danh vào Thứ 5 hoặc Chủ nhật')
       return
@@ -1013,25 +1015,29 @@ export default function ActivitiesPage() {
       const now = new Date()
       const checkInTime = now.toTimeString().substring(0, 8)
 
-      // Upsert attendance record
-      const { data, error } = await supabase
+      const targetTypes: DayType[] = dayType === 'cn'
+        ? (session ? [session] : ['cn', 'cn_le'])
+        : [dayType]
+
+      // Upsert attendance record(s)
+      const { data: upserted, error } = await supabase
         .from('attendance_records')
-        .upsert({
+        .upsert(targetTypes.map(dt => ({
           student_id: studentId,
           class_id: selectedClassId,
           school_year_id: schoolYear?.id,
           attendance_date: selectedDate,
-          day_type: dayType,
+          day_type: dt,
           status: status,
           check_in_time: checkInTime,
           check_in_method: 'manual',
           created_by: user?.id,
           updated_at: now.toISOString(),
-        }, {
+        })), {
           onConflict: 'student_id,attendance_date,day_type',
         })
         .select('*')
-        .single()
+      const data = upserted?.[0]
 
       if (error) {
         console.error('Error saving attendance:', error)
@@ -1044,21 +1050,26 @@ export default function ActivitiesPage() {
         return
       }
 
-      // Update local state
-      setStudents(prev => prev.map(s =>
-        s.id === studentId
-          ? {
-              ...s,
-              attendance_status: status,
-              attendance_time: checkInTime.substring(0, 5),
-              attendance_by: user?.full_name || 'Người dùng hiện tại',
-              attendance_record_id: data?.id,
-            }
-          : s
-      ))
+      // Update local state (Chủ nhật: tải lại để có đủ 2 buổi)
+      if (dayType === 'cn') {
+        await fetchStudents()
+      } else {
+        setStudents(prev => prev.map(s =>
+          s.id === studentId
+            ? {
+                ...s,
+                attendance_status: status,
+                attendance_time: checkInTime.substring(0, 5),
+                attendance_by: user?.full_name || 'Người dùng hiện tại',
+                attendance_record_id: data?.id,
+              }
+            : s
+        ))
+      }
 
       setSaving(null)
-      showNotification('success', status === 'present' ? 'Đã điểm danh có mặt' : 'Đã điểm danh vắng mặt')
+      const sessionLabel = session ? ` ${SUNDAY_SESSION_SHORT_LABELS[session].toLowerCase()}` : ''
+      showNotification('success', status === 'present' ? `Đã điểm danh có mặt${sessionLabel}` : `Đã điểm danh vắng mặt${sessionLabel}`)
       updateAttendanceCount(studentId)
     } catch (error) {
       console.error('Error:', error)
@@ -1079,7 +1090,17 @@ export default function ActivitiesPage() {
       return
     }
 
-    const studentsToMark = students.filter(s => s.attendance_status === null && !s.has_compensatory_attendance)
+    // Chủ nhật: điền buổi còn thiếu (giáo lý và/hoặc đi lễ) cho từng em
+    const targets: { student: StudentWithAttendance; dayTypes: DayType[] }[] = students
+      .filter(s => !s.has_compensatory_attendance)
+      .map(s => ({
+        student: s,
+        dayTypes: dayType === 'cn'
+          ? ([s.attendance_status === null ? 'cn' : null, s.mass_status === null ? 'cn_le' : null].filter(Boolean) as DayType[])
+          : (s.attendance_status === null ? [dayType] : []),
+      }))
+      .filter(t => t.dayTypes.length > 0)
+    const studentsToMark = targets.map(t => t.student)
     if (studentsToMark.length === 0) {
       showNotification('success', 'Tất cả đã được điểm danh')
       return
@@ -1090,18 +1111,18 @@ export default function ActivitiesPage() {
       const now = new Date()
       const checkInTime = now.toTimeString().substring(0, 8)
 
-      // Create attendance records for all unmarked students
-      const records = studentsToMark.map(student => ({
+      // Create attendance records for all unmarked students / sessions
+      const records = targets.flatMap(({ student, dayTypes }) => dayTypes.map(dt => ({
         student_id: student.id,
         class_id: selectedClassId,
         school_year_id: schoolYear?.id,
         attendance_date: selectedDate,
-        day_type: dayType,
+        day_type: dt,
         status: 'present' as const,
         check_in_time: checkInTime,
         check_in_method: 'manual' as const,
         created_by: user?.id,
-      }))
+      })))
 
       const { error } = await supabase
         .from('attendance_records')
@@ -1119,13 +1140,17 @@ export default function ActivitiesPage() {
         return
       }
 
-      // Update local state
-      setStudents(prev => prev.map(s => ({
-        ...s,
-        attendance_status: 'present' as const,
-        attendance_time: s.attendance_time || checkInTime.substring(0, 5),
-        attendance_by: s.attendance_by || user?.full_name || 'Người dùng hiện tại',
-      })))
+      // Update local state (Chủ nhật: tải lại để có đủ 2 buổi)
+      if (dayType === 'cn') {
+        await fetchStudents()
+      } else {
+        setStudents(prev => prev.map(s => ({
+          ...s,
+          attendance_status: 'present' as const,
+          attendance_time: s.attendance_time || checkInTime.substring(0, 5),
+          attendance_by: s.attendance_by || user?.full_name || 'Người dùng hiện tại',
+        })))
+      }
 
       setSaving(null)
       showNotification('success', `Đã điểm danh ${studentsToMark.length} thiếu nhi`)
@@ -1138,13 +1163,19 @@ export default function ActivitiesPage() {
   }
 
   // Clear attendance for a student - delete from database
-  const clearAttendance = async (studentId: string) => {
+  /** Xoá điểm danh. Chủ nhật: truyền session để xoá 1 buổi, bỏ trống = xoá cả 2. */
+  const clearAttendance = async (studentId: string, session?: SundaySession) => {
     const student = students.find(s => s.id === studentId)
-    if (!student?.attendance_record_id) {
+    const ids = (
+      session === 'cn' ? [student?.attendance_record_id]
+      : session === 'cn_le' ? [student?.mass_record_id]
+      : [student?.attendance_record_id, student?.mass_record_id]
+    ).filter((id): id is string => !!id)
+    if (ids.length === 0) {
       // Just clear local state if no record exists
       setStudents(prev => prev.map(s =>
         s.id === studentId
-          ? { ...s, attendance_status: null, attendance_time: undefined, attendance_by: undefined, attendance_record_id: undefined }
+          ? { ...s, attendance_status: null, attendance_time: undefined, attendance_by: undefined, attendance_record_id: undefined, mass_status: null, mass_time: undefined, mass_by: undefined, mass_record_id: undefined }
           : s
       ))
       return
@@ -1155,7 +1186,7 @@ export default function ActivitiesPage() {
       const { error } = await supabase
         .from('attendance_records')
         .delete()
-        .eq('id', student.attendance_record_id)
+        .in('id', ids)
 
       if (error) {
         console.error('Error deleting attendance:', error)
@@ -1167,12 +1198,16 @@ export default function ActivitiesPage() {
         return
       }
 
-      // Update local state
-      setStudents(prev => prev.map(s =>
-        s.id === studentId
-          ? { ...s, attendance_status: null, attendance_time: undefined, attendance_by: undefined, attendance_record_id: undefined }
-          : s
-      ))
+      // Update local state (Chủ nhật: tải lại để có đủ 2 buổi)
+      if (dayType === 'cn') {
+        await fetchStudents()
+      } else {
+        setStudents(prev => prev.map(s =>
+          s.id === studentId
+            ? { ...s, attendance_status: null, attendance_time: undefined, attendance_by: undefined, attendance_record_id: undefined }
+            : s
+        ))
+      }
 
       setSaving(null)
       showNotification('success', 'Đã xóa điểm danh')
@@ -1380,6 +1415,34 @@ export default function ActivitiesPage() {
   }
 
   // Open Import Excel modal
+  /** Ô bấm cho 1 buổi Chủ nhật (giáo lý / đi lễ): chưa có → có mặt; đã có mặt → xoá; vắng → chuyển có mặt */
+  const renderSundaySessionChip = (student: StudentWithAttendance, session: SundaySession) => {
+    const status = session === 'cn' ? student.attendance_status : student.mass_status
+    const Icon = session === 'cn' ? BookOpen : Church
+    const disabled = saving === student.id || !!currentDateHoliday
+    const onClick = () => {
+      if (status === 'present') clearAttendance(student.id, session)
+      else markAttendance(student.id, 'present', session)
+    }
+    const cls = status === 'present'
+      ? 'bg-[rgba(0,168,107,0.12)] border-[#00a86b] text-[#00a86b]'
+      : status === 'absent'
+        ? 'bg-[rgba(250,134,94,0.15)] border-brand text-brand'
+        : 'bg-transparent border-[#e0e0e0] text-[#666d80] hover:border-brand hover:text-brand'
+    return (
+      <button
+        key={session}
+        onClick={onClick}
+        disabled={disabled}
+        title={status === 'present' ? `Bỏ điểm danh ${SUNDAY_SESSION_SHORT_LABELS[session]}` : `Điểm danh ${SUNDAY_SESSION_SHORT_LABELS[session]}`}
+        className={`h-[34px] px-3 rounded-full border-[1.5px] flex items-center gap-1.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${cls}`}
+      >
+        {status === 'present' ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : status === 'absent' ? <X className="w-3.5 h-3.5" strokeWidth={3} /> : <Icon className="w-3.5 h-3.5" />}
+        {SUNDAY_SESSION_SHORT_LABELS[session]}
+      </button>
+    )
+  }
+
   const openImportExcelModal = () => {
     setIsImportExcelModalOpen(true)
   }
@@ -1668,7 +1731,9 @@ export default function ActivitiesPage() {
           .lte('attendance_date', toDate)
 
         // Filter by attendance type if not 'all'
-        if (reportAttendanceType !== 'all') {
+        if (reportAttendanceType === 'cn') {
+          query = query.in('day_type', ['cn', 'cn_le'])
+        } else if (reportAttendanceType !== 'all') {
           query = query.eq('day_type', reportAttendanceType)
         }
 
@@ -1691,23 +1756,29 @@ export default function ActivitiesPage() {
         setReportDates(sortedDates)
 
         // Map attendance to students
+        // Chủ nhật tách 2 buổi: 'cn' (giáo lý) vào attendanceMap, 'cn_le' (đi lễ) vào massMap
         const attendanceMap = new Map<string, Map<string, 'present' | 'absent'>>()
+        const massMap = new Map<string, Map<string, 'present' | 'absent'>>()
         attendanceData?.forEach(record => {
-          if (!attendanceMap.has(record.student_id)) {
-            attendanceMap.set(record.student_id, new Map())
+          const target = record.day_type === 'cn_le' ? massMap : attendanceMap
+          if (!target.has(record.student_id)) {
+            target.set(record.student_id, new Map())
           }
-          attendanceMap.get(record.student_id)?.set(record.attendance_date, record.status)
+          target.get(record.student_id)?.set(record.attendance_date, record.status)
         })
 
         // Build report students
         const reportStudentsData: ReportStudent[] = (studentsData || []).map(student => {
           const studentAttendance: Record<string, 'present' | 'absent' | null> = {}
+          const studentMass: Record<string, 'present' | 'absent' | null> = {}
           sortedDates.forEach(date => {
             studentAttendance[date] = attendanceMap.get(student.id)?.get(date) || null
+            if (isSundayDate(date)) studentMass[date] = massMap.get(student.id)?.get(date) || null
           })
           return {
             ...student,
             attendance: studentAttendance,
+            attendance_mass: studentMass,
           }
         })
 
@@ -1720,19 +1791,22 @@ export default function ActivitiesPage() {
         let totalAttendance = 0
 
         attendanceData?.forEach(record => {
-          if (record.status === 'present') {
+          if (record.status === 'present' && record.day_type === 'thu5') {
             totalAttendance++
-            if (record.day_type === 'thu5') {
-              presentThu5++
-            } else if (record.day_type === 'cn') {
-              presentCn++
-            }
+            presentThu5++
           }
         })
+        // Chủ nhật: "có mặt" = đủ cả giáo lý lẫn đi lễ; thêm số lượt chỉ 1 buổi
+        const sundayCounts = countSundayReport(reportStudentsData, sortedDates.filter(isSundayDate))
+        presentCn = sundayCounts.full
+        const partialCn = sundayCounts.partial
+        totalAttendance += sundayCounts.full + sundayCounts.partial
 
         // Count not checked: each student counts as +1 if they have at least one null date
         reportStudentsData.forEach(student => {
-          const hasNullDate = sortedDates.some(date => student.attendance[date] === null)
+          const hasNullDate = sortedDates.some(date =>
+            student.attendance[date] === null || (isSundayDate(date) && student.attendance_mass?.[date] === null)
+          )
           if (hasNullDate) {
             notChecked++
           }
@@ -1741,6 +1815,7 @@ export default function ActivitiesPage() {
         setReportStats({
           presentThu5,
           presentCn,
+          partialCn,
           notChecked,
           totalAttendance,
         })
@@ -1821,7 +1896,7 @@ export default function ActivitiesPage() {
         const title = reportAttendanceType === 'thu5'
           ? 'ĐIỂM DANH ĐI LỄ THỨ NĂM'
           : reportAttendanceType === 'cn'
-            ? 'ĐIỂM DANH HỌC GIÁO LÝ CHÚA NHẬT'
+            ? 'ĐIỂM DANH HỌC GIÁO LÝ & ĐI LỄ CHÚA NHẬT'
             : 'BẢNG ĐIỂM DANH'
         const holidayNames = new Map<string, string>()
         reportHolidayMap.forEach((holiday, date) => holidayNames.set(date, holiday.name))
@@ -1988,17 +2063,23 @@ export default function ActivitiesPage() {
       const classIds = allClasses.map(c => c.id)
       let attendanceQuery = supabase
         .from('attendance_records')
-        .select('class_id, status, day_type')
+        .select('class_id, status, day_type, student_id, attendance_date')
         .in('class_id', classIds)
         .gte('attendance_date', fromDate)
         .lte('attendance_date', toDate)
         .eq('status', 'present')
 
-      if (priestAttendanceType !== 'all') {
+      if (priestAttendanceType === 'cn') {
+        attendanceQuery = attendanceQuery.in('day_type', ['cn', 'cn_le'])
+      } else if (priestAttendanceType !== 'all') {
         attendanceQuery = attendanceQuery.eq('day_type', priestAttendanceType)
       }
 
-      const { data: attendanceRecords } = await attendanceQuery
+      const { data: rawPriestRecords } = await attendanceQuery
+      // Chủ nhật: chỉ tính có mặt khi đủ cả giáo lý lẫn đi lễ
+      const attendanceRecords = rawPriestRecords
+        ? mergeSundayRecords(rawPriestRecords).filter(r => r.status === 'present')
+        : rawPriestRecords
 
       // 6. Count present per class
       const classPresentCounts = new Map<string, number>()
@@ -2468,7 +2549,7 @@ export default function ActivitiesPage() {
                 }`}>
                   <span className={`text-base ${dayType ? 'text-black dark:text-white' : isCompensatoryMode ? 'text-blue-700' : 'text-orange-600'}`}>
                     {dayType
-                      ? `Buổi: ${dayOfWeek.toLowerCase()}`
+                      ? `Buổi: ${dayOfWeek.toLowerCase()}${isSunday ? ' (giáo lý + đi lễ)' : ''}`
                       : isCompensatoryMode
                         ? `Bổ sung Thứ 5`
                         : `Buổi: ${dayOfWeek.toLowerCase()} (không điểm danh)`
@@ -2876,12 +2957,30 @@ export default function ActivitiesPage() {
                         students.map((student, index) => (
                           <div
                             key={student.id}
-                            className={`min-w-[760px] flex items-center py-5 ${index !== students.length - 1 ? 'border-b border-[#f0f0f0]' : ''} ${saving === student.id ? 'opacity-50' : ''}`}
+                            className={`${isSunday ? 'min-w-[900px]' : 'min-w-[760px]'} flex items-center py-5 ${index !== students.length - 1 ? 'border-b border-[#f0f0f0]' : ''} ${saving === student.id ? 'opacity-50' : ''}`}
                           >
                             {/* Checkbox Column */}
                             <div className="w-[60px] flex items-center justify-center">
                               {saving === student.id ? (
                                 <Loader2 className="w-6 h-6 animate-spin text-brand" />
+                              ) : isSunday ? (
+                                (() => {
+                                  const st = sundayStatus(student.attendance_status, student.mass_status)
+                                  return st === 'none' ? (
+                                    <button
+                                      onClick={() => markAttendance(student.id, 'present')}
+                                      disabled={!!currentDateHoliday}
+                                      title="Có mặt cả 2 buổi"
+                                      className="w-[26px] h-[26px] rounded-[5px] border-2 border-[#e0e0e0] hover:border-brand transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    />
+                                  ) : (
+                                    <div className={`w-[26px] h-[26px] rounded-[5px] flex items-center justify-center ${
+                                      st === 'full' ? 'bg-brand' : st === 'absent' ? 'bg-[#666d80]' : 'bg-[#f59e0b]'
+                                    }`}>
+                                      {st === 'full' ? <Check className="w-5 h-5 text-white" strokeWidth={3} /> : <span className="text-xs font-bold text-white">½</span>}
+                                    </div>
+                                  )
+                                })()
                               ) : student.attendance_status ? (
                                 <div className={`w-[26px] h-[26px] rounded-[5px] flex items-center justify-center ${
                                   student.attendance_status === 'present' ? 'bg-brand' : 'bg-[#666d80]'
@@ -2926,6 +3025,51 @@ export default function ActivitiesPage() {
                               <span className="text-sm text-[#666d80] mt-1">{student.student_code || '---'}</span>
                             </div>
 
+                            {isSunday ? (
+                              (() => {
+                                const st = sundayStatus(student.attendance_status, student.mass_status)
+                                return (
+                                  <>
+                                    <div className="w-[150px]">
+                                      <span className={`text-base font-medium ${
+                                        st === 'full' ? 'text-[#00a86b]' : st === 'none' ? 'text-brand' : st === 'absent' ? 'text-[#666d80]' : 'text-[#d97706]'
+                                      }`}>
+                                        {SUNDAY_STATUS_LABELS[st]}
+                                      </span>
+                                    </div>
+                                    <div className="w-[260px] flex items-center gap-2">
+                                      {renderSundaySessionChip(student, 'cn')}
+                                      {renderSundaySessionChip(student, 'cn_le')}
+                                      {st === 'none' && (
+                                        <button
+                                          onClick={() => markAttendance(student.id, 'absent')}
+                                          disabled={saving === student.id || !!currentDateHoliday}
+                                          title="Vắng cả 2 buổi"
+                                          className="h-[34px] w-[34px] rounded-full bg-[rgba(250,134,94,0.15)] flex items-center justify-center hover:bg-[rgba(250,134,94,0.25)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          <X className="w-3.5 h-3.5 text-brand" strokeWidth={3} />
+                                        </button>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 flex flex-col pl-5">
+                                      {student.attendance_status && (
+                                        <span className="text-sm text-black dark:text-white leading-tight">
+                                          Giáo lý: {student.attendance_status === 'present' ? `có mặt${student.attendance_time ? ` lúc ${student.attendance_time}` : ''}` : 'vắng'}
+                                          {student.attendance_by ? <span className="text-[#666d80]"> · {student.attendance_by}</span> : null}
+                                        </span>
+                                      )}
+                                      {student.mass_status && (
+                                        <span className="text-sm text-black dark:text-white leading-tight mt-0.5">
+                                          Đi lễ: {student.mass_status === 'present' ? `có mặt${student.mass_time ? ` lúc ${student.mass_time}` : ''}` : 'vắng'}
+                                          {student.mass_by ? <span className="text-[#666d80]"> · {student.mass_by}</span> : null}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </>
+                                )
+                              })()
+                            ) : (
+                            <>
                             {/* Status Text Column */}
                             <div className="w-[150px]">
                               <span className={`text-base font-medium ${
@@ -3016,6 +3160,8 @@ export default function ActivitiesPage() {
                                 </>
                               ) : null}
                             </div>
+                            </>
+                            )}
 
                             {/* Actions Column */}
                             <div className="w-[80px] flex items-center justify-end gap-3">
@@ -3718,6 +3864,9 @@ export default function ActivitiesPage() {
                       </div>
                       <div className="flex items-end justify-between">
                         <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportStats.presentCn}</span>
+                        {reportStats.partialCn > 0 && (
+                          <span className="text-xs text-[#d97706] mb-1">Chỉ 1 buổi: {reportStats.partialCn}</span>
+                        )}
                       </div>
                     </div>
 
@@ -3818,19 +3967,25 @@ export default function ActivitiesPage() {
                 {/* Data Table */}
                 {reportType === 'attendance' ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full border-collapse" style={{ minWidth: `${550 + reportDates.length * 90}px` }}>
+                    <table className="w-full border-collapse" style={{ minWidth: `${550 + reportDates.length * 90 + reportSundayCount * 70}px` }}>
                       <thead>
                         <tr className="bg-[#E5E1DC] h-[38px]">
-                          <th className="text-left px-4 text-[16px] font-medium text-[#666d80] w-[100px] whitespace-nowrap">STT</th>
-                          <th className="text-left px-4 text-[16px] font-medium text-[#666d80] w-[300px] whitespace-nowrap">Tên thánh</th>
-                          <th className="text-left px-4 text-[16px] font-medium text-[#666d80] whitespace-nowrap" colSpan={2}>Họ và tên</th>
+                          <th rowSpan={reportSundayCount > 0 ? 2 : 1} className="text-left px-4 text-[16px] font-medium text-[#666d80] w-[100px] whitespace-nowrap">STT</th>
+                          <th rowSpan={reportSundayCount > 0 ? 2 : 1} className="text-left px-4 text-[16px] font-medium text-[#666d80] w-[300px] whitespace-nowrap">Tên thánh</th>
+                          <th rowSpan={reportSundayCount > 0 ? 2 : 1} className="text-left px-4 text-[16px] font-medium text-[#666d80] whitespace-nowrap" colSpan={2}>Họ và tên</th>
                           {reportDates.length === 0 ? (
                             <th className="text-center px-4 text-[16px] text-[#666d80]">Không có dữ liệu</th>
                           ) : (
                             reportDates.map((date) => {
                               const holiday = reportHolidayMap.get(date)
+                              const sunday = isSundayDate(date) && !holiday
                               return (
-                                <th key={date} className={`text-center px-2 text-[14px] font-medium text-[#666d80] whitespace-nowrap min-w-[70px] ${holiday ? 'bg-amber-50' : ''}`}>
+                                <th
+                                  key={date}
+                                  colSpan={sunday ? 2 : 1}
+                                  rowSpan={!sunday && reportSundayCount > 0 ? 2 : 1}
+                                  className={`text-center px-2 text-[14px] font-medium text-[#666d80] whitespace-nowrap min-w-[70px] ${holiday ? 'bg-amber-50' : ''} ${sunday ? 'border-l border-[#8A8C90]' : ''}`}
+                                >
                                   {formatShortDate(date)}
                                   {holiday && (
                                     <div className="text-[10px] font-normal text-amber-600 leading-tight">{holiday.name}</div>
@@ -3840,11 +3995,21 @@ export default function ActivitiesPage() {
                             })
                           )}
                         </tr>
+                        {reportSundayCount > 0 && (
+                          <tr className="bg-[#E5E1DC] h-[26px]">
+                            {reportDates.filter(d => isSundayDate(d) && !reportHolidayMap.has(d)).map((date) => (
+                              <React.Fragment key={date}>
+                                <th className="text-center text-[11px] font-medium text-[#666d80] border-l border-[#8A8C90]" title="Học giáo lý">GL</th>
+                                <th className="text-center text-[11px] font-medium text-[#666d80] border-l border-[#8A8C90]/40" title="Đi lễ">Lễ</th>
+                              </React.Fragment>
+                            ))}
+                          </tr>
+                        )}
                       </thead>
                       <tbody>
                         {reportStudents.length === 0 ? (
                           <tr>
-                            <td colSpan={4 + reportDates.length} className="py-12 text-center text-[16px] text-[#666d80]">
+                            <td colSpan={4 + reportDates.length + reportSundayCount} className="py-12 text-center text-[16px] text-[#666d80]">
                               Không có học sinh trong lớp này
                             </td>
                           </tr>
@@ -3877,19 +4042,27 @@ export default function ActivitiesPage() {
                                     </td>
                                   )
                                 }
-                                return (
-                                <td key={date} className={`text-center border-l border-[#8A8C90] ${student.attendance[date] === 'present' ? 'bg-[#F5D5D5]' : ''}`}>
-                                  {student.attendance[date] === 'present' ? (
-                                    <span className="text-[#8A8C90] text-[16px]">×</span>
-                                  ) : student.attendance[date] === 'absent' ? (
-                                    <div className="w-[24px] h-[24px] rounded-full bg-[#22C55E] flex items-center justify-center mx-auto">
-                                      <Check className="w-4 h-4 text-white" />
-                                    </div>
-                                  ) : (
-                                    <span className="text-[#666d80]">-</span>
-                                  )}
-                                </td>
+                                const renderCell = (status: 'present' | 'absent' | null | undefined, key: string, extraClass = '') => (
+                                  <td key={key} className={`text-center border-l border-[#8A8C90] ${extraClass} ${status === 'present' ? 'bg-[#F5D5D5]' : ''}`}>
+                                    {status === 'present' ? (
+                                      <span className="text-[#8A8C90] text-[16px]">×</span>
+                                    ) : status === 'absent' ? (
+                                      <div className="w-[24px] h-[24px] rounded-full bg-[#22C55E] flex items-center justify-center mx-auto">
+                                        <Check className="w-4 h-4 text-white" />
+                                      </div>
+                                    ) : (
+                                      <span className="text-[#666d80]">-</span>
+                                    )}
+                                  </td>
                                 )
+                                if (isSundayDate(date)) {
+                                  // Chủ nhật: 2 cột con — giáo lý | đi lễ
+                                  return [
+                                    renderCell(student.attendance[date], `${date}-gl`),
+                                    renderCell(student.attendance_mass?.[date], `${date}-le`, 'border-[#8A8C90]/40'),
+                                  ]
+                                }
+                                return renderCell(student.attendance[date], date)
                               })}
                             </tr>
                             )

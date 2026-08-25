@@ -121,3 +121,20 @@ describe('listAttendanceDates', () => {
     expect(listAttendanceDates('2026-09-04', '2026-09-09', 'thu5')).toEqual([])
   })
 })
+
+import { buildAttendanceExcelColumns } from '../score-report-excel'
+
+describe('buildAttendanceExcelColumns', () => {
+  it('Chủ nhật tách GL | Lễ, Thứ 5 và CN nghỉ lễ giữ 1 cột', () => {
+    const cols = buildAttendanceExcelColumns(
+      ['2026-08-20', '2026-08-23', '2026-08-30'],
+      new Map([['2026-08-30', 'Nghỉ']]),
+    )
+    expect(cols).toEqual([
+      { date: '2026-08-20', session: 'single' },
+      { date: '2026-08-23', session: 'gl' },
+      { date: '2026-08-23', session: 'le' },
+      { date: '2026-08-30', session: 'single' },
+    ])
+  })
+})

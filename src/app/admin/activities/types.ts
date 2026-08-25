@@ -6,7 +6,10 @@ export interface ReportStudent {
   full_name: string
   saint_name?: string
   avatar_url?: string
+  /** Thứ 5 / Chủ nhật buổi học giáo lý ('cn'), theo ngày */
   attendance: Record<string, 'present' | 'absent' | null>
+  /** Chủ nhật buổi đi lễ ('cn_le'), theo ngày */
+  attendance_mass?: Record<string, 'present' | 'absent' | null>
 }
 
 export interface ReportStudentScore {
@@ -41,6 +44,11 @@ export interface StudentWithAttendance extends ThieuNhiProfile {
   attendance_time?: string
   attendance_by?: string
   attendance_record_id?: string
+  /** Chủ nhật – buổi đi lễ (day_type 'cn_le'); attendance_* là buổi học giáo lý ('cn') */
+  mass_status?: 'present' | 'absent' | null
+  mass_time?: string
+  mass_by?: string
+  mass_record_id?: string
   has_thursday_attendance?: boolean
   has_compensatory_attendance?: boolean
   compensatory_record_id?: string

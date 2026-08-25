@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Check } from 'lucide-react'
+import { mergeSundayRecords, computeSundayCount } from '@/lib/sunday-attendance'
 import { supabase, ThieuNhiProfile, SchoolYear, AttendanceRecord, Holiday } from '@/lib/supabase'
 import { countWeekdays } from '@/lib/queries'
 
@@ -180,9 +181,20 @@ export default function StudentAttendancePage() {
 
   // Calculate attendance from attendance_records table
   const thu5Records = attendanceRecords.filter(r => r.day_type === 'thu5')
-  const cnRecords = attendanceRecords.filter(r => r.day_type === 'cn')
+  // Chủ nhật: giáo lý ('cn') + đi lễ ('cn_le'), mỗi buổi = 0.5; lưới tuần chỉ tô khi đủ cả 2
+  const cnCatechismRecords = attendanceRecords.filter(r => r.day_type === 'cn')
+  const cnMassRecords = attendanceRecords.filter(r => r.day_type === 'cn_le')
+  const cnRecords = mergeSundayRecords(attendanceRecords.filter(r => r.day_type === 'cn' || r.day_type === 'cn_le'))
+    .filter(r => r.status === 'present')
   const attendanceThu5 = thu5Records.length
-  const attendanceCn = cnRecords.length
+  const attendanceCn = computeSundayCount(cnCatechismRecords.length, cnMassRecords.length)
+  const sundayDays = Array.from(
+    new Set([...cnCatechismRecords, ...cnMassRecords].map(r => r.attendance_date))
+  ).sort((x, y) => (x < y ? 1 : -1)).map(date => ({
+    date,
+    catechism: cnCatechismRecords.find(r => r.attendance_date === date),
+    mass: cnMassRecords.find(r => r.attendance_date === date),
+  }))
 
   // Get set of actual attended weeks
   const thu5AttendedWeeks = new Set(thu5Records.map(r => getWeekNumber(r.attendance_date)))
@@ -433,22 +445,25 @@ export default function StudentAttendancePage() {
             </span>
           </div>
 
-          {/* Records Grid */}
-          {cnRecords.length > 0 ? (
+          {/* Records Grid: mỗi Chủ nhật hiện 2 buổi (giáo lý / đi lễ) */}
+          {sundayDays.length > 0 ? (
             <div className="grid grid-cols-3 gap-4">
-              {cnRecords.map((record) => (
-                <div key={record.id} className="bg-white dark:bg-white/10 rounded-[14px] p-4 h-[104px]">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CalendarIcon />
-                    <span className="text-sm font-medium text-black dark:text-white">{formatDate(record.attendance_date)}</span>
-                  </div>
+              {sundayDays.map((day) => (
+                <div key={day.date} className="bg-white dark:bg-white/10 rounded-[14px] p-4 min-h-[104px]">
                   <div className="flex items-center gap-2 mb-2">
-                    <ClockIcon />
-                    <span className="text-sm font-light text-[#666d80]">Điểm danh lúc: {formatTime(record.check_in_time)}</span>
+                    <CalendarIcon />
+                    <span className="text-sm font-medium text-black dark:text-white">{formatDate(day.date)}</span>
+                    <span className={`ml-auto text-xs font-semibold ${day.catechism && day.mass ? 'text-[#00a86b]' : 'text-[#d97706]'}`}>
+                      {day.catechism && day.mass ? '1 buổi' : '½ buổi'}
+                    </span>
                   </div>
-                  <p className="text-xs text-[#666d80]">
-                    &quot;{getCheckInMethodLabel(record.check_in_method)} - {record.created_by_user ? `${record.created_by_user.saint_name ? record.created_by_user.saint_name + ' ' : ''}${record.created_by_user.full_name}` : 'Không rõ'}&quot;
-                  </p>
+                  {([['Giáo lý', day.catechism], ['Đi lễ', day.mass]] as const).map(([label, rec]) => (
+                    <div key={label} className="flex items-center gap-2 text-sm">
+                      {rec ? <Check className="w-3.5 h-3.5 text-[#00a86b]" strokeWidth={3} /> : <span className="w-3.5 h-3.5 rounded-full border border-[#e0e0e0] inline-block" />}
+                      <span className={rec ? 'text-black dark:text-white' : 'text-[#666d80]'}>{label}</span>
+                      {rec && <span className="text-xs text-[#666d80]">{formatTime(rec.check_in_time)} · {getCheckInMethodLabel(rec.check_in_method)}</span>}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>

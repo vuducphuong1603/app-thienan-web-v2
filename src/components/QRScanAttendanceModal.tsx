@@ -4,6 +4,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import jsQR from 'jsqr'
 import { X, Camera, CameraOff, CheckCircle2, Clock, XCircle, Users, ScanLine, Search, UserPlus, Phone, Loader2 } from 'lucide-react'
 import { supabase, SchoolYear, UserProfile } from '@/lib/supabase'
+import { todayForAttendance } from '@/lib/debug-date'
+import { recalcAttendanceCount } from '@/lib/attendance-count'
+import { SundaySession, SUNDAY_SESSION_LABELS, SUNDAY_SESSIONS, holidayDayTypesFor, DayType } from '@/lib/sunday-attendance'
+import { BookOpen, Church } from 'lucide-react'
 import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, RestoredAttendanceRecord } from '@/lib/qr-attendance'
 
 type ScanEntry = {
@@ -63,6 +67,10 @@ export default function QRScanAttendanceModal({
   const [markedStudents, setMarkedStudents] = useState<Set<string>>(new Set())
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Chủ nhật: phải chọn buổi (học giáo lý / đi lễ) trước khi điểm danh
+  const [sundaySession, setSundaySession] = useState<SundaySession | null>(null)
+  const sessionRef = useRef<SundaySession | null>(null)
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -74,7 +82,7 @@ export default function QRScanAttendanceModal({
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const successCountRef = useRef(0)
 
-  const scanTarget = useRef(getScanTarget(new Date()))
+  const scanTarget = useRef(getScanTarget(todayForAttendance()))
 
   const pad = (n: number) => n.toString().padStart(2, '0')
 
@@ -89,41 +97,22 @@ export default function QRScanAttendanceModal({
 
   // Đồng bộ lại số buổi điểm danh trong thieu_nhi (giống điểm danh thủ công)
   const updateAttendanceCount = useCallback(async (studentId: string) => {
-    if (!schoolYear?.id) return
-    try {
-      const [{ count: thu5Count }, { count: cnCount }] = await Promise.all([
-        supabase
-          .from('attendance_records')
-          .select('*', { count: 'exact', head: true })
-          .eq('student_id', studentId)
-          .eq('day_type', 'thu5')
-          .eq('status', 'present')
-          .eq('school_year_id', schoolYear.id),
-        supabase
-          .from('attendance_records')
-          .select('*', { count: 'exact', head: true })
-          .eq('student_id', studentId)
-          .eq('day_type', 'cn')
-          .eq('status', 'present')
-          .eq('school_year_id', schoolYear.id),
-      ])
-      await supabase
-        .from('thieu_nhi')
-        .update({
-          attendance_thu5: thu5Count || 0,
-          attendance_cn: cnCount || 0,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', studentId)
-    } catch (error) {
-      console.error('Error updating attendance count:', error)
-    }
+    await recalcAttendanceCount(studentId, schoolYear?.id)
   }, [schoolYear?.id])
+
+  /** day_type thực tế để ghi: CN thì theo buổi đã chọn, T5 giữ nguyên */
+  const resolveDayType = (): DayType | null => {
+    const { dayType } = scanTarget.current
+    if (dayType === 'cn') return sessionRef.current
+    return dayType
+  }
 
   const handleDecoded = useCallback((raw: string) => {
     if (scanLockRef.current) return
     const studentCode = parseStudentCode(raw)
     if (!studentCode) return
+    const dayType = resolveDayType()
+    if (!dayType) return
     if (shouldThrottleScan(studentCode, recentScansRef.current, Date.now())) return
 
     scanLockRef.current = true
@@ -131,7 +120,7 @@ export default function QRScanAttendanceModal({
     const d = new Date()
     const timeNow = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
     const timeDisplay = `${pad(d.getHours())}:${pad(d.getMinutes())}`
-    const { dateStr, dayType } = scanTarget.current
+    const { dateStr } = scanTarget.current
 
     const run = async () => {
       try {
@@ -252,14 +241,17 @@ export default function QRScanAttendanceModal({
         const { data, error } = await query.order('full_name').limit(20)
 
         if (!error && data) {
-          const { dateStr, dayType } = scanTarget.current
+          const { dateStr } = scanTarget.current
+          const dayType = resolveDayType()
           const studentIds = data.map((s) => s.id)
-          const { data: attendanceData } = await supabase
-            .from('attendance_records')
-            .select('student_id')
-            .eq('attendance_date', dateStr)
-            .eq('day_type', dayType)
-            .in('student_id', studentIds)
+          const { data: attendanceData } = dayType
+            ? await supabase
+                .from('attendance_records')
+                .select('student_id')
+                .eq('attendance_date', dateStr)
+                .eq('day_type', dayType)
+                .in('student_id', studentIds)
+            : { data: null }
 
           if (attendanceData) {
             setMarkedStudents(prev => {
@@ -289,12 +281,17 @@ export default function QRScanAttendanceModal({
 
   const handleManualAttendance = useCallback(async (student: ManualStudent) => {
     if (manualMarking) return
+    const dayType = resolveDayType()
+    if (!dayType) {
+      showFeedback('not_found', 'Vui lòng chọn buổi: Học giáo lý hoặc Đi lễ')
+      return
+    }
     setManualMarking(student.id)
 
     const d = new Date()
     const timeNow = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
     const timeDisplay = `${pad(d.getHours())}:${pad(d.getMinutes())}`
-    const { dateStr, dayType } = scanTarget.current
+    const { dateStr } = scanTarget.current
     const displayName = `${student.saint_name ? `${student.saint_name} ` : ''}${student.full_name}`
 
     try {
@@ -357,11 +354,54 @@ export default function QRScanAttendanceModal({
   }, [manualMarking, schoolYear?.id, user?.id, showFeedback, updateAttendanceCount])
 
   // Vòng lặp giải mã QR từ khung hình video
+  /** Khôi phục lịch sử / danh sách đã điểm danh của buổi đang chọn (sau reload hoặc đổi buổi) */
+  const restoreForDayType = useCallback(async (dayType: DayType, isCancelled: () => boolean = () => false) => {
+    const { dateStr } = scanTarget.current
+    // Khôi phục dữ liệu điểm danh trong ngày (cả quét QR lẫn thủ công),
+    // để reload / mở lại modal không làm "mất" dữ liệu đã điểm danh.
+    // Lịch sử + bộ đếm chỉ lấy của CHÍNH người đang đăng nhập (created_by);
+    // markedStudents vẫn lấy toàn bộ để chặn điểm danh trùng.
+    let histQuery = supabase
+      .from('attendance_records')
+      .select('id, check_in_time, thieu_nhi(full_name, saint_name, student_code, classes(name))')
+      .eq('attendance_date', dateStr)
+      .eq('day_type', dayType)
+      .in('check_in_method', ['qr_scan', 'manual'])
+    let countQuery = supabase
+      .from('attendance_records')
+      .select('id', { count: 'exact', head: true })
+      .eq('attendance_date', dateStr)
+      .eq('day_type', dayType)
+      .in('check_in_method', ['qr_scan', 'manual'])
+    if (user?.id) {
+      histQuery = histQuery.eq('created_by', user.id)
+      countQuery = countQuery.eq('created_by', user.id)
+    }
+    const [{ data: hist }, { count: todayCount }, { data: markedRows }] = await Promise.all([
+      histQuery.order('created_at', { ascending: false }).limit(5),
+      countQuery,
+      supabase
+        .from('attendance_records')
+        .select('student_id')
+        .eq('attendance_date', dateStr)
+        .eq('day_type', dayType),
+    ])
+    if (isCancelled()) return
+    if (hist) {
+      setScanHistory(hist.map((r) => mapRestoredScanEntry(r as unknown as RestoredAttendanceRecord)))
+    }
+    setScanCount(todayCount ?? hist?.length ?? 0)
+    if (markedRows) {
+      setMarkedStudents(new Set(markedRows.map((r) => r.student_id as string)))
+    }
+
+  }, [user?.id])
+
   const decodeLoop = useCallback(() => {
     const video = videoRef.current
     if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
       const now = performance.now()
-      if (now - lastDecodeRef.current > 150 && !scanLockRef.current) {
+      if (now - lastDecodeRef.current > 150 && !scanLockRef.current && resolveDayType()) {
         lastDecodeRef.current = now
         if (!canvasRef.current) canvasRef.current = document.createElement('canvas')
         const canvas = canvasRef.current
@@ -387,7 +427,7 @@ export default function QRScanAttendanceModal({
     if (!isOpen) return
 
     let cancelled = false
-    scanTarget.current = getScanTarget(new Date())
+    scanTarget.current = getScanTarget(todayForAttendance())
     successCountRef.current = 0
     setHolidayName(null)
     setScanHistory([])
@@ -401,6 +441,8 @@ export default function QRScanAttendanceModal({
     setSearchLoading(false)
     setManualMarking(null)
     setMarkedStudents(new Set())
+    setSundaySession(null)
+    sessionRef.current = null
 
     const init = async () => {
       // Kiểm tra ngày nghỉ lễ cho ngày điểm danh mục tiêu
@@ -409,7 +451,7 @@ export default function QRScanAttendanceModal({
         .from('holidays')
         .select('name')
         .eq('holiday_date', dateStr)
-        .in('day_type', [dayType, 'both'])
+        .in('day_type', holidayDayTypesFor(dayType))
       if (schoolYear?.id) holidayQuery = holidayQuery.eq('school_year_id', schoolYear.id)
       const { data: holiday } = await holidayQuery.maybeSingle()
       if (cancelled) return
@@ -418,43 +460,8 @@ export default function QRScanAttendanceModal({
         return
       }
 
-      // Khôi phục dữ liệu điểm danh trong ngày (cả quét QR lẫn thủ công),
-      // để reload / mở lại modal không làm "mất" dữ liệu đã điểm danh.
-      // Lịch sử + bộ đếm chỉ lấy của CHÍNH người đang đăng nhập (created_by);
-      // markedStudents vẫn lấy toàn bộ để chặn điểm danh trùng.
-      let histQuery = supabase
-        .from('attendance_records')
-        .select('id, check_in_time, thieu_nhi(full_name, saint_name, student_code, classes(name))')
-        .eq('attendance_date', dateStr)
-        .eq('day_type', dayType)
-        .in('check_in_method', ['qr_scan', 'manual'])
-      let countQuery = supabase
-        .from('attendance_records')
-        .select('id', { count: 'exact', head: true })
-        .eq('attendance_date', dateStr)
-        .eq('day_type', dayType)
-        .in('check_in_method', ['qr_scan', 'manual'])
-      if (user?.id) {
-        histQuery = histQuery.eq('created_by', user.id)
-        countQuery = countQuery.eq('created_by', user.id)
-      }
-      const [{ data: hist }, { count: todayCount }, { data: markedRows }] = await Promise.all([
-        histQuery.order('created_at', { ascending: false }).limit(5),
-        countQuery,
-        supabase
-          .from('attendance_records')
-          .select('student_id')
-          .eq('attendance_date', dateStr)
-          .eq('day_type', dayType),
-      ])
-      if (cancelled) return
-      if (hist) {
-        setScanHistory(hist.map((r) => mapRestoredScanEntry(r as unknown as RestoredAttendanceRecord)))
-      }
-      setScanCount(todayCount ?? hist?.length ?? 0)
-      if (markedRows) {
-        setMarkedStudents(new Set(markedRows.map((r) => r.student_id as string)))
-      }
+      // Thứ 5: khôi phục ngay. Chủ nhật: khôi phục sau khi chọn buổi (chooseSession).
+      if (dayType === 'thu5') await restoreForDayType(dayType, () => cancelled)
 
       // Khởi động camera
       setCameraStatus('loading')
@@ -539,6 +546,19 @@ export default function QRScanAttendanceModal({
     }
   }, [isOpen])
 
+  const chooseSession = (session: SundaySession) => {
+    if (sessionRef.current === session) return
+    sessionRef.current = session
+    setSundaySession(session)
+    setScanHistory([])
+    setScanCount(0)
+    setMarkedStudents(new Set())
+    setFeedback({ type: null, message: '' })
+    scanLockRef.current = false
+    recentScansRef.current.clear()
+    restoreForDayType(session)
+  }
+
   const handleSearchFocus = () => {
     setSearchFocused(true)
     // Sau khi bàn phím mở, kéo panel về đầu để ô tìm kiếm + kết quả luôn hiện phía trên bàn phím
@@ -580,7 +600,8 @@ export default function QRScanAttendanceModal({
               <h2 className="text-xl font-bold text-white">Quét QR điểm danh</h2>
             </div>
             <p className="text-sm text-[#94A3B8] mt-1">
-              {dayType === 'cn' ? 'Chủ nhật' : 'Thứ 5'} ngày {dateDisplay} — quét QR hoặc tìm kiếm thủ công
+              {dayType === 'cn' ? 'Chủ nhật' : 'Thứ 5'} ngày {dateDisplay}
+              {dayType === 'cn' && sundaySession ? ` · ${SUNDAY_SESSION_LABELS[sundaySession]}` : ''} — quét QR hoặc tìm kiếm thủ công
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -610,6 +631,34 @@ export default function QRScanAttendanceModal({
           </div>
         ) : (
           <>
+            {dayType === 'cn' && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8] mb-2">Chọn buổi điểm danh</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {SUNDAY_SESSIONS.map((session) => {
+                    const active = sundaySession === session
+                    const Icon = session === 'cn' ? BookOpen : Church
+                    return (
+                      <button
+                        key={session}
+                        type="button"
+                        onClick={() => chooseSession(session)}
+                        aria-pressed={active}
+                        className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition-colors border ${
+                          active
+                            ? 'bg-brand border-brand text-white'
+                            : 'bg-white/5 border-white/10 text-[#CBD5E1] hover:bg-white/10'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {SUNDAY_SESSION_LABELS[session]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Camera - thu gọn trên mobile khi đang tìm kiếm để bàn phím không che kết quả */}
             <div className={`relative w-full aspect-[4/3] rounded-[16px] overflow-hidden bg-black mb-4 ${searchActive ? 'hidden sm:block' : ''}`}>
               <video
@@ -638,6 +687,14 @@ export default function QRScanAttendanceModal({
                     <Camera className="w-4 h-4" />
                     Thử lại
                   </button>
+                </div>
+              )}
+
+              {dayType === 'cn' && !sundaySession && cameraStatus !== 'error' && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/80 px-6 text-center">
+                  <ScanLine className="w-8 h-8 text-brand mb-2" />
+                  <p className="text-white text-sm font-semibold">Chọn buổi trước khi quét</p>
+                  <p className="text-[#94A3B8] text-xs mt-1">Học giáo lý hoặc Đi lễ — mỗi buổi được nửa điểm Chủ nhật</p>
                 </div>
               )}
 
@@ -720,7 +777,7 @@ export default function QRScanAttendanceModal({
                       <button
                         key={student.id}
                         onClick={() => handleManualAttendance(student)}
-                        disabled={isMarking || isMarked}
+                        disabled={isMarking || isMarked || (dayType === 'cn' && !sundaySession)}
                         className="w-full flex items-center gap-3 rounded-xl bg-white/5 hover:bg-white/10 px-3 py-2.5 text-left transition-colors disabled:cursor-default disabled:hover:bg-white/5"
                       >
                         <div className="min-w-0 flex-1">

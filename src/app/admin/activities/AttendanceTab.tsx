@@ -3,7 +3,9 @@
 import React, { useState, useRef } from 'react'
 import { supabase, Class, SchoolYear, BRANCHES } from '@/lib/supabase'
 import { UserProfile } from '@/lib/supabase'
-import { Check, X, Loader2, Plus, Calendar, ScanLine } from 'lucide-react'
+import { Check, X, Loader2, Plus, Calendar, ScanLine, BookOpen, Church } from 'lucide-react'
+import { recalcAttendanceCount } from '@/lib/attendance-count'
+import { DayType, SundaySession, SUNDAY_SESSION_SHORT_LABELS, sundayStatus, SUNDAY_STATUS_LABELS } from '@/lib/sunday-attendance'
 import CustomCalendar from '@/components/ui/CustomCalendar'
 import QRScanAttendanceModal from '@/components/QRScanAttendanceModal'
 import AttendanceConfirmModal from '@/components/AttendanceConfirmModal'
@@ -132,43 +134,26 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
 
   // Stats
   const totalStudents = students.length
-  const presentCount = students.filter(s => s.attendance_status === 'present').length
-  const notCheckedCount = students.filter(s => s.attendance_status === null).length
+  const isSunday = dayType === 'cn'
+  // Chủ nhật: có mặt = đủ cả giáo lý lẫn đi lễ; chưa điểm danh = chưa có buổi nào
+  const presentCount = isSunday
+    ? students.filter(s => sundayStatus(s.attendance_status, s.mass_status) === 'full').length
+    : students.filter(s => s.attendance_status === 'present').length
+  const notCheckedCount = isSunday
+    ? students.filter(s => sundayStatus(s.attendance_status, s.mass_status) === 'none').length
+    : students.filter(s => s.attendance_status === null).length
 
   // Update attendance count in thieu_nhi table
   const updateAttendanceCount = async (studentId: string) => {
-    try {
-      const { count: thu5Count } = await supabase
-        .from('attendance_records')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_id', studentId)
-        .eq('day_type', 'thu5')
-        .eq('status', 'present')
-        .eq('school_year_id', schoolYear?.id)
-
-      const { count: cnCount } = await supabase
-        .from('attendance_records')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_id', studentId)
-        .eq('day_type', 'cn')
-        .eq('status', 'present')
-        .eq('school_year_id', schoolYear?.id)
-
-      await supabase
-        .from('thieu_nhi')
-        .update({
-          attendance_thu5: thu5Count || 0,
-          attendance_cn: cnCount || 0,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', studentId)
-    } catch (error) {
-      console.error('Error updating attendance count:', error)
-    }
+    await recalcAttendanceCount(studentId, schoolYear?.id)
   }
 
   // Mark attendance
-  const markAttendance = async (studentId: string, status: 'present' | 'absent') => {
+  /**
+   * @param session Chủ nhật: buổi cần ghi ('cn' giáo lý / 'cn_le' đi lễ).
+   *                Bỏ trống vào Chủ nhật = ghi cả 2 buổi (dùng cho "Vắng mặt").
+   */
+  const markAttendance = async (studentId: string, status: 'present' | 'absent', session?: SundaySession) => {
     if (!dayType) {
       showNotification('error', 'Chỉ điểm danh vào Thứ 5 hoặc Chủ nhật')
       return
@@ -211,24 +196,27 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
       const now = new Date()
       const checkInTime = now.toTimeString().substring(0, 8)
 
+      const targetTypes: DayType[] = dayType === 'cn'
+        ? (session ? [session] : ['cn', 'cn_le'])
+        : [dayType]
+
       const { error } = await supabase
         .from('attendance_records')
-        .upsert({
+        .upsert(targetTypes.map(dt => ({
           student_id: studentId,
           class_id: selectedClassId,
           school_year_id: schoolYear?.id,
           attendance_date: selectedDate,
-          day_type: dayType,
+          day_type: dt,
           status: status,
           check_in_time: checkInTime,
           check_in_method: 'manual',
           created_by: user?.id,
           updated_at: now.toISOString(),
-        }, {
+        })), {
           onConflict: 'student_id,attendance_date,day_type',
         })
         .select('*')
-        .single()
 
       if (error) {
         if (error.code === '42P01' || error.message?.includes('does not exist')) {
@@ -262,7 +250,17 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
       return
     }
 
-    const studentsToMark = students.filter(s => s.attendance_status === null && !s.has_compensatory_attendance)
+    // Chủ nhật: điền buổi còn thiếu (giáo lý và/hoặc đi lễ) cho từng em
+    const targets: { student: StudentWithAttendance; dayTypes: DayType[] }[] = students
+      .filter(s => !s.has_compensatory_attendance)
+      .map(s => ({
+        student: s,
+        dayTypes: dayType === 'cn'
+          ? ([s.attendance_status === null ? 'cn' : null, s.mass_status === null ? 'cn_le' : null].filter(Boolean) as DayType[])
+          : (s.attendance_status === null ? [dayType] : []),
+      }))
+      .filter(t => t.dayTypes.length > 0)
+    const studentsToMark = targets.map(t => t.student)
     if (studentsToMark.length === 0) {
       showNotification('success', 'Tất cả đã được điểm danh')
       return
@@ -273,17 +271,17 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
       const now = new Date()
       const checkInTime = now.toTimeString().substring(0, 8)
 
-      const records = studentsToMark.map(student => ({
+      const records = targets.flatMap(({ student, dayTypes }) => dayTypes.map(dt => ({
         student_id: student.id,
         class_id: selectedClassId,
         school_year_id: schoolYear?.id,
         attendance_date: selectedDate,
-        day_type: dayType,
+        day_type: dt,
         status: 'present' as const,
         check_in_time: checkInTime,
         check_in_method: 'manual' as const,
         created_by: user?.id,
-      }))
+      })))
 
       const { error } = await supabase
         .from('attendance_records')
@@ -313,9 +311,15 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
   }
 
   // Clear attendance
-  const clearAttendance = async (studentId: string) => {
+  /** Xoá điểm danh. Chủ nhật: truyền session để xoá 1 buổi, bỏ trống = xoá cả 2. */
+  const clearAttendance = async (studentId: string, session?: SundaySession) => {
     const student = students.find(s => s.id === studentId)
-    if (!student?.attendance_record_id) {
+    const ids = (
+      session === 'cn' ? [student?.attendance_record_id]
+      : session === 'cn_le' ? [student?.mass_record_id]
+      : [student?.attendance_record_id, student?.mass_record_id]
+    ).filter((id): id is string => !!id)
+    if (ids.length === 0) {
       invalidateAttendanceStudents(selectedClassId, selectedDate)
       return
     }
@@ -325,7 +329,7 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
       const { error } = await supabase
         .from('attendance_records')
         .delete()
-        .eq('id', student.attendance_record_id)
+        .in('id', ids)
 
       if (error) {
         if (error.code === '42P01' || error.message?.includes('does not exist')) {
@@ -509,6 +513,34 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
   }
 
   // Import Excel handlers
+  /** Ô bấm cho 1 buổi Chủ nhật (giáo lý / đi lễ): chưa có → điểm danh có mặt; đã có mặt → xoá; vắng → chuyển có mặt */
+  const renderSundaySessionChip = (student: StudentWithAttendance, session: SundaySession) => {
+    const status = session === 'cn' ? student.attendance_status : student.mass_status
+    const Icon = session === 'cn' ? BookOpen : Church
+    const disabled = saving === student.id || !!currentDateHoliday
+    const onClick = () => {
+      if (status === 'present') clearAttendance(student.id, session)
+      else markAttendance(student.id, 'present', session)
+    }
+    const cls = status === 'present'
+      ? 'bg-[rgba(0,168,107,0.12)] border-[#00a86b] text-[#00a86b]'
+      : status === 'absent'
+        ? 'bg-[rgba(250,134,94,0.15)] border-brand text-brand'
+        : 'bg-transparent border-[#e0e0e0] text-[#666d80] hover:border-brand hover:text-brand'
+    return (
+      <button
+        key={session}
+        onClick={onClick}
+        disabled={disabled}
+        title={status === 'present' ? `Bỏ điểm danh ${SUNDAY_SESSION_SHORT_LABELS[session]}` : `Điểm danh ${SUNDAY_SESSION_SHORT_LABELS[session]}`}
+        className={`h-[34px] px-3 rounded-full border-[1.5px] flex items-center gap-1.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${cls}`}
+      >
+        {status === 'present' ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : status === 'absent' ? <X className="w-3.5 h-3.5" strokeWidth={3} /> : <Icon className="w-3.5 h-3.5" />}
+        {SUNDAY_SESSION_SHORT_LABELS[session]}
+      </button>
+    )
+  }
+
   const openImportExcelModal = () => setIsImportExcelModalOpen(true)
   const closeImportExcelModal = () => setIsImportExcelModalOpen(false)
   const handleImportExcel = (file: File) => {
@@ -653,7 +685,7 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
           }`}>
             <span className={`text-base ${dayType ? 'text-black dark:text-white' : isCompensatoryMode ? 'text-blue-700' : 'text-orange-600'}`}>
               {dayType
-                ? `Buổi: ${dayOfWeek.toLowerCase()}`
+                ? `Buổi: ${dayOfWeek.toLowerCase()}${isSunday ? ' (giáo lý + đi lễ)' : ''}`
                 : isCompensatoryMode
                   ? `Bổ sung Thứ 5`
                   : `Buổi: ${dayOfWeek.toLowerCase()} (không điểm danh)`
@@ -890,7 +922,7 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
 
               {/* Student List */}
               <div className="overflow-x-auto">
-              <div className="space-y-0 min-w-[760px]">
+              <div className={`space-y-0 ${isSunday ? 'min-w-[900px]' : 'min-w-[760px]'}`}>
                 {loading ? (
                   <div className="flex items-center justify-center py-16">
                     <svg className="animate-spin h-8 w-8 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1023,6 +1055,24 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
                       <div className="w-[60px] flex items-center justify-center">
                         {saving === student.id ? (
                           <Loader2 className="w-6 h-6 animate-spin text-brand" />
+                        ) : isSunday ? (
+                          (() => {
+                            const st = sundayStatus(student.attendance_status, student.mass_status)
+                            return st === 'none' ? (
+                              <button
+                                onClick={() => markAttendance(student.id, 'present')}
+                                disabled={!!currentDateHoliday}
+                                title="Có mặt cả 2 buổi"
+                                className="w-[26px] h-[26px] rounded-[5px] border-2 border-[#e0e0e0] hover:border-brand transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                            ) : (
+                              <div className={`w-[26px] h-[26px] rounded-[5px] flex items-center justify-center ${
+                                st === 'full' ? 'bg-brand' : st === 'absent' ? 'bg-[#666d80]' : 'bg-[#f59e0b]'
+                              }`}>
+                                {st === 'full' ? <Check className="w-5 h-5 text-white" strokeWidth={3} /> : <span className="text-xs font-bold text-white">½</span>}
+                              </div>
+                            )
+                          })()
                         ) : student.attendance_status ? (
                           <div className={`w-[26px] h-[26px] rounded-[5px] flex items-center justify-center ${
                             student.attendance_status === 'present' ? 'bg-brand' : 'bg-[#666d80]'
@@ -1059,6 +1109,51 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
                         <span className="text-sm text-[#666d80] mt-1">{student.student_code || '---'}</span>
                       </div>
 
+                      {isSunday ? (
+                        (() => {
+                          const st = sundayStatus(student.attendance_status, student.mass_status)
+                          return (
+                            <>
+                              <div className="w-[150px]">
+                                <span className={`text-base font-medium ${
+                                  st === 'full' ? 'text-[#00a86b]' : st === 'none' ? 'text-brand' : st === 'absent' ? 'text-[#666d80]' : 'text-[#d97706]'
+                                }`}>
+                                  {SUNDAY_STATUS_LABELS[st]}
+                                </span>
+                              </div>
+                              <div className="w-[260px] flex items-center gap-2">
+                                {renderSundaySessionChip(student, 'cn')}
+                                {renderSundaySessionChip(student, 'cn_le')}
+                                {st === 'none' && (
+                                  <button
+                                    onClick={() => markAttendance(student.id, 'absent')}
+                                    disabled={saving === student.id || !!currentDateHoliday}
+                                    title="Vắng cả 2 buổi"
+                                    className="h-[34px] w-[34px] rounded-full bg-[rgba(250,134,94,0.15)] flex items-center justify-center hover:bg-[rgba(250,134,94,0.25)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <X className="w-3.5 h-3.5 text-brand" strokeWidth={3} />
+                                  </button>
+                                )}
+                              </div>
+                              <div className="flex-1 flex flex-col pl-5">
+                                {student.attendance_status && (
+                                  <span className="text-sm text-black dark:text-white leading-tight">
+                                    Giáo lý: {student.attendance_status === 'present' ? `có mặt${student.attendance_time ? ` lúc ${student.attendance_time}` : ''}` : 'vắng'}
+                                    {student.attendance_by ? <span className="text-[#666d80]"> · {student.attendance_by}</span> : null}
+                                  </span>
+                                )}
+                                {student.mass_status && (
+                                  <span className="text-sm text-black dark:text-white leading-tight mt-0.5">
+                                    Đi lễ: {student.mass_status === 'present' ? `có mặt${student.mass_time ? ` lúc ${student.mass_time}` : ''}` : 'vắng'}
+                                    {student.mass_by ? <span className="text-[#666d80]"> · {student.mass_by}</span> : null}
+                                  </span>
+                                )}
+                              </div>
+                            </>
+                          )
+                        })()
+                      ) : (
+                      <>
                       <div className="w-[150px]">
                         <span className={`text-base font-medium ${
                           student.has_compensatory_attendance && !student.attendance_status
@@ -1128,6 +1223,8 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
                           </>
                         ) : null}
                       </div>
+                      </>
+                      )}
 
                       <div className="w-[80px] flex items-center justify-end gap-3">
                         <button

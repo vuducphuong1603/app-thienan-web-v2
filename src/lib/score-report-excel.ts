@@ -1,6 +1,7 @@
 // Xuất Excel bảng điểm / điểm danh theo mẫu "FILE MAU SO DIEM TUNG LOP.xlsx"
 // (logo Xứ Đoàn, Times New Roman, header 2 tầng với 3 khối màu, viền lưới, công thức)
 
+import { isSundayDate } from './sunday-attendance'
 export interface ScoreColumnSelection {
   diLeT5: boolean
   hocGL: boolean
@@ -373,7 +374,21 @@ export async function buildScoreReportWorkbook(opts: {
 export interface AttendanceReportStudent {
   saint_name?: string
   full_name: string
+  /** Thứ 5 / Chủ nhật buổi học giáo lý */
   attendance: Record<string, string | null | undefined>
+  /** Chủ nhật buổi đi lễ */
+  attendance_mass?: Record<string, string | null | undefined>
+}
+
+/** Cột ngày trong sheet điểm danh: Chủ nhật (không nghỉ) tách 2 cột con GL | Lễ */
+export type AttendanceExcelColumn = { date: string; session: 'single' | 'gl' | 'le' }
+
+export function buildAttendanceExcelColumns(dates: string[], holidayNames: Map<string, string>): AttendanceExcelColumn[] {
+  return dates.flatMap((date): AttendanceExcelColumn[] =>
+    isSundayDate(date) && !holidayNames.has(date)
+      ? [{ date, session: 'gl' }, { date, session: 'le' }]
+      : [{ date, session: 'single' }],
+  )
 }
 
 export async function buildAttendanceWorkbook(opts: {
@@ -389,17 +404,20 @@ export async function buildAttendanceWorkbook(opts: {
   const ExcelJS = await loadExcelJS()
   const { className, title, dates, formatDate, holidayNames, students, logoBase64, badgeBase64 } = opts
 
+  const columns = buildAttendanceExcelColumns(dates, holidayNames)
+  const hasSplit = columns.some(c => c.session !== 'single')
+
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Điểm danh', {
     pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   })
-  const totalCols = 4 + dates.length
+  const totalCols = 4 + columns.length
 
   ws.getColumn(1).width = 4.7
   ws.getColumn(2).width = 14
   ws.getColumn(3).width = 19
   ws.getColumn(4).width = 10
-  for (let d = 0; d < dates.length; d++) ws.getColumn(5 + d).width = 6.5
+  columns.forEach((c, i) => { ws.getColumn(5 + i).width = c.session === 'single' ? 6.5 : 4.5 })
 
   const headerRow = addSheetHeader(ws, wb, {
     title,
@@ -409,30 +427,58 @@ export async function buildAttendanceWorkbook(opts: {
     badgeBase64,
     extraInfo: `Tổng số buổi: ${dates.length}`,
   })
+  const subHeaderRow = hasSplit ? headerRow + 1 : headerRow
 
-  const labels = ['Stt', 'Tên thánh', 'Họ đệm', 'Tên', ...dates.map(d => formatDate(d))]
-  labels.forEach((label, ci) => {
-    const cell = ws.getCell(headerRow, ci + 1)
-    cell.value = label
-    cell.font = { name: FONT, size: 10, bold: true }
+  const styleHeaderCell = (cell: import('exceljs').Cell, value: string, size = 10) => {
+    cell.value = value
+    cell.font = { name: FONT, size, bold: true }
     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
     cell.border = thinBorder
     cell.fill = fill(COLOR.headerInfo)
+  }
+
+  // 4 cột cố định (gộp 2 hàng nếu có Chủ nhật tách buổi)
+  ;['Stt', 'Tên thánh', 'Họ đệm', 'Tên'].forEach((label, ci) => {
+    styleHeaderCell(ws.getCell(headerRow, ci + 1), label)
+    if (hasSplit) {
+      styleHeaderCell(ws.getCell(subHeaderRow, ci + 1), label)
+      ws.mergeCells(headerRow, ci + 1, subHeaderRow, ci + 1)
+    }
+  })
+  // Cột ngày
+  columns.forEach((c, i) => {
+    const col = 5 + i
+    if (c.session === 'single') {
+      styleHeaderCell(ws.getCell(headerRow, col), formatDate(c.date))
+      if (hasSplit) {
+        styleHeaderCell(ws.getCell(subHeaderRow, col), formatDate(c.date))
+        ws.mergeCells(headerRow, col, subHeaderRow, col)
+      }
+    } else if (c.session === 'gl') {
+      // Ô ngày gộp ngang 2 cột (GL | Lễ)
+      styleHeaderCell(ws.getCell(headerRow, col), formatDate(c.date))
+      styleHeaderCell(ws.getCell(headerRow, col + 1), formatDate(c.date))
+      ws.mergeCells(headerRow, col, headerRow, col + 1)
+      styleHeaderCell(ws.getCell(subHeaderRow, col), 'GL', 8)
+      styleHeaderCell(ws.getCell(subHeaderRow, col + 1), 'Lễ', 8)
+    }
   })
   ws.getRow(headerRow).height = 28
+  if (hasSplit) ws.getRow(subHeaderRow).height = 14
 
   students.forEach((s, idx) => {
-    const rowIdx = headerRow + 1 + idx
+    const rowIdx = subHeaderRow + 1 + idx
     const nameParts = s.full_name.split(' ')
     const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
     const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
     // Theo file mẫu: có mặt đánh X, còn lại để trống với nền xanh nhạt
     const values: (string | number)[] = [idx + 1, s.saint_name || '', familyMiddleName, givenName]
-    dates.forEach(date => {
-      if (holidayNames.has(date)) {
+    columns.forEach(c => {
+      if (holidayNames.has(c.date)) {
         values.push('Nghỉ')
       } else {
-        values.push(s.attendance[date] === 'present' ? 'X' : '')
+        const status = c.session === 'le' ? s.attendance_mass?.[c.date] : s.attendance[c.date]
+        values.push(status === 'present' ? 'X' : '')
       }
     })
     values.forEach((v, ci) => {

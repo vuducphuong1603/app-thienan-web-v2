@@ -1,4 +1,5 @@
-import { forwardRef } from 'react'
+import { forwardRef, Fragment } from 'react'
+import { isSundayDate } from '@/lib/sunday-attendance'
 
 interface AttendanceReportStudent {
   id: string
@@ -6,6 +7,8 @@ interface AttendanceReportStudent {
   full_name: string
   saint_name?: string
   attendance: Record<string, 'present' | 'absent' | null>
+  /** Chủ nhật buổi đi lễ ('cn_le'); attendance là giáo lý */
+  attendance_mass?: Record<string, 'present' | 'absent' | null>
 }
 
 interface ScoreReportStudent {
@@ -155,17 +158,39 @@ ReportExportTemplate.displayName = 'ReportExportTemplate'
 
 // Attendance Table Component
 function AttendanceTable({ students, dates, holidayMap }: { students: AttendanceReportStudent[], dates: string[], holidayMap?: Map<string, { name: string; day_type: string }> }) {
+  // Chủ nhật (không nghỉ lễ) tách 2 cột con: GL (học giáo lý) | Lễ (đi lễ)
+  const isSplit = (date: string) => isSundayDate(date) && !holidayMap?.has(date)
+  const hasSplit = dates.some(isSplit)
+  // Không dùng rowSpan: html-to-image render rowSpan lệch → hàng 2 dùng ô trống (bỏ viền trên) để nối liền ô hàng 1
+  const topCls = 'border border-gray-400 border-b-0 px-2 py-2 text-center'
+  const bottomCls = 'border border-gray-400 border-t-0 px-1 py-1 text-center'
+  const renderCell = (status: 'present' | 'absent' | null | undefined, key: string) => (
+    <td key={key} className="border border-gray-400 px-2 py-2 text-center">
+      {status === 'absent' ? (
+        <span className="text-red-600 font-bold">x</span>
+      ) : status === 'present' ? (
+        <span className="text-green-600">&#10003;</span>
+      ) : (
+        ''
+      )}
+    </td>
+  )
   return (
     <table className="w-full border-collapse text-sm">
       <thead>
         <tr className="bg-[#fff3cd]">
-          <th className="border border-gray-400 px-2 py-2 text-center w-[50px]">STT</th>
-          <th className="border border-gray-400 px-2 py-2 text-center w-[120px]">Tên thánh</th>
-          <th className="border border-gray-400 px-2 py-2 text-center" colSpan={2}>Họ và tên</th>
+          <th className={`${hasSplit ? topCls : 'border border-gray-400 px-2 py-2 text-center'} w-[50px]`}>STT</th>
+          <th className={`${hasSplit ? topCls : 'border border-gray-400 px-2 py-2 text-center'} w-[120px]`}>Tên thánh</th>
+          <th className={hasSplit ? topCls : 'border border-gray-400 px-2 py-2 text-center'} colSpan={2}>Họ và tên</th>
           {dates.map(date => {
             const holiday = holidayMap?.get(date)
+            const split = isSplit(date)
             return (
-              <th key={date} className={`border border-gray-400 px-2 py-2 text-center w-[50px] ${holiday ? 'bg-amber-100' : ''}`}>
+              <th
+                key={date}
+                colSpan={split ? 2 : 1}
+                className={`${!split && hasSplit ? topCls : 'border border-gray-400 px-2 py-2 text-center'} w-[50px] ${holiday ? 'bg-amber-100' : ''}`}
+              >
                 {formatShortDate(date)}
                 {holiday && (
                   <div className="text-[8px] font-normal text-amber-700 leading-tight mt-0.5">{holiday.name}</div>
@@ -174,6 +199,24 @@ function AttendanceTable({ students, dates, holidayMap }: { students: Attendance
             )
           })}
         </tr>
+        {hasSplit && (
+          <tr className="bg-[#fff3cd]">
+            <th className={bottomCls} />
+            <th className={bottomCls} />
+            <th className={bottomCls} colSpan={2} />
+            {dates.map(date => {
+              if (!isSplit(date)) {
+                return <th key={date} className={`${bottomCls} ${holidayMap?.has(date) ? 'bg-amber-100' : ''}`} />
+              }
+              return (
+                <Fragment key={date}>
+                  <th className="border border-gray-400 px-1 py-1 text-center text-[11px] font-medium">GL</th>
+                  <th className="border border-gray-400 px-1 py-1 text-center text-[11px] font-medium">Lễ</th>
+                </Fragment>
+              )
+            })}
+          </tr>
+        )}
       </thead>
       <tbody>
         {students.map((student, index) => {
@@ -196,17 +239,13 @@ function AttendanceTable({ students, dates, holidayMap }: { students: Attendance
                     </td>
                   )
                 }
-                return (
-                  <td key={date} className="border border-gray-400 px-2 py-2 text-center">
-                    {student.attendance[date] === 'absent' ? (
-                      <span className="text-red-600 font-bold">x</span>
-                    ) : student.attendance[date] === 'present' ? (
-                      <span className="text-green-600">&#10003;</span>
-                    ) : (
-                      ''
-                    )}
-                  </td>
-                )
+                if (isSplit(date)) {
+                  return [
+                    renderCell(student.attendance[date], `${date}-gl`),
+                    renderCell(student.attendance_mass?.[date], `${date}-le`),
+                  ]
+                }
+                return renderCell(student.attendance[date], date)
               })}
             </tr>
           )
