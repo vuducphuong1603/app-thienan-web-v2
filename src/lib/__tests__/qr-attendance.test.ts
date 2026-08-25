@@ -85,10 +85,24 @@ describe('splitSearchWords', () => {
 })
 
 describe('studentSearchOrFilter', () => {
-  it('tạo bộ lọc or theo tên, tên thánh và mã thiếu nhi', () => {
-    expect(studentSearchOrFilter('An')).toBe(
-      'full_name.ilike.%An%,saint_name.ilike.%An%,student_code.ilike.%An%'
-    )
+  it('tìm theo mọi cột text của thiếu nhi', () => {
+    const f = studentSearchOrFilter('An')
+    expect(f).toContain('full_name.ilike.%An%')
+    expect(f).toContain('saint_name.ilike.%An%')
+    expect(f).toContain('student_code.ilike.%An%')
+    expect(f).toContain('parent_phone.ilike.%An%')
+    expect(f).toContain('parent_name.ilike.%An%')
+    expect(f).toContain('phone.ilike.%An%')
+    expect(f).toContain('address.ilike.%An%')
+    expect(f).not.toContain('class_id')
+  })
+
+  it('thêm điều kiện lớp khi có class_id khớp tên lớp', () => {
+    expect(studentSearchOrFilter('Ấu', ['id1', 'id2'])).toContain('class_id.in.(id1,id2)')
+  })
+
+  it('loại bỏ ký tự , ( ) phá cú pháp filter', () => {
+    expect(studentSearchOrFilter('a,(b)')).toContain('full_name.ilike.%ab%')
   })
 })
 

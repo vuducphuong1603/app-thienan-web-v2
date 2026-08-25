@@ -234,8 +234,18 @@ export default function QRScanAttendanceModal({
           .select('id, full_name, saint_name, student_code, class_id, parent_phone, classes(name)')
           .eq('status', 'ACTIVE')
 
-        for (const word of splitSearchWords(text)) {
-          query = query.or(studentSearchOrFilter(word))
+        // Tìm lớp có tên khớp từ khóa để hỗ trợ tìm theo lớp
+        const words = splitSearchWords(text)
+        const { data: classRows } = await supabase
+          .from('classes')
+          .select('id, name')
+          .or(words.map(w => `name.ilike.%${w.replace(/[,()]/g, '')}%`).join(','))
+        for (const word of words) {
+          const lw = word.toLowerCase()
+          const classIds = (classRows || [])
+            .filter(c => (c.name as string).toLowerCase().includes(lw))
+            .map(c => c.id as string)
+          query = query.or(studentSearchOrFilter(word, classIds))
         }
 
         const { data, error } = await query.order('full_name').limit(20)
@@ -742,7 +752,7 @@ export default function QRScanAttendanceModal({
                   onChange={(e) => handleSearch(e.target.value)}
                   onFocus={handleSearchFocus}
                   onBlur={() => setSearchFocused(false)}
-                  placeholder="Tìm tên, tên thánh, mã thiếu nhi..."
+                  placeholder="Tìm tên, mã, lớp, SĐT phụ huynh..."
                   autoCorrect="off"
                   className="flex-1 bg-transparent text-base sm:text-sm text-white placeholder-[#64748B] outline-none"
                 />
@@ -769,7 +779,7 @@ export default function QRScanAttendanceModal({
               )}
 
               {searchResults.length > 0 && (
-                <div className="space-y-2 mt-2 max-h-[45dvh] sm:max-h-[240px] overflow-y-auto pr-1">
+                <div className="space-y-2 mt-2 sm:max-h-[240px] sm:overflow-y-auto pr-1">
                   {searchResults.map((student) => {
                     const isMarked = markedStudents.has(student.id)
                     const isMarking = manualMarking === student.id

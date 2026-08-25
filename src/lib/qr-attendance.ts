@@ -31,9 +31,23 @@ export function splitSearchWords(text: string): string[] {
   return text.trim().split(/\s+/).filter(w => w.length > 0)
 }
 
-/** Bộ lọc `or` của Supabase: khớp tên, tên thánh hoặc mã thiếu nhi */
-export function studentSearchOrFilter(word: string): string {
-  return `full_name.ilike.%${word}%,saint_name.ilike.%${word}%,student_code.ilike.%${word}%`
+/** Các cột text của thieu_nhi được tìm kiếm thủ công */
+export const STUDENT_SEARCH_COLUMNS = [
+  'full_name', 'saint_name', 'student_code',
+  'phone', 'parent_name', 'parent_phone', 'parent_name_2', 'parent_phone_2',
+  'address', 'notes',
+] as const
+
+/**
+ * Bộ lọc `or` của Supabase: khớp mọi dữ liệu text của thiếu nhi
+ * (tên, tên thánh, mã, SĐT, phụ huynh, địa chỉ, ghi chú) và lớp (qua danh sách class_id).
+ * Ký tự , ( ) bị loại bỏ vì phá cú pháp filter của PostgREST.
+ */
+export function studentSearchOrFilter(word: string, classIds: string[] = []): string {
+  const w = word.replace(/[,()]/g, '')
+  const parts = STUDENT_SEARCH_COLUMNS.map(col => `${col}.ilike.%${w}%`)
+  if (classIds.length > 0) parts.push(`class_id.in.(${classIds.join(',')})`)
+  return parts.join(',')
 }
 
 /**
