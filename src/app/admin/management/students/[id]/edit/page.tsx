@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ChevronLeft, User } from 'lucide-react'
 import { supabase, Class, BRANCHES } from '@/lib/supabase'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
+import { useAuth } from '@/lib/auth-context'
 
 interface StudentFormData {
   student_code: string
@@ -46,6 +47,9 @@ export default function EditStudentPage() {
   const params = useParams()
   const studentId = params.id as string
   const router = useRouter()
+  const { user } = useAuth()
+  // GLV quay về danh sách lớp của mình, admin về trang quản lý chung
+  const studentsListHref = user?.role === 'admin' ? '/admin/management/students' : '/dashboard/management'
   const [formData, setFormData] = useState<StudentFormData>(initialFormData)
   const [classes, setClasses] = useState<Class[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -78,7 +82,7 @@ export default function EditStudentPage() {
         if (error || !studentData) {
           console.error('Error fetching student:', error)
           alert('Không tìm thấy thiếu nhi')
-          router.push('/admin/management/students')
+          router.push(studentsListHref)
           return
         }
 
@@ -222,7 +226,7 @@ export default function EditStudentPage() {
         return
       }
 
-      router.push('/admin/management/students')
+      router.push(studentsListHref)
     } catch (err) {
       console.error('Error:', err)
       alert('Có lỗi xảy ra. Vui lòng thử lại.')
@@ -262,7 +266,7 @@ export default function EditStudentPage() {
           <div className="flex flex-col gap-1.5">
             {/* Back Button */}
             <button
-              onClick={() => router.push('/admin/management/students')}
+              onClick={() => router.push(studentsListHref)}
               className="flex items-center gap-1.5 text-[#666d80] hover:text-black dark:hover:text-white transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -275,7 +279,7 @@ export default function EditStudentPage() {
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
             <button
-              onClick={() => router.push('/admin/management/students')}
+              onClick={() => router.push(studentsListHref)}
               className="h-10 px-6 bg-white dark:bg-white/10 rounded-full text-sm font-bold text-black dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
             >
               Hủy

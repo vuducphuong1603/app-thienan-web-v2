@@ -75,9 +75,15 @@ export default function ManagementLayout({ children }: ManagementLayoutProps) {
   const router = useRouter()
   const isAdmin = user?.role === 'admin'
 
-  // Chỉ admin (Ban điều hành) mới được vào Người dùng / Lớp học
+  // Chỉ admin (Ban điều hành) mới được vào Người dùng / Lớp học,
+  // danh sách toàn bộ thiếu nhi và trang thêm thiếu nhi.
+  // GLV vẫn dùng được các trang con /students/[id]/(view|edit|attendance).
   const isAdminOnlyPath =
-    pathname?.includes('/admin/management/users') || pathname?.includes('/admin/management/classes')
+    pathname?.includes('/admin/management/users') ||
+    pathname?.includes('/admin/management/classes') ||
+    pathname === '/admin/management/students' ||
+    pathname === '/admin/management/students/' ||
+    pathname?.includes('/admin/management/students/add')
   useEffect(() => {
     if (user && !isAdmin && isAdminOnlyPath) {
       router.replace('/dashboard/management')
