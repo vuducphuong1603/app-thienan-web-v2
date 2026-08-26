@@ -50,6 +50,10 @@ export default function EditStudentPage() {
   const { user } = useAuth()
   // GLV quay về danh sách lớp của mình, admin về trang quản lý chung
   const studentsListHref = user?.role === 'admin' ? '/admin/management/students' : '/dashboard/management'
+  // GLV chỉ sửa SĐT/địa chỉ/ghi chú + nhập điểm của thiếu nhi lớp mình;
+  // không đổi mã TN, lớp, tên thánh, họ tên, ngày sinh, ảnh (chỉ admin)
+  const isGLV = user?.role === 'giao_ly_vien'
+  const canEditCore = !isGLV
   const [formData, setFormData] = useState<StudentFormData>(initialFormData)
   const [classes, setClasses] = useState<Class[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -117,6 +121,14 @@ export default function EditStudentPage() {
 
     fetchData()
   }, [studentId, router])
+
+  // GLV chỉ được thao tác với thiếu nhi thuộc lớp mình phụ trách
+  useEffect(() => {
+    if (!isLoading && isGLV && formData.class_id && user?.class_id !== formData.class_id) {
+      alert('Bạn chỉ được chỉnh sửa thiếu nhi thuộc lớp mình phụ trách')
+      router.replace('/dashboard/management')
+    }
+  }, [isLoading, isGLV, formData.class_id, user?.class_id, router])
 
   // Group classes by branch
   const classesGroupedByBranch = BRANCHES.reduce((acc, branch) => {
@@ -198,26 +210,32 @@ export default function EditStudentPage() {
 
     setIsSubmitting(true)
     try {
+      // GLV chỉ gửi các trường được phép sửa theo bảng phân quyền
+      const allowedForAll = {
+        phone: formData.phone.trim() || null,
+        parent_phone: formData.parent_phone.trim() || null,
+        parent_phone_2: formData.parent_phone_2.trim() || null,
+        address: formData.address.trim() || null,
+        notes: formData.notes.trim() || null,
+        score_45_hk1: parseFloat(formData.score_45_hk1) || 0,
+        score_exam_hk1: parseFloat(formData.score_exam_hk1) || 0,
+        score_45_hk2: parseFloat(formData.score_45_hk2) || 0,
+        score_exam_hk2: parseFloat(formData.score_exam_hk2) || 0,
+        updated_at: new Date().toISOString(),
+      }
+      const adminOnly = canEditCore
+        ? {
+            student_code: formData.student_code.trim() || null,
+            class_id: formData.class_id,
+            saint_name: formData.saint_name.trim() || null,
+            full_name: formData.full_name.trim(),
+            date_of_birth: formData.date_of_birth || null,
+            avatar_url: avatarPreview || null,
+          }
+        : {}
       const { error } = await supabase
         .from('thieu_nhi')
-        .update({
-          student_code: formData.student_code.trim() || null,
-          class_id: formData.class_id,
-          saint_name: formData.saint_name.trim() || null,
-          full_name: formData.full_name.trim(),
-          date_of_birth: formData.date_of_birth || null,
-          phone: formData.phone.trim() || null,
-          parent_phone: formData.parent_phone.trim() || null,
-          parent_phone_2: formData.parent_phone_2.trim() || null,
-          address: formData.address.trim() || null,
-          notes: formData.notes.trim() || null,
-          score_45_hk1: parseFloat(formData.score_45_hk1) || 0,
-          score_exam_hk1: parseFloat(formData.score_exam_hk1) || 0,
-          score_45_hk2: parseFloat(formData.score_45_hk2) || 0,
-          score_exam_hk2: parseFloat(formData.score_exam_hk2) || 0,
-          avatar_url: avatarPreview || null,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ ...allowedForAll, ...adminOnly })
         .eq('id', studentId)
 
       if (error) {
@@ -320,6 +338,7 @@ export default function EditStudentPage() {
                 )}
               </div>
               {/* Avatar Actions */}
+              {canEditCore && (
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <button
@@ -347,6 +366,7 @@ export default function EditStudentPage() {
                   className="hidden"
                 />
               </div>
+              )}
             </div>
 
             {/* Row 1: Mã thiếu nhi + Lớp */}
@@ -361,7 +381,8 @@ export default function EditStudentPage() {
                   value={formData.student_code}
                   onChange={(e) => handleChange('student_code', e.target.value)}
                   placeholder="VD: HA172336"
-                  className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand"
+                  disabled={!canEditCore}
+                  className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -372,8 +393,9 @@ export default function EditStudentPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => setIsClassDropdownOpen(!isClassDropdownOpen)}
-                  className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-left flex items-center justify-between ${errors.class_id ? 'ring-1 ring-red-500' : ''}`}
+                  onClick={() => canEditCore && setIsClassDropdownOpen(!isClassDropdownOpen)}
+                  disabled={!canEditCore}
+                  className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-left flex items-center justify-between disabled:opacity-60 disabled:cursor-not-allowed ${errors.class_id ? 'ring-1 ring-red-500' : ''}`}
                 >
                   <span className={formData.class_id ? 'text-black dark:text-white' : 'text-[#8B8685]'}>
                     {formData.class_id ? getClassInfo(formData.class_id) : 'Chọn lớp'}
@@ -421,7 +443,8 @@ export default function EditStudentPage() {
                   value={formData.saint_name}
                   onChange={(e) => handleChange('saint_name', e.target.value)}
                   placeholder="VD: Têrêsa Avila"
-                  className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand"
+                  disabled={!canEditCore}
+                  className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
               <div className="flex-1">
@@ -433,7 +456,8 @@ export default function EditStudentPage() {
                   value={formData.full_name}
                   onChange={(e) => handleChange('full_name', e.target.value)}
                   placeholder="VD: Hoàng Nguyễn Khả Ái"
-                  className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand ${errors.full_name ? 'ring-1 ring-red-500' : ''}`}
+                  disabled={!canEditCore}
+                  className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-60 disabled:cursor-not-allowed ${errors.full_name ? 'ring-1 ring-red-500' : ''}`}
                 />
                 {errors.full_name && <p className="text-xs text-red-500 mt-1">{errors.full_name}</p>}
               </div>
@@ -445,11 +469,20 @@ export default function EditStudentPage() {
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">
                   Ngày sinh
                 </label>
-                <CustomDatePicker
-                  value={formData.date_of_birth}
-                  onChange={(date) => handleChange('date_of_birth', date)}
-                  placeholder="Chọn ngày sinh"
-                />
+                {canEditCore ? (
+                  <CustomDatePicker
+                    value={formData.date_of_birth}
+                    onChange={(date) => handleChange('date_of_birth', date)}
+                    placeholder="Chọn ngày sinh"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={formData.date_of_birth ? formData.date_of_birth.split('-').reverse().join('/') : ''}
+                    disabled
+                    className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                  />
+                )}
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">

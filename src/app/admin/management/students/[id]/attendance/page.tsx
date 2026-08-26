@@ -6,6 +6,7 @@ import { ArrowLeft, Check } from 'lucide-react'
 import { mergeSundayRecords, computeSundayCount } from '@/lib/sunday-attendance'
 import { supabase, ThieuNhiProfile, SchoolYear, AttendanceRecord, Holiday } from '@/lib/supabase'
 import { countWeekdays } from '@/lib/queries'
+import { useAuth } from '@/lib/auth-context'
 
 interface StudentWithClass extends ThieuNhiProfile {
   class_name?: string
@@ -20,7 +21,16 @@ export default function StudentAttendancePage() {
   const params = useParams()
   const studentId = params.id as string
 
+  const { user } = useAuth()
   const [student, setStudent] = useState<StudentWithClass | null>(null)
+
+  // GLV chỉ xem lịch sử điểm danh của thiếu nhi lớp mình phụ trách
+  useEffect(() => {
+    if (student && user?.role === 'giao_ly_vien' && student.class_id !== user.class_id) {
+      alert('Bạn chỉ được xem thiếu nhi thuộc lớp mình phụ trách')
+      router.replace('/dashboard/management')
+    }
+  }, [student, user, router])
   const [schoolYear, setSchoolYear] = useState<SchoolYear | null>(null)
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecordWithDetails[]>([])
   const [loading, setLoading] = useState(true)

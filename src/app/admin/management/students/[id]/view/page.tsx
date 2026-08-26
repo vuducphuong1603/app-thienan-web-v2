@@ -46,6 +46,14 @@ export default function ViewStudentPage() {
   // GLV quay về danh sách lớp của mình, admin về trang quản lý chung
   const studentsListHref = user?.role === 'admin' ? '/admin/management/students' : '/dashboard/management'
   const [student, setStudent] = useState<StudentData | null>(null)
+
+  // GLV chỉ xem chi tiết thiếu nhi thuộc lớp mình phụ trách
+  useEffect(() => {
+    if (student && user?.role === 'giao_ly_vien' && student.class_id !== user.class_id) {
+      alert('Bạn chỉ được xem thiếu nhi thuộc lớp mình phụ trách')
+      router.replace('/dashboard/management')
+    }
+  }, [student, user, router])
   const [classes, setClasses] = useState<Class[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [effectiveThu5Days, setEffectiveThu5Days] = useState(40)
