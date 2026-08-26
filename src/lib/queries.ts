@@ -270,6 +270,7 @@ export function useGLVPerStudentStats(classId: string | undefined, enabled = tru
         schoolYearId
           ? supabase.from('attendance_records').select('student_id, day_type')
               .eq('class_id', classId).eq('status', 'present').eq('school_year_id', schoolYearId)
+              .gte('attendance_date', schoolYear.start_date).lte('attendance_date', schoolYear.end_date)
           : supabase.from('attendance_records').select('student_id, day_type')
               .eq('class_id', classId).eq('status', 'present'),
       ])
@@ -543,7 +544,7 @@ export function useStudentsWithDetails() {
           (from, to) => supabase.from('thieu_nhi').select('id, full_name, saint_name, student_code, date_of_birth, gender, phone, address, parent_name, parent_phone, parent_name_2, parent_phone_2, class_id, status, avatar_url, notes, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn, created_at, updated_at')
             .order('full_name', { ascending: true }).order('id', { ascending: true }).range(from, to)
         ).then(rows => { console.log('[query] thieu_nhi done:', Date.now() - t0, 'ms', 'rows:', rows.length); return rows }),
-        supabase.from('holidays').select('day_type')
+        supabase.from('holidays').select('day_type, school_year_id')
           .then(r => { console.log('[query] holidays done:', Date.now() - t0, 'ms', r.error?.message || 'OK'); return r }),
       ])
 
@@ -555,7 +556,9 @@ export function useStudentsWithDetails() {
 
       const schoolYear = schoolYearRes.data
       const classesData = classesRes.data || []
-      const holidays = (allHolidaysRes.data || []) as Pick<Holiday, 'day_type'>[]
+      // Chỉ lấy ngày nghỉ của năm học hiện tại, tránh trừ nhầm ngày nghỉ năm cũ
+      const holidays = ((allHolidaysRes.data || []) as Pick<Holiday, 'day_type' | 'school_year_id'>[])
+        .filter(h => !schoolYear || h.school_year_id === schoolYear.id)
 
       // Count actual Thursdays (4) and Sundays (0) in school year
       const totalThu5 = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 4) : 40

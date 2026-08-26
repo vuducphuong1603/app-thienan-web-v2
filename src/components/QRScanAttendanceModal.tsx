@@ -97,7 +97,7 @@ export default function QRScanAttendanceModal({
 
   // Đồng bộ lại số buổi điểm danh trong thieu_nhi (giống điểm danh thủ công)
   const updateAttendanceCount = useCallback(async (studentId: string) => {
-    await recalcAttendanceCount(studentId, schoolYear?.id)
+    await recalcAttendanceCount(studentId, schoolYear)
   }, [schoolYear?.id])
 
   /** day_type thực tế để ghi: CN thì theo buổi đã chọn, T5 giữ nguyên */

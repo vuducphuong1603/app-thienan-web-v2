@@ -957,7 +957,7 @@ export default function ActivitiesPage() {
 
   // Số buổi T5/CN trong thieu_nhi (CN = (giáo lý + đi lễ) / 2)
   const updateAttendanceCount = async (studentId: string) => {
-    await recalcAttendanceCount(studentId, schoolYear?.id)
+    await recalcAttendanceCount(studentId, schoolYear)
   }
 
   // Handle attendance marking - save to database

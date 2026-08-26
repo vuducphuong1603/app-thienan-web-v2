@@ -145,7 +145,7 @@ export default function AttendanceTab({ classes, schoolYear, user }: AttendanceT
 
   // Update attendance count in thieu_nhi table
   const updateAttendanceCount = async (studentId: string) => {
-    await recalcAttendanceCount(studentId, schoolYear?.id)
+    await recalcAttendanceCount(studentId, schoolYear)
   }
 
   // Mark attendance

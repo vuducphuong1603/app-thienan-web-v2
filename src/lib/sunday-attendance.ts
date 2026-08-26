@@ -139,3 +139,19 @@ export function countSundayReport(
   }
   return { full, partial }
 }
+
+/**
+ * Ngày điểm danh có nằm trong khoảng năm học không.
+ * Điểm danh ngoài khoảng (vd test trước ngày bắt đầu tính điểm danh) vẫn lưu bản ghi
+ * nhưng không được tính vào số buổi. Thiếu thông tin năm học thì không chặn.
+ */
+export function isWithinSchoolYear(
+  date: string,
+  schoolYear: { start_date?: string | null; end_date?: string | null } | null | undefined
+): boolean {
+  if (!schoolYear) return true
+  const { start_date, end_date } = schoolYear
+  if (start_date && date < start_date) return false
+  if (end_date && date > end_date) return false
+  return true
+}
