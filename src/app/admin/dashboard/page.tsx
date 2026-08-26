@@ -61,7 +61,7 @@ export default function AdminDashboard() {
             <div>
               <p className="text-sm sm:text-base text-[#666D80] dark:text-gray-300 mb-1">Chúc ngày tốt lành</p>
               <h1 className="text-2xl sm:text-3xl lg:text-[40px] font-bold text-black dark:text-white leading-tight">
-                Chào mừng, {firstName}. <span className="inline-block animate-wave">👋</span>
+                Chào mừng, Trưởng {firstName}. <span className="inline-block animate-wave">👋</span>
               </h1>
             </div>
             <div className="flex flex-wrap items-center gap-3 lg:gap-4">

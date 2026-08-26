@@ -56,7 +56,7 @@ export default function UserDashboard() {
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Chúc ngày tốt lành</p>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Chào mừng, {firstName}. <span className="inline-block animate-wave">👋</span>
+                Chào mừng, Trưởng {firstName}. <span className="inline-block animate-wave">👋</span>
               </h1>
             </div>
             <div className="flex flex-wrap items-center gap-3">
