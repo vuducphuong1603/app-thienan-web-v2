@@ -75,9 +75,9 @@ export function useDashboardStats(enabled = true) {
     staleTime: 5 * 60 * 1000, // Dashboard stats don't change often
     queryFn: async () => {
       const [glvRes, thieuNhiRes, classesRes] = await Promise.all([
-        supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'giao_ly_vien'),
-        supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }),
-        supabase.from('classes').select('*', { count: 'exact', head: true }),
+        supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'giao_ly_vien').eq('status', 'ACTIVE'),
+        supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+        supabase.from('classes').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
       ])
 
       // Throw on auth/RLS errors so React Query retries instead of caching 0
