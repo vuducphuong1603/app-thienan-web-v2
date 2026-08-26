@@ -23,6 +23,8 @@ export default function StudentAttendancePage() {
 
   const { user } = useAuth()
   const [student, setStudent] = useState<StudentWithClass | null>(null)
+  const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([])
+  const [selectedYearId, setSelectedYearId] = useState<string>('')
 
   // GLV chỉ xem lịch sử điểm danh của thiếu nhi lớp mình phụ trách
   useEffect(() => {
@@ -69,12 +71,15 @@ export default function StudentAttendancePage() {
         class_name: className
       })
 
-      // Fetch current school year
-      const { data: schoolYearData } = await supabase
+      // Danh sách năm học để chọn xem lại lịch sử; mặc định năm hiện tại
+      const { data: yearsData } = await supabase
         .from('school_years')
         .select('*')
-        .eq('is_current', true)
-        .single()
+        .order('start_date', { ascending: false })
+      const years = (yearsData || []) as SchoolYear[]
+      setSchoolYears(years)
+      const schoolYearData =
+        years.find(y => y.id === selectedYearId) || years.find(y => y.is_current) || years[0] || null
 
       setSchoolYear(schoolYearData)
 
@@ -99,13 +104,17 @@ export default function StudentAttendancePage() {
         setTotalCnDays(Math.max(1, cnTotal - cnHolidays))
       }
 
-      // Fetch attendance records from attendance_records table
-      const { data: attendanceData, error: attendanceError } = await supabase
+      // Fetch attendance records của đúng năm học đang xem
+      let recordsQuery = supabase
         .from('attendance_records')
         .select('*')
         .eq('student_id', studentId)
         .eq('status', 'present')
         .order('attendance_date', { ascending: false })
+      if (schoolYearData?.id) {
+        recordsQuery = recordsQuery.eq('school_year_id', schoolYearData.id)
+      }
+      const { data: attendanceData, error: attendanceError } = await recordsQuery
 
       if (!attendanceError && attendanceData) {
         // Get unique created_by user IDs
@@ -140,7 +149,7 @@ export default function StudentAttendancePage() {
     } finally {
       setLoading(false)
     }
-  }, [studentId])
+  }, [studentId, selectedYearId])
 
   useEffect(() => {
     fetchData()
@@ -345,8 +354,19 @@ export default function StudentAttendancePage() {
                   <span className="text-[#fa865e]"> ({student.student_code})</span>
                 )}
               </p>
-              <p className="text-xs text-black/40 dark:text-white/40">
-                Lớp: {student.class_name || 'Chưa phân lớp'} | Năm học: {schoolYear?.name || '2025-2026'}
+              <p className="text-xs text-black/40 dark:text-white/40 flex items-center gap-1.5 flex-wrap">
+                <span>Lớp: {student.class_name || 'Chưa phân lớp'} | Năm học:</span>
+                <select
+                  value={schoolYear?.id || ''}
+                  onChange={(e) => setSelectedYearId(e.target.value)}
+                  className="bg-[#F6F6F6] dark:bg-white/10 text-black dark:text-white rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer"
+                >
+                  {schoolYears.map((y) => (
+                    <option key={y.id} value={y.id}>
+                      {y.name}{y.is_current ? ' (hiện tại)' : ''}
+                    </option>
+                  ))}
+                </select>
               </p>
             </div>
           </div>
