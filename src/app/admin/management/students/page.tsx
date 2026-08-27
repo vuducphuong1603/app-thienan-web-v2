@@ -52,6 +52,10 @@ export default function StudentsPage() {
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false)
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  // Mobile: ẩn cột điểm mặc định, bật bằng nút "Hiện điểm". Desktop (lg+) luôn hiện.
+  const [showScores, setShowScores] = useState(false)
+  const scoreHeadCls = showScores ? 'flex' : 'hidden lg:flex'
+  const scoreCellCls = showScores ? 'table-cell' : 'hidden lg:table-cell'
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<StudentWithDetails | null>(null)
 
@@ -163,6 +167,7 @@ export default function StudentsPage() {
   // Start editing a student's scores
   const startEditing = (student: StudentWithDetails) => {
     setEditingStudentId(student.id)
+    setShowScores(true)
     setEditingScores({
       score_45_hk1: (student.score_45_hk1 || 0).toString(),
       score_exam_hk1: (student.score_exam_hk1 || 0).toString(),
@@ -333,6 +338,19 @@ export default function StudentsPage() {
               )}
             </div>
 
+            {/* Toggle score columns - mobile only */}
+            <button
+              type="button"
+              onClick={() => setShowScores((v) => !v)}
+              className={`lg:hidden flex items-center gap-2 h-[38px] px-4 rounded-full text-sm font-medium border transition-colors ${showScores ? 'bg-brand/10 border-brand text-brand' : 'bg-white dark:bg-white/10 border-[#E5E1DC] dark:border-white/10 text-black dark:text-white'}`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M15.477 12.89L17 22L12 19L7 22L8.523 12.89" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {showScores ? 'Ẩn điểm' : 'Hiện điểm'}
+            </button>
+
             {/* Import Button - Solid orange background */}
             <button
               onClick={() => setIsImportModalOpen(true)}
@@ -359,7 +377,7 @@ export default function StudentsPage() {
 
       {/* Table */}
       <div className="overflow-x-auto px-4 sm:px-6 pb-4">
-        <div className="min-w-[1200px]">
+        <div className={showScores ? 'min-w-[1200px]' : 'min-w-[640px] lg:min-w-[1200px]'}>
         {/* Header Bar */}
         <div className="bg-[#E5E1DC] rounded-[15px] h-12 border border-white/60 flex items-center">
           <div className="w-[15%] min-w-[180px] px-4 flex items-center">
@@ -375,39 +393,39 @@ export default function StudentsPage() {
           <div className="w-[9%] min-w-[110px] px-2 flex items-center">
             <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide">LIÊN HỆ</span>
           </div>
-          <div className="w-[5%] min-w-[55px] px-1 flex flex-col items-center justify-center">
+          <div className={`w-[5%] min-w-[55px] px-1 ${scoreHeadCls} flex-col items-center justify-center`}>
             <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">45&apos;</span>
             <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">HK1</span>
           </div>
-          <div className="w-[5%] min-w-[55px] px-1 flex flex-col items-center justify-center">
+          <div className={`w-[5%] min-w-[55px] px-1 ${scoreHeadCls} flex-col items-center justify-center`}>
             <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">THI</span>
             <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">HK1</span>
           </div>
-          <div className="w-[5%] min-w-[55px] px-1 flex flex-col items-center justify-center">
+          <div className={`w-[5%] min-w-[55px] px-1 ${scoreHeadCls} flex-col items-center justify-center`}>
             <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">45&apos;</span>
             <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">HK2</span>
           </div>
-          <div className="w-[5%] min-w-[55px] px-1 flex flex-col items-center justify-center">
+          <div className={`w-[5%] min-w-[55px] px-1 ${scoreHeadCls} flex-col items-center justify-center`}>
             <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">THI</span>
             <span className="text-xs font-semibold text-[#8a8c90] uppercase tracking-wide leading-tight">HK2</span>
           </div>
-          <div className="w-[6%] min-w-[65px] px-1 flex flex-col items-center justify-center">
+          <div className={`w-[6%] min-w-[65px] px-1 ${scoreHeadCls} flex-col items-center justify-center`}>
             <span className="text-xs font-semibold text-[#6e62e5] uppercase tracking-wide leading-tight">TB</span>
             <span className="text-xs font-semibold text-[#6e62e5] uppercase tracking-wide leading-tight">GIÁO LÝ</span>
           </div>
-          <div className="w-[6%] min-w-[65px] px-1 flex flex-col items-center justify-center">
+          <div className={`w-[6%] min-w-[65px] px-1 ${scoreHeadCls} flex-col items-center justify-center`}>
             <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">ĐIỂM</span>
             <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">DANH T5</span>
           </div>
-          <div className="w-[6%] min-w-[70px] px-1 flex flex-col items-center justify-center">
+          <div className={`w-[6%] min-w-[70px] px-1 ${scoreHeadCls} flex-col items-center justify-center`}>
             <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">ĐIỂM</span>
             <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">DANH CN</span>
           </div>
-          <div className="w-[6%] min-w-[70px] px-1 flex flex-col items-center justify-center">
+          <div className={`w-[6%] min-w-[70px] px-1 ${scoreHeadCls} flex-col items-center justify-center`}>
             <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">TB ĐIỂM</span>
             <span className="text-xs font-semibold text-[#8B8685] uppercase tracking-wide leading-tight">DANH</span>
           </div>
-          <div className="w-[5%] min-w-[55px] px-1 flex flex-col items-center justify-center">
+          <div className={`w-[5%] min-w-[55px] px-1 ${scoreHeadCls} flex-col items-center justify-center`}>
             <span className="text-xs font-semibold text-[#E178FF] uppercase tracking-wide leading-tight">TỔNG</span>
             <span className="text-xs font-semibold text-[#E178FF] uppercase tracking-wide leading-tight">TB</span>
           </div>
@@ -417,21 +435,21 @@ export default function StudentsPage() {
         </div>
 
         {/* Table Body */}
-        <table className="w-full table-fixed">
+        <table className={`w-full ${showScores ? 'table-fixed' : 'lg:table-fixed'}`}>
           <colgroup>
             <col className="w-[15%]" />
             <col className="w-[5%]" />
             <col className="w-[6%]" />
             <col className="w-[9%]" />
-            <col className="w-[5%]" />
-            <col className="w-[5%]" />
-            <col className="w-[5%]" />
-            <col className="w-[5%]" />
-            <col className="w-[6%]" />
-            <col className="w-[6%]" />
-            <col className="w-[6%]" />
-            <col className="w-[6%]" />
-            <col className="w-[5%]" />
+            <col className={`${showScores ? '' : 'hidden lg:table-column'} w-[5%]`} />
+            <col className={`${showScores ? '' : 'hidden lg:table-column'} w-[5%]`} />
+            <col className={`${showScores ? '' : 'hidden lg:table-column'} w-[5%]`} />
+            <col className={`${showScores ? '' : 'hidden lg:table-column'} w-[5%]`} />
+            <col className={`${showScores ? '' : 'hidden lg:table-column'} w-[6%]`} />
+            <col className={`${showScores ? '' : 'hidden lg:table-column'} w-[6%]`} />
+            <col className={`${showScores ? '' : 'hidden lg:table-column'} w-[6%]`} />
+            <col className={`${showScores ? '' : 'hidden lg:table-column'} w-[6%]`} />
+            <col className={`${showScores ? '' : 'hidden lg:table-column'} w-[5%]`} />
             <col />
           </colgroup>
           <thead className="sr-only">
@@ -575,7 +593,7 @@ export default function StudentsPage() {
                     </td>
 
                     {/* Score: 45' HK1 - Start of score group with #F6F6F6 background */}
-                    <td className="px-1 py-3 text-center bg-[#F6F6F6]" style={{ borderLeft: '0.5px solid #E5E1DC', borderRight: '0.5px solid #E5E1DC' }}>
+                    <td className={`${scoreCellCls} px-1 py-3 text-center bg-[#F6F6F6]`} style={{ borderLeft: '0.5px solid #E5E1DC', borderRight: '0.5px solid #E5E1DC' }}>
                       {isEditing ? (
                         <input
                           type="text"
@@ -589,7 +607,7 @@ export default function StudentsPage() {
                     </td>
 
                     {/* Score: THI HK1 */}
-                    <td className="px-1 py-3 text-center bg-[#F6F6F6]" style={{ borderRight: '0.5px solid #E5E1DC' }}>
+                    <td className={`${scoreCellCls} px-1 py-3 text-center bg-[#F6F6F6]`} style={{ borderRight: '0.5px solid #E5E1DC' }}>
                       {isEditing ? (
                         <input
                           type="text"
@@ -603,7 +621,7 @@ export default function StudentsPage() {
                     </td>
 
                     {/* Score: 45' HK2 */}
-                    <td className="px-1 py-3 text-center bg-[#F6F6F6]" style={{ borderRight: '0.5px solid #E5E1DC' }}>
+                    <td className={`${scoreCellCls} px-1 py-3 text-center bg-[#F6F6F6]`} style={{ borderRight: '0.5px solid #E5E1DC' }}>
                       {isEditing ? (
                         <input
                           type="text"
@@ -617,7 +635,7 @@ export default function StudentsPage() {
                     </td>
 
                     {/* Score: THI HK2 */}
-                    <td className="px-1 py-3 text-center bg-[#F6F6F6]" style={{ borderRight: '0.5px solid #E5E1DC' }}>
+                    <td className={`${scoreCellCls} px-1 py-3 text-center bg-[#F6F6F6]`} style={{ borderRight: '0.5px solid #E5E1DC' }}>
                       {isEditing ? (
                         <input
                           type="text"
@@ -631,27 +649,27 @@ export default function StudentsPage() {
                     </td>
 
                     {/* TB Giáo Lý (calculated, purple) - End of score group */}
-                    <td className="px-1 py-3 text-center bg-[#F6F6F6]" style={{ borderRight: '0.5px solid #E5E1DC' }}>
+                    <td className={`${scoreCellCls} px-1 py-3 text-center bg-[#F6F6F6]`} style={{ borderRight: '0.5px solid #E5E1DC' }}>
                       <span className="text-sm font-medium text-[#6e62e5]">{student.avg_catechism?.toFixed(1) || '0.0'}</span>
                     </td>
 
                     {/* Điểm danh T5 */}
-                    <td className={`px-1 py-3 text-center ${rowBgClass}`}>
+                    <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
                       <span className="text-sm text-[#8B8685]">{student.score_thu5?.toFixed(1) || '0.0'}</span>
                     </td>
 
                     {/* Điểm danh CN */}
-                    <td className={`px-1 py-3 text-center ${rowBgClass}`}>
+                    <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
                       <span className="text-sm text-[#8B8685]">{student.score_cn?.toFixed(1) || '0.0'}</span>
                     </td>
 
                     {/* TB Điểm danh (calculated) */}
-                    <td className={`px-1 py-3 text-center ${rowBgClass}`}>
+                    <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
                       <span className="text-sm text-[#8B8685]">{student.avg_attendance?.toFixed(1) || '0.0'}</span>
                     </td>
 
                     {/* Tổng TB (calculated, pink) */}
-                    <td className={`px-1 py-3 text-center ${rowBgClass}`}>
+                    <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
                       <span className="text-sm font-semibold text-[#E178FF]">{student.total_avg?.toFixed(1) || '0.0'}</span>
                     </td>
 
