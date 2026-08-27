@@ -1,5 +1,6 @@
 'use client'
 
+import { CLASS_TEACHER_ROLES } from '@/lib/class-teachers'
 import { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft, ChevronDown, Search, UserMinus } from 'lucide-react'
 import { supabase, Class, BRANCHES, Branch } from '@/lib/supabase'
@@ -47,7 +48,7 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
       const { data: allTeachers, error } = await supabase
         .from('users')
         .select('id, full_name, saint_name, role, class_id, class_name')
-        .eq('role', 'giao_ly_vien')
+        .in('role', [...CLASS_TEACHER_ROLES])
 
       if (error) {
         console.error('Error fetching teachers:', error)

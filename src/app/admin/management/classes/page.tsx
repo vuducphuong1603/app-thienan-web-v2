@@ -8,6 +8,8 @@ import AddClassForm from '@/components/management/AddClassForm'
 import EditClassForm from '@/components/management/EditClassForm'
 import { useClassesWithDetails, useInvalidateQueries } from '@/lib/queries'
 import { normalizeSearchText } from '@/lib/search'
+import { useAuth } from '@/lib/auth-context'
+import { prioritizeAssignedClass, prioritizeAssignedBranch } from '@/lib/class-teachers'
 
 interface ClassWithDetails extends Class {
   teachers?: string[]
@@ -51,6 +53,7 @@ function ClassesPageContent() {
   const [classToDelete, setClassToDelete] = useState<ClassWithDetails | null>(null)
   const [handledEditParam, setHandledEditParam] = useState(false)
 
+  const { user } = useAuth()
   const { data: classes = [], isLoading: loading, isError, error, refetch } = useClassesWithDetails()
   const { invalidateClasses } = useInvalidateQueries()
 
@@ -83,8 +86,12 @@ function ClassesPageContent() {
   })
 
   // Group classes by branch
-  const groupedClasses = BRANCHES.reduce((acc, branch) => {
-    const branchClasses = filteredClasses.filter((cls) => cls.branch === branch)
+  // Ưu tiên ngành / lớp mà người dùng được phân công lên đầu (kể cả admin kiêm nhiệm)
+  const groupedClasses = prioritizeAssignedBranch(BRANCHES, classes, user).reduce((acc, branch) => {
+    const branchClasses = prioritizeAssignedClass(
+      filteredClasses.filter((cls) => cls.branch === branch),
+      user
+    )
     if (branchClasses.length > 0) {
       acc[branch] = branchClasses
     }

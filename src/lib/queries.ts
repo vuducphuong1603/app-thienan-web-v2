@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { sundayFullyPresentIds } from '@/lib/sunday-attendance'
 import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord, NotificationWithStatus, Notification, UserNote, Holiday, SchoolYear, AttendanceRecord, ThieuNhiProfile, BRANCHES } from './supabase'
+import { CLASS_TEACHER_ROLES } from './class-teachers'
 
 // ============ Helper: Count weekdays between two dates ============
 export function countWeekdays(startDate: string, endDate: string, dayOfWeek: number): number {
@@ -617,7 +618,7 @@ export function useClassesWithDetails() {
       // nếu không sĩ số sẽ bị cắt cụt khi số thiếu nhi vượt 1000.
       const [classesRes, usersRes, students] = await Promise.all([
         supabase.from('classes').select('*').order('display_order', { ascending: true }),
-        supabase.from('users').select('id, full_name, saint_name, class_id, class_name').eq('role', 'giao_ly_vien'),
+        supabase.from('users').select('id, full_name, saint_name, class_id, class_name').in('role', [...CLASS_TEACHER_ROLES]),
         fetchAllRows<{ id: string; class_id: string }>(
           (from, to) => supabase.from('thieu_nhi').select('id, class_id').eq('status', 'ACTIVE').order('id', { ascending: true }).range(from, to)
         ),
@@ -725,7 +726,7 @@ export function useClassDetail(classId: string) {
         supabase
           .from('users')
           .select('id, full_name, saint_name, phone, email, avatar_url, status, class_id, class_name')
-          .eq('role', 'giao_ly_vien'),
+          .in('role', [...CLASS_TEACHER_ROLES]),
         // Supabase trả tối đa 1000 dòng mỗi request nên phải lấy hết theo trang
         fetchAllRows<Omit<ClassStudentDetail, 'avgCatechism' | 'avgAttendance' | 'totalAvg'>>(
           (from, to) =>
