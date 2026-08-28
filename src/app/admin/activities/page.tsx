@@ -49,11 +49,12 @@ interface ReportStudentScore {
   average_hk1: number | null
   average_hk2: number | null
   average_year: number | null
-  // Attendance-based averages (điểm điểm danh), same formula as useStudentsWithDetails:
-  // TB Thứ 5 = attendance_thu5 * 0.4 * (10 / effective Thursday count in school year)
-  // TB Giáo lý = attendance_cn * 0.6 * (10 / effective Sunday count in school year)
-  avg_thu5: number | null
-  avg_gl: number | null
+  // Điểm điểm danh thang 10 (tính từ attendance_records trong năm học / số buổi hiệu lực):
+  // Đi lễ T5, Học GL (CN buổi 'cn'), Đi lễ CN (buổi 'cn_le'); Điểm TB = T5*0.4 + ((GL+LễCN)/2)*0.6
+  diem_t5: number | null
+  diem_gl: number | null
+  diem_le_cn: number | null
+  diem_tb: number | null
 }
 
 type TimeFilterMode = 'week' | 'dateRange' | 'month'
@@ -540,8 +541,7 @@ export default function ActivitiesPage() {
   const [scoreColumns, setScoreColumns] = useState({
     diLeT5: false,
     hocGL: false,
-    tbThu5: false,
-    tbGL: false,
+    diLeCN: false,
     diemTB: false,
     score45HK1: false,
     scoreExamHK1: false,
@@ -1585,7 +1585,7 @@ export default function ActivitiesPage() {
       if (reportType === 'score') {
         // Generate score report — also fetch holidays to compute effective
         // session counts for the attendance-based averages (TB Thứ 5 / TB Giáo lý)
-        const [studentsResult, holidaysResult] = await Promise.all([
+        const [studentsResult, holidaysResult, attendanceResult] = await Promise.all([
           supabase
             .from('thieu_nhi')
             .select('id, student_code, full_name, saint_name, avatar_url, score_di_le_t5, score_hoc_gl, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn')
@@ -1595,7 +1595,27 @@ export default function ActivitiesPage() {
           schoolYear?.id
             ? supabase.from('holidays').select('day_type').eq('school_year_id', schoolYear.id)
             : Promise.resolve({ data: [] as Pick<Holiday, 'day_type'>[], error: null }),
+          // Số buổi có mặt từng loại (thu5 / cn / cn_le) trong năm học để tính điểm điểm danh thang 10
+          schoolYear
+            ? supabase
+                .from('attendance_records')
+                .select('student_id, day_type')
+                .eq('class_id', reportClassId)
+                .eq('status', 'present')
+                .gte('attendance_date', schoolYear.start_date)
+                .lte('attendance_date', schoolYear.end_date)
+            : Promise.resolve({ data: [] as { student_id: string; day_type: string }[], error: null }),
         ])
+        if (attendanceResult.error) throw attendanceResult.error
+        const presentCounts = new Map<string, { thu5: number; cn: number; cnLe: number }>()
+        for (const r of (attendanceResult.data || []) as { student_id: string; day_type: string }[]) {
+          const c = presentCounts.get(r.student_id) || { thu5: 0, cn: 0, cnLe: 0 }
+          if (r.day_type === 'thu5') c.thu5++
+          else if (r.day_type === 'cn') c.cn++
+          else if (r.day_type === 'cn_le') c.cnLe++
+          presentCounts.set(r.student_id, c)
+        }
+        const { attendanceScores } = await import('@/lib/score-report-excel')
 
         const studentsData = studentsResult.data
         const studentsError = studentsResult.error
@@ -1620,11 +1640,11 @@ export default function ActivitiesPage() {
           const score45HK2 = student.score_45_hk2 !== null ? Number(student.score_45_hk2) : null
           const scoreExamHK2 = student.score_exam_hk2 !== null ? Number(student.score_exam_hk2) : null
 
-          // Attendance-based averages (điểm điểm danh) — same formula as useStudentsWithDetails
-          const attendanceThu5 = student.attendance_thu5 !== null ? Number(student.attendance_thu5) : 0
-          const attendanceCn = student.attendance_cn !== null ? Number(student.attendance_cn) : 0
-          const avgThu5 = Math.round(((attendanceThu5 * 0.4) * (10 / effectiveThu5Days)) * 100) / 100
-          const avgGL = Math.round(((attendanceCn * 0.6) * (10 / effectiveCnDays)) * 100) / 100
+          // Điểm điểm danh thang 10 theo công thức file mẫu sổ điểm
+          const attScores = attendanceScores(
+            presentCounts.get(student.id) || { thu5: 0, cn: 0, cnLe: 0 },
+            { thu5: effectiveThu5Days, cn: effectiveCnDays },
+          )
 
           // Calculate average HK1 (45 min counts 1, exam counts 2)
           let averageHK1: number | null = null
@@ -1659,8 +1679,10 @@ export default function ActivitiesPage() {
             average_hk1: averageHK1,
             average_hk2: averageHK2,
             average_year: averageYear,
-            avg_thu5: avgThu5,
-            avg_gl: avgGL,
+            diem_t5: attScores.diem_t5,
+            diem_gl: attScores.diem_gl,
+            diem_le_cn: attScores.diem_le_cn,
+            diem_tb: attScores.diem_tb,
           }
         })
 
@@ -3733,20 +3755,11 @@ export default function ActivitiesPage() {
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={scoreColumns.tbThu5}
-                      onChange={(e) => setScoreColumns(prev => ({ ...prev, tbThu5: e.target.checked }))}
+                      checked={scoreColumns.diLeCN}
+                      onChange={(e) => setScoreColumns(prev => ({ ...prev, diLeCN: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black dark:text-white">TB Thứ 5</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={scoreColumns.tbGL}
-                      onChange={(e) => setScoreColumns(prev => ({ ...prev, tbGL: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
-                    />
-                    <span className="text-sm text-black dark:text-white">TB Giáo lý</span>
+                    <span className="text-sm text-black dark:text-white">Đi Lễ CN</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -4124,8 +4137,8 @@ export default function ActivitiesPage() {
                       const showAll = !anySelected
                       const showDiLeT5 = showAll || scoreColumns.diLeT5
                       const showHocGL = showAll || scoreColumns.hocGL
-                      const showTbThu5 = showAll || scoreColumns.tbThu5
-                      const showTbGL = showAll || scoreColumns.tbGL
+                      const showDiLeCN = showAll || scoreColumns.diLeCN
+                      const showDiemTB = showAll || scoreColumns.diemTB
                       const show45HK1 = showAll || scoreColumns.score45HK1
                       const showExamHK1 = showAll || scoreColumns.scoreExamHK1
                       const show45HK2 = showAll || scoreColumns.score45HK2
@@ -4163,7 +4176,7 @@ export default function ActivitiesPage() {
                       }
 
                       // Count visible columns for colSpan
-                      const visibleScoreCols = [showDiLeT5, showHocGL, showTbThu5, showTbGL, show45HK1, showExamHK1, show45HK2, showExamHK2, showDiemTong, showKetQua].filter(Boolean).length
+                      const visibleScoreCols = [showDiLeT5, showHocGL, showDiLeCN, showDiemTB, show45HK1, showExamHK1, show45HK2, showExamHK2, showDiemTong, showKetQua].filter(Boolean).length
 
                       return (
                         <table className="w-full">
@@ -4174,11 +4187,10 @@ export default function ActivitiesPage() {
                               <th className="text-left px-4 text-[14px] font-medium text-[#666d80] w-[180px]">Họ và tên</th>
                               {showDiLeT5 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">Đi Lễ T5</th>}
                               {showHocGL && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">Học GL</th>}
-                              {showTbThu5 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">TB Thứ 5</th>}
-                              {showTbGL && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">TB Giáo lý</th>}
+                              {showDiLeCN && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">Đi Lễ CN</th>}
+                              {showDiemTB && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">Điểm TB</th>}
                               {show45HK1 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">45p HK1</th>}
                               {showExamHK1 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">Thi HK1</th>}
-                              {(show45HK1 || showExamHK1) && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">TB HK1</th>}
                               {show45HK2 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">45p HK2</th>}
                               {showExamHK2 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">Thi HK2</th>}
                               {(show45HK2 || showExamHK2) && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">TB HK2</th>}
@@ -4189,7 +4201,7 @@ export default function ActivitiesPage() {
                           <tbody>
                             {reportScoreStudents.length === 0 ? (
                               <tr>
-                                <td colSpan={3 + visibleScoreCols + ((show45HK1 || showExamHK1) ? 1 : 0) + ((show45HK2 || showExamHK2) ? 1 : 0)} className="py-12 text-center text-[16px] text-[#666d80]">
+                                <td colSpan={3 + visibleScoreCols + ((show45HK2 || showExamHK2) ? 1 : 0)} className="py-12 text-center text-[16px] text-[#666d80]">
                                   Không có học sinh trong lớp này
                                 </td>
                               </tr>
@@ -4200,13 +4212,12 @@ export default function ActivitiesPage() {
                                     <td className="px-4 text-[14px] text-black dark:text-white">{index + 1}</td>
                                     <td className="px-4 text-[14px] text-black dark:text-white">{student.saint_name || '-'}</td>
                                     <td className="px-4 text-[14px] font-medium text-black dark:text-white">{student.full_name}</td>
-                                    {showDiLeT5 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_di_le_t5 !== null ? student.score_di_le_t5 : '-'}</td>}
-                                    {showHocGL && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_hoc_gl !== null ? student.score_hoc_gl : '-'}</td>}
-                                    {showTbThu5 && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.avg_thu5 !== null ? student.avg_thu5 : '-'}</td>}
-                                    {showTbGL && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.avg_gl !== null ? student.avg_gl : '-'}</td>}
+                                    {showDiLeT5 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.diem_t5 !== null ? student.diem_t5 : '-'}</td>}
+                                    {showHocGL && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.diem_gl !== null ? student.diem_gl : '-'}</td>}
+                                    {showDiLeCN && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.diem_le_cn !== null ? student.diem_le_cn : '-'}</td>}
+                                    {showDiemTB && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.diem_tb !== null ? student.diem_tb : '-'}</td>}
                                     {show45HK1 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_45_hk1 !== null ? student.score_45_hk1 : '-'}</td>}
                                     {showExamHK1 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_exam_hk1 !== null ? student.score_exam_hk1 : '-'}</td>}
-                                    {(show45HK1 || showExamHK1) && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.average_hk1 !== null ? student.average_hk1 : '-'}</td>}
                                     {show45HK2 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_45_hk2 !== null ? student.score_45_hk2 : '-'}</td>}
                                     {showExamHK2 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_exam_hk2 !== null ? student.score_exam_hk2 : '-'}</td>}
                                     {(show45HK2 || showExamHK2) && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.average_hk2 !== null ? student.average_hk2 : '-'}</td>}

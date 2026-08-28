@@ -27,8 +27,10 @@ export interface ReportStudentScore {
   average_hk1: number | null
   average_hk2: number | null
   average_year: number | null
-  avg_thu5: number | null
-  avg_gl: number | null
+  diem_t5: number | null
+  diem_gl: number | null
+  diem_le_cn: number | null
+  diem_tb: number | null
 }
 
 export type TimeFilterMode = 'week' | 'dateRange' | 'month'

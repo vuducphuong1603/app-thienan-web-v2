@@ -25,8 +25,10 @@ interface ScoreReportStudent {
   average_hk1: number | null
   average_hk2: number | null
   average_year: number | null
-  avg_thu5: number | null
-  avg_gl: number | null
+  diem_t5: number | null
+  diem_gl: number | null
+  diem_le_cn: number | null
+  diem_tb: number | null
 }
 
 interface AttendanceReportProps {
@@ -42,8 +44,7 @@ interface AttendanceReportProps {
 interface ScoreColumns {
   diLeT5: boolean
   hocGL: boolean
-  tbThu5: boolean
-  tbGL: boolean
+  diLeCN: boolean
   diemTB: boolean
   score45HK1: boolean
   scoreExamHK1: boolean
@@ -262,8 +263,8 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
   const showAll = !anySelected
   const showDiLeT5 = showAll || scoreColumns?.diLeT5
   const showHocGL = showAll || scoreColumns?.hocGL
-  const showTbThu5 = showAll || scoreColumns?.tbThu5
-  const showTbGL = showAll || scoreColumns?.tbGL
+  const showDiLeCN = showAll || scoreColumns?.diLeCN
+  const showDiemTB = showAll || scoreColumns?.diemTB
   const show45HK1 = showAll || scoreColumns?.score45HK1
   const showExamHK1 = showAll || scoreColumns?.scoreExamHK1
   const show45HK2 = showAll || scoreColumns?.score45HK2
@@ -309,11 +310,10 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
           <th className="border border-gray-400 px-1 py-2 text-center" colSpan={2}>Họ và tên</th>
           {showDiLeT5 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Đi Lễ<br/>T5</th>}
           {showHocGL && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Học<br/>GL</th>}
-          {showTbThu5 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>Thứ 5</th>}
-          {showTbGL && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>Giáo lý</th>}
+          {showDiLeCN && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Đi Lễ<br/>CN</th>}
+          {showDiemTB && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">Điểm<br/>TB</th>}
           {show45HK1 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">45p<br/>HK1</th>}
           {showExamHK1 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Thi<br/>HK1</th>}
-          {(show45HK1 || showExamHK1) && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>HK1</th>}
           {show45HK2 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">45p<br/>HK2</th>}
           {showExamHK2 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Thi<br/>HK2</th>}
           {(show45HK2 || showExamHK2) && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>HK2</th>}
@@ -335,22 +335,22 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
               <td className="border border-gray-400 px-1 py-2 text-center font-medium">{givenName}</td>
               {showDiLeT5 && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
-                  {student.score_di_le_t5 !== null ? student.score_di_le_t5 : '-'}
+                  {student.diem_t5 !== null ? student.diem_t5 : '-'}
                 </td>
               )}
               {showHocGL && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
-                  {student.score_hoc_gl !== null ? student.score_hoc_gl : '-'}
+                  {student.diem_gl !== null ? student.diem_gl : '-'}
                 </td>
               )}
-              {showTbThu5 && (
-                <td className="border border-gray-400 px-1 py-2 text-center font-semibold bg-[#e8f5e9]">
-                  {student.avg_thu5 !== null ? student.avg_thu5 : '-'}
+              {showDiLeCN && (
+                <td className="border border-gray-400 px-1 py-2 text-center">
+                  {student.diem_le_cn !== null ? student.diem_le_cn : '-'}
                 </td>
               )}
-              {showTbGL && (
+              {showDiemTB && (
                 <td className="border border-gray-400 px-1 py-2 text-center font-semibold bg-[#e8f5e9]">
-                  {student.avg_gl !== null ? student.avg_gl : '-'}
+                  {student.diem_tb !== null ? student.diem_tb : '-'}
                 </td>
               )}
               {show45HK1 && (
@@ -361,11 +361,6 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
               {showExamHK1 && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
                   {student.score_exam_hk1 !== null ? student.score_exam_hk1 : '-'}
-                </td>
-              )}
-              {(show45HK1 || showExamHK1) && (
-                <td className="border border-gray-400 px-1 py-2 text-center font-semibold bg-[#e8f5e9]">
-                  {student.average_hk1 !== null ? student.average_hk1 : '-'}
                 </td>
               )}
               {show45HK2 && (

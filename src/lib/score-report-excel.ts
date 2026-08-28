@@ -5,8 +5,8 @@ import { isSundayDate } from './sunday-attendance'
 export interface ScoreColumnSelection {
   diLeT5: boolean
   hocGL: boolean
-  tbThu5: boolean
-  tbGL: boolean
+  diLeCN: boolean
+  diemTB: boolean
   score45HK1: boolean
   scoreExamHK1: boolean
   score45HK2: boolean
@@ -37,8 +37,37 @@ export interface ScoreReportStudent {
   average_hk1: number | null
   average_hk2: number | null
   average_year: number | null
-  avg_thu5: number | null
-  avg_gl: number | null
+  /** Điểm điểm danh thang 10 (chưa nhân hệ số): Đi lễ T5, Học GL (CN), Đi lễ CN */
+  diem_t5: number | null
+  diem_gl: number | null
+  diem_le_cn: number | null
+  /** Điểm TB điểm danh = T5*0.4 + ((GL + Lễ CN)/2)*0.6 — dùng khi không xuất được công thức */
+  diem_tb: number | null
+}
+
+/** Tách "Họ và tên" thành họ + đệm và tên (từ cuối cùng) */
+export function splitFullName(fullName: string): { hoDem: string; ten: string } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return { hoDem: '', ten: '' }
+  return { hoDem: parts.slice(0, -1).join(' '), ten: parts[parts.length - 1] }
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100
+
+/**
+ * Quy đổi số buổi có mặt sang điểm thang 10 theo số buổi hiệu lực trong năm học,
+ * và tính Điểm TB điểm danh theo công thức file mẫu: T5*0.4 + ((GL + Lễ CN)/2)*0.6
+ */
+export function attendanceScores(
+  counts: { thu5: number; cn: number; cnLe: number },
+  effectiveDays: { thu5: number; cn: number },
+): { diem_t5: number; diem_gl: number; diem_le_cn: number; diem_tb: number } {
+  const scale = (count: number, days: number) => (days > 0 ? round2(Math.min(10, (count * 10) / days)) : 0)
+  const diem_t5 = scale(counts.thu5, effectiveDays.thu5)
+  const diem_gl = scale(counts.cn, effectiveDays.cn)
+  const diem_le_cn = scale(counts.cnLe, effectiveDays.cn)
+  const diem_tb = round2(diem_t5 * 0.4 + ((diem_gl + diem_le_cn) / 2) * 0.6)
+  return { diem_t5, diem_gl, diem_le_cn, diem_tb }
 }
 
 // Bảng màu lấy từ file mẫu
@@ -59,17 +88,20 @@ export function buildScoreColumns(sel: ScoreColumnSelection): ReportColumn[] {
   const show = (k: keyof ScoreColumnSelection) => showAll || sel[k]
 
   const cols: ReportColumn[] = [
-    { key: 'stt', label: 'Stt', group: 'info', width: 6.6 },
+    // Độ rộng cột theo file mẫu đã chỉnh (Khai Tâm A 2026-08-28)
+    { key: 'stt', label: 'Stt', group: 'info', width: 3.6 },
     { key: 'saintName', label: 'Tên thánh', group: 'info', width: 14.9 },
-    { key: 'fullName', label: 'Họ và Tên', group: 'info', width: 25 },
+    { key: 'hoDem', label: 'Họ', group: 'info', width: 25 },
+    { key: 'ten', label: 'Tên', group: 'info', width: 25 },
   ]
   if (show('diLeT5')) cols.push({ key: 'diLeT5', label: 'Đi Lễ T5', group: 'diemdanh', width: 6.9, numFmt: '0.0' })
   if (show('hocGL')) cols.push({ key: 'hocGL', label: 'Học GL', group: 'diemdanh', width: 6.9, numFmt: '0.0' })
-  if (show('tbThu5')) cols.push({ key: 'tbThu5', label: 'TB Thứ 5', group: 'diemdanh', width: 6.9, numFmt: '0.0' })
-  if (show('tbGL')) cols.push({ key: 'tbGL', label: 'TB Giáo lý', group: 'diemdanh', width: 7.4, numFmt: '0.0' })
+  if (show('diLeCN')) cols.push({ key: 'diLeCN', label: 'Đi Lễ CN', group: 'diemdanh', width: 6.9, numFmt: '0.0' })
+  if (show('diemTB')) cols.push({ key: 'diemTB', label: 'Điểm TB', group: 'diemdanh', width: 7.4, numFmt: '0.0' })
   if (show('score45HK1')) cols.push({ key: 's45HK1', label: "45' HKI", group: 'giaoly', width: 6.9, numFmt: '0.0' })
   if (show('scoreExamHK1')) cols.push({ key: 'examHK1', label: 'Thi HKI', group: 'giaoly', width: 6.9, numFmt: '0.0' })
-  if (show('score45HK1') || show('scoreExamHK1')) cols.push({ key: 'tbHK1', label: 'TB HKI', group: 'giaoly', width: 6.9, numFmt: '0.0' })
+  // Cột TB HKI tạm ẩn cho tới khi sơ kết HKI (yêu cầu 2026-08-28). Khi cần hiện lại:
+  // if (show('score45HK1') || show('scoreExamHK1')) cols.push({ key: 'tbHK1', label: 'TB HKI', group: 'giaoly', width: 6.9, numFmt: '0.0' })
   if (show('score45HK2')) cols.push({ key: 's45HK2', label: "45' HKII", group: 'giaoly', width: 6.9, numFmt: '0.0' })
   if (show('scoreExamHK2')) cols.push({ key: 'examHK2', label: 'Thi HKII', group: 'giaoly', width: 6.9, numFmt: '0.0' })
   if (show('score45HK2') || show('scoreExamHK2')) cols.push({ key: 'tbHK2', label: 'TB HKII', group: 'giaoly', width: 6.9, numFmt: '0.0' })
@@ -92,6 +124,7 @@ export function colLetter(index: number): string {
 }
 
 export interface RowFormulas {
+  diemTB?: string
   tbHK1?: string
   tbHK2?: string
   tbNam?: string
@@ -111,14 +144,19 @@ export function buildRowFormulas(
   const has = (...keys: string[]) => keys.every(k => pos[k] !== undefined)
 
   const f: RowFormulas = {}
-  if (has('tbHK1', 's45HK1', 'examHK1')) {
-    f.tbHK1 = `(${ref('s45HK1')}+${ref('examHK1')}*2)/3`
+  // Điểm TB điểm danh theo file mẫu: =(T5*0.4)+(((GL+LễCN)/2)*0.6)
+  if (has('diemTB', 'diLeT5', 'hocGL', 'diLeCN')) {
+    f.diemTB = `(${ref('diLeT5')}*0.4)+(((${ref('hocGL')}+${ref('diLeCN')})/2)*0.6)`
   }
-  if (has('tbHK2', 's45HK2', 'examHK2')) {
-    f.tbHK2 = `(${ref('s45HK2')}+${ref('examHK2')}*2)/3`
-  }
-  if (has('tbNam', 'tbHK1', 'tbHK2')) {
-    f.tbNam = `(${ref('tbHK1')}+${ref('tbHK2')}*2)/3`
+  // TB HK = (45' + Thi*2)/3. Nếu cột TB HK bị ẩn nhưng vẫn đủ nguồn thì nội suy biểu thức để dùng cho TB Năm
+  const tbHK1Expr = has('s45HK1', 'examHK1') ? `(${ref('s45HK1')}+${ref('examHK1')}*2)/3` : undefined
+  const tbHK2Expr = has('s45HK2', 'examHK2') ? `(${ref('s45HK2')}+${ref('examHK2')}*2)/3` : undefined
+  if (has('tbHK1') && tbHK1Expr) f.tbHK1 = tbHK1Expr
+  if (has('tbHK2') && tbHK2Expr) f.tbHK2 = tbHK2Expr
+  const tbHK1Ref = has('tbHK1') ? ref('tbHK1') : tbHK1Expr
+  const tbHK2Ref = has('tbHK2') ? ref('tbHK2') : tbHK2Expr
+  if (has('tbNam') && tbHK1Ref && tbHK2Ref) {
+    f.tbNam = `(${tbHK1Ref}+${tbHK2Ref}*2)/3`
   }
   if (has('hang', 'tbNam')) {
     const col = colLetter(pos.tbNam)
@@ -193,14 +231,14 @@ function addSheetHeader(
   const { title, className, logoBase64, badgeBase64, extraInfo } = opts
   // Tiêu đề 20pt cần đủ chỗ: merge tối thiểu 9 cột kể cả khi bảng hẹp hơn
   const totalCols = Math.max(opts.totalCols, 9)
-  const orgSpan = Math.min(Math.max(totalCols, 5), 8)
 
-  ws.mergeCells(1, 2, 1, orgSpan)
-  ws.getCell(1, 2).value = 'Phong trào thiếu nhi thánh thể Việt Nam'
-  ws.mergeCells(2, 2, 2, orgSpan)
-  ws.getCell(2, 2).value = 'Giáo xứ Thiên Ân - Xứ Đoàn Đức Mẹ Fatima'
+  // 2 dòng tên đơn vị merge trọn chiều rộng bảng → canh giữa đúng tâm bảng điểm
+  ws.mergeCells(1, 1, 1, totalCols)
+  ws.getCell(1, 1).value = 'Phong trào thiếu nhi thánh thể Việt Nam'
+  ws.mergeCells(2, 1, 2, totalCols)
+  ws.getCell(2, 1).value = 'Giáo xứ Thiên Ân - Xứ Đoàn Đức Mẹ Fatima'
   for (const r of [1, 2]) {
-    const cell = ws.getCell(r, 2)
+    const cell = ws.getCell(r, 1)
     cell.font = { name: FONT, size: FONT_SIZE }
     cell.alignment = { horizontal: 'center', vertical: 'middle' }
     ws.getRow(r).height = 15.75
@@ -214,7 +252,8 @@ function addSheetHeader(
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' }
   ws.getRow(4).height = 32.25
 
-  const labelCol = Math.max(1, Math.floor(totalCols / 2) - 1)
+  // Như file mẫu: 'Lớp:' ở cột B, tên lớp cột C, sĩ số cột D
+  const labelCol = 2
   const lblCell = ws.getCell(5, labelCol)
   lblCell.value = 'Lớp: '
   lblCell.font = { name: FONT, size: FONT_SIZE }
@@ -225,29 +264,29 @@ function addSheetHeader(
   clsCell.fill = fill(COLOR.classCell)
   clsCell.alignment = { horizontal: 'center', vertical: 'middle' }
   if (extraInfo) {
-    const infoCell = ws.getCell(5, Math.min(labelCol + 3, totalCols))
+    const infoCell = ws.getCell(5, Math.min(labelCol + 2, totalCols))
     infoCell.value = extraInfo
     infoCell.font = { name: FONT, size: FONT_SIZE }
     infoCell.alignment = { horizontal: 'left', vertical: 'middle' }
   }
   ws.getRow(5).height = 18
 
-  // Như file mẫu: huy hiệu TNTT (cờ đỏ chén thánh) ngoài cùng bên trái,
-  // logo tròn Xứ Đoàn ngay bên cạnh
+  // Theo file mẫu đã chỉnh: logo nhỏ, nằm 2 bên — huy hiệu TNTT góc trái,
+  // logo tròn Xứ Đoàn góc phải (cột áp chót của bảng), đều gói trong 3 dòng đầu
   if (badgeBase64) {
     const badgeId = wb.addImage({ base64: badgeBase64, extension: 'png' })
     ws.addImage(badgeId, {
-      tl: { col: 0.08, row: 0.15 },
-      ext: { width: 72, height: 90 },
-      editAs: 'absolute',
+      tl: { col: 0.25, row: 0 },
+      ext: { width: 49, height: 61 },
+      editAs: 'oneCell',
     })
   }
   if (logoBase64) {
     const imgId = wb.addImage({ base64: logoBase64, extension: 'png' })
     ws.addImage(imgId, {
-      tl: { col: badgeBase64 ? 1.65 : 0.1, row: 0.1 },
-      ext: { width: 95, height: 95 },
-      editAs: 'absolute',
+      tl: { col: Math.max(1, totalCols - 2) + 0.3, row: 0 },
+      ext: { width: 61, height: 61 },
+      editAs: 'oneCell',
     })
   }
 
@@ -328,11 +367,12 @@ export async function buildScoreReportWorkbook(opts: {
     switch (key) {
       case 'stt': return stt
       case 'saintName': return s.saint_name || ''
-      case 'fullName': return s.full_name
-      case 'diLeT5': return s.score_di_le_t5 ?? ''
-      case 'hocGL': return s.score_hoc_gl ?? ''
-      case 'tbThu5': return s.avg_thu5 ?? ''
-      case 'tbGL': return s.avg_gl ?? ''
+      case 'hoDem': return splitFullName(s.full_name).hoDem
+      case 'ten': return splitFullName(s.full_name).ten
+      case 'diLeT5': return s.diem_t5 ?? ''
+      case 'hocGL': return s.diem_gl ?? ''
+      case 'diLeCN': return s.diem_le_cn ?? ''
+      case 'diemTB': return s.diem_tb ?? ''
       case 's45HK1': return s.score_45_hk1 ?? ''
       case 'examHK1': return s.score_exam_hk1 ?? ''
       case 'tbHK1': return s.average_hk1 ?? ''
@@ -357,7 +397,7 @@ export async function buildScoreReportWorkbook(opts: {
       }
       cell.font = { name: FONT, size: FONT_SIZE }
       cell.alignment = {
-        horizontal: c.key === 'fullName' ? 'left' : 'center',
+        horizontal: c.key === 'hoDem' ? 'left' : 'center',
         vertical: 'middle',
       }
       cell.border = thinBorder
