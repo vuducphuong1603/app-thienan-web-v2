@@ -8,7 +8,7 @@ import { todayForAttendance } from '@/lib/debug-date'
 import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { SundaySession, SUNDAY_SESSION_LABELS, SUNDAY_SESSIONS, holidayDayTypesFor, DayType } from '@/lib/sunday-attendance'
 import { BookOpen, Church } from 'lucide-react'
-import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, RestoredAttendanceRecord } from '@/lib/qr-attendance'
+import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, matchesStudentSearch, mapRestoredScanEntry, RestoredAttendanceRecord } from '@/lib/qr-attendance'
 
 type ScanEntry = {
   id: string
@@ -236,6 +236,7 @@ export default function QRScanAttendanceModal({
 
         // Tìm lớp có tên khớp từ khóa để hỗ trợ tìm theo lớp
         const words = splitSearchWords(text)
+        const matchedClassIds: string[] = []
         const { data: classRows } = await supabase
           .from('classes')
           .select('id, name')
@@ -245,10 +246,20 @@ export default function QRScanAttendanceModal({
           const classIds = (classRows || [])
             .filter(c => (c.name as string).toLowerCase().includes(lw))
             .map(c => c.id as string)
+          matchedClassIds.push(...classIds)
           query = query.or(studentSearchOrFilter(word, classIds))
         }
 
-        const { data, error } = await query.order('full_name').limit(20)
+        const { data: rawData, error } = await query.order('full_name').limit(50)
+        // DB ilike khớp cả họ / tên đệm → lọc lại: chỉ lấy khớp tên cuối (hoặc tên thánh / mã / SĐT / lớp)
+        const data = rawData?.filter((s) => matchesStudentSearch({
+          full_name: s.full_name as string,
+          saint_name: s.saint_name as string | null,
+          student_code: s.student_code as string | null,
+          class_id: s.class_id as string,
+          className: (s as { classes?: { name?: string } | null }).classes?.name,
+          parent_phone: s.parent_phone as string | null,
+        }, text, matchedClassIds)).slice(0, 20)
 
         if (!error && data) {
           const { dateStr } = scanTarget.current

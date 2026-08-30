@@ -1,3 +1,4 @@
+import { normalizeSearchText } from './search'
 // Logic thuần cho điểm danh quét QR (đồng bộ với app mobile TN Thiên Ân)
 
 export const SCAN_THROTTLE_MS = 3000
@@ -101,4 +102,40 @@ export function mapRestoredScanEntry(record: RestoredAttendanceRecord): {
     time: record.check_in_time?.substring(0, 5) || '',
     status: 'success',
   }
+}
+
+/** Tên cuối (từ cuối cùng) của họ tên: "Mai Ngọc Huyền Trâm" → "Trâm" */
+export function lastNameOf(fullName: string | null | undefined): string {
+  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean)
+  return parts.length ? parts[parts.length - 1] : ''
+}
+
+export interface SearchableStudent {
+  full_name: string
+  saint_name?: string | null
+  student_code?: string | null
+  class_id?: string | null
+  className?: string | null
+  parent_phone?: string | null
+}
+
+/**
+ * Lọc phía client sau khi DB trả về (ilike trên full_name khớp cả tên đệm):
+ * mỗi từ khóa chỉ được khớp tên cuối của thiếu nhi (không khớp họ / tên đệm),
+ * hoặc khớp tên thánh, mã, SĐT phụ huynh, tên lớp / class_id.
+ * Ngoại lệ: cả cụm từ khóa là phần cuối của họ tên ("huyền trâm" → "Mai Ngọc Huyền Trâm").
+ */
+export function matchesStudentSearch(student: SearchableStudent, text: string, classIds: string[] = []): boolean {
+  const words = splitSearchWords(text).map(normalizeSearchText)
+  if (words.length === 0) return true
+  const fullName = normalizeSearchText(student.full_name || '')
+  if (fullName.endsWith(words.join(' '))) return true
+
+  const last = normalizeSearchText(lastNameOf(student.full_name))
+  const others = [student.saint_name, student.student_code, student.parent_phone, student.className]
+    .map(v => normalizeSearchText(v || ''))
+    .filter(Boolean)
+  const inClass = !!student.class_id && classIds.includes(student.class_id)
+
+  return words.every(w => last.includes(w) || others.some(o => o.includes(w)) || inClass)
 }

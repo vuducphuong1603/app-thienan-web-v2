@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry } from '../qr-attendance'
+import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch } from '../qr-attendance'
 
 describe('parseStudentCode', () => {
   it('trả về nguyên mã khi QR chỉ chứa mã', () => {
@@ -136,5 +136,49 @@ describe('mapRestoredScanEntry', () => {
       time: '',
       status: 'success',
     })
+  })
+})
+
+describe('lastNameOf', () => {
+  it('lấy từ cuối của họ tên', () => {
+    expect(lastNameOf('Mai Ngọc Huyền Trâm')).toBe('Trâm')
+    expect(lastNameOf('  An ')).toBe('An')
+    expect(lastNameOf('')).toBe('')
+    expect(lastNameOf(null)).toBe('')
+  })
+})
+
+describe('matchesStudentSearch', () => {
+  const tram = { full_name: 'Mai Ngọc Huyền Trâm', saint_name: 'Maria', student_code: 'MT192565', class_id: 'c1', className: 'Ấu 1B', parent_phone: '0971175784' }
+  const mai = { full_name: 'Nguyễn Thị Mai', saint_name: 'Anna', student_code: 'MA152263', class_id: 'c2', className: 'Thiếu 2B', parent_phone: '0988545566' }
+
+  it('chỉ khớp tên cuối, không khớp họ / tên đệm', () => {
+    expect(matchesStudentSearch(tram, 'mai')).toBe(false)
+    expect(matchesStudentSearch(mai, 'mai')).toBe(true)
+    expect(matchesStudentSearch(tram, 'tram')).toBe(true)
+    expect(matchesStudentSearch(tram, 'Trâm')).toBe(true)
+  })
+
+  it('cụm từ là phần cuối của họ tên thì khớp', () => {
+    expect(matchesStudentSearch(tram, 'huyền trâm')).toBe(true)
+    expect(matchesStudentSearch(tram, 'mai ngoc')).toBe(false)
+  })
+
+  it('vẫn khớp tên thánh, mã, SĐT, tên lớp, class_id', () => {
+    expect(matchesStudentSearch(tram, 'maria')).toBe(true)
+    expect(matchesStudentSearch(tram, 'MT1925')).toBe(true)
+    expect(matchesStudentSearch(tram, '0971')).toBe(true)
+    expect(matchesStudentSearch(tram, 'au 1b')).toBe(true)
+    expect(matchesStudentSearch(tram, 'xyz', ['c1'])).toBe(true)
+    expect(matchesStudentSearch(tram, 'xyz', ['c2'])).toBe(false)
+  })
+
+  it('nhiều từ: mọi từ phải khớp', () => {
+    expect(matchesStudentSearch(tram, 'maria tram')).toBe(true)
+    expect(matchesStudentSearch(tram, 'maria mai')).toBe(false)
+  })
+
+  it('chuỗi rỗng khớp tất cả', () => {
+    expect(matchesStudentSearch(tram, '  ')).toBe(true)
   })
 })
