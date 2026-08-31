@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { ArrowLeft, ChevronDown, User } from 'lucide-react'
+import { ArrowLeft, Camera, ChevronDown, Image as ImageIcon, User } from 'lucide-react'
 import Image from 'next/image'
 import { supabase, UserProfile, UserRole, ROLE_LABELS, BRANCHES, Class } from '@/lib/supabase'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
+import AvatarCropModal from '@/components/ui/AvatarCropModal'
+import { validateAvatarFile } from '@/lib/student-avatar'
 
 interface EditUserFormProps {
   user: UserProfile
@@ -47,11 +49,14 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
   const [isLoadingClasses, setIsLoadingClasses] = useState(false)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url || null)
+  // Ảnh vừa chọn, chờ điều chỉnh (kéo/phóng to) trong modal crop
+  const [cropFile, setCropFile] = useState<File | null>(null)
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false)
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Partial<FormData>>({})
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const libraryInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch classes when branch changes
   useEffect(() => {
@@ -93,20 +98,25 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
     }
   }
 
+  // Nhận ảnh từ camera hoặc thư viện, validate rồi mở modal điều chỉnh
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Dung lượng file tối đa 5MB')
-        return
-      }
-      setAvatarFile(file)
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setAvatarPreview(e.target?.result as string)
-      }
-      reader.readAsDataURL(file)
+    if (!file) return
+    const validationError = validateAvatarFile(file)
+    if (validationError) {
+      alert(validationError)
+      e.target.value = ''
+      return
     }
+    setCropFile(file)
+    e.target.value = ''
+  }
+
+  // Nhận ảnh đã cắt từ modal, hiện preview và chờ lưu
+  const handleCropConfirm = (file: File, previewUrl: string) => {
+    setAvatarFile(file)
+    setAvatarPreview(previewUrl)
+    setCropFile(null)
   }
 
   const validateForm = (): boolean => {
@@ -253,18 +263,39 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
                   <User className="w-12 h-12 text-brand" />
                 )}
               </div>
-              <div className="flex flex-col gap-1">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-sm font-medium text-brand hover:underline"
-                >
-                  Chọn ảnh đại diện
-                </button>
-                <p className="text-xs text-black/40">Hỗ trợ JPG, PNG. Dung lượng tối đa 5MB.</p>
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-brand/10 text-sm font-medium text-brand hover:bg-brand/20 transition-colors"
+                  >
+                    <Camera className="w-4 h-4" />
+                    Chụp ảnh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => libraryInputRef.current?.click()}
+                    className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-brand/10 text-sm font-medium text-brand hover:bg-brand/20 transition-colors"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    Chọn từ thư viện
+                  </button>
+                </div>
+                <p className="text-xs text-black/40 dark:text-white/40">Hỗ trợ JPG, PNG. Dung lượng tối đa 5MB.</p>
+                {/* Camera: trên điện thoại mở thẳng máy ảnh; trên máy tính mở chọn file */}
                 <input
-                  ref={fileInputRef}
+                  ref={cameraInputRef}
                   type="file"
-                  accept="image/jpeg,image/png"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleAvatarSelect}
+                  className="hidden"
+                />
+                <input
+                  ref={libraryInputRef}
+                  type="file"
+                  accept="image/*"
                   onChange={handleAvatarSelect}
                   className="hidden"
                 />
@@ -525,6 +556,15 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
           </div>
         </div>
       </div>
+
+      {/* Modal điều chỉnh (kéo/phóng to) ảnh đại diện vừa chọn */}
+      {cropFile && (
+        <AvatarCropModal
+          file={cropFile}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropFile(null)}
+        />
+      )}
     </div>
   )
 }
