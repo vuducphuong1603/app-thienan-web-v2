@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, User } from 'lucide-react'
 import { supabase, Class, BRANCHES } from '@/lib/supabase'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
+import AvatarCropModal from '@/components/ui/AvatarCropModal'
 import { validateAvatarFile, uploadStudentAvatar } from '@/lib/student-avatar'
 
 interface StudentFormData {
@@ -51,6 +52,8 @@ export default function AddStudentPage() {
   const [errors, setErrors] = useState<Partial<Record<keyof StudentFormData, string>>>({})
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  // Ảnh vừa chọn, chờ điều chỉnh (kéo/phóng to) trong modal crop
+  const [cropFile, setCropFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false)
 
@@ -90,7 +93,7 @@ export default function AddStudentPage() {
     }
   }
 
-  // Handle avatar change
+  // Nhận ảnh vừa chọn, validate rồi mở modal điều chỉnh (kéo/phóng to)
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -100,12 +103,15 @@ export default function AddStudentPage() {
       e.target.value = ''
       return
     }
+    setCropFile(file)
+    e.target.value = ''
+  }
+
+  // Nhận ảnh đã cắt từ modal, hiện preview và chờ lưu
+  const handleCropConfirm = (file: File, previewUrl: string) => {
     setAvatarFile(file)
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setAvatarPreview(reader.result as string)
-    }
-    reader.readAsDataURL(file)
+    setAvatarPreview(previewUrl)
+    setCropFile(null)
   }
 
   // Remove avatar
@@ -572,6 +578,15 @@ export default function AddStudentPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal điều chỉnh (kéo/phóng to) ảnh đại diện vừa chọn */}
+      {cropFile && (
+        <AvatarCropModal
+          file={cropFile}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropFile(null)}
+        />
+      )}
     </div>
   )
 }
