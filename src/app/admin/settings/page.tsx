@@ -6,8 +6,10 @@ import { useEffect, useState, useRef } from 'react'
 import DashboardHeader from '@/components/dashboard/DashboardHeader'
 import { useTheme } from '@/lib/theme-context'
 import Image from 'next/image'
-import { Eye, EyeOff, Check, X, Plus, Trash2 } from 'lucide-react'
+import { Camera, Eye, EyeOff, Check, Image as ImageIcon, X, Plus, Trash2 } from 'lucide-react'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
+import AvatarCropModal from '@/components/ui/AvatarCropModal'
+import { validateAvatarFile } from '@/lib/student-avatar'
 import { useCurrentSchoolYear, useHolidays, useInvalidateQueries, countWeekdays, queryKeys } from '@/lib/queries'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -120,7 +122,10 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  // Ảnh vừa chọn, chờ điều chỉnh (kéo/phóng to) trong modal crop
+  const [cropFile, setCropFile] = useState<File | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const libraryInputRef = useRef<HTMLInputElement>(null)
 
   // School Year State
   const { data: fetchedSchoolYear, isLoading: loadingSchoolYear, error: schoolYearQueryError } = useCurrentSchoolYear(!!user && isAdmin)
@@ -564,11 +569,24 @@ export default function SettingsPage() {
     }
   }
 
-  // Handle avatar upload
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Nhận ảnh từ camera hoặc thư viện, validate rồi mở modal điều chỉnh
+  const handleAvatarSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
+    const validationError = validateAvatarFile(file)
+    if (validationError) {
+      setSaveMessage({ type: 'error', text: validationError })
+      setTimeout(() => setSaveMessage(null), 3000)
+      event.target.value = ''
+      return
+    }
+    setCropFile(file)
+    event.target.value = ''
+  }
 
+  // Nhận ảnh đã cắt từ modal rồi upload luôn
+  const handleCropConfirm = async (file: File) => {
+    setCropFile(null)
     setIsUploadingAvatar(true)
     setSaveMessage(null)
 
@@ -584,10 +602,6 @@ export default function SettingsPage() {
       setSaveMessage({ type: 'error', text: 'Đã có lỗi xảy ra' })
     } finally {
       setIsUploadingAvatar(false)
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
       // Auto hide message after 3 seconds
       setTimeout(() => setSaveMessage(null), 3000)
     }
@@ -663,12 +677,20 @@ export default function SettingsPage() {
         <div className="flex-1 flex flex-col gap-4">
           {/* Avatar Section */}
           <div className="flex items-center gap-4">
-            {/* Hidden file input */}
+            {/* Camera: trên điện thoại mở thẳng máy ảnh; trên máy tính mở chọn file */}
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp"
-              onChange={handleAvatarUpload}
+              accept="image/*"
+              capture="environment"
+              onChange={handleAvatarSelect}
+              className="hidden"
+            />
+            <input
+              ref={libraryInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarSelect}
               className="hidden"
             />
             <div className="w-[103px] h-[103px] rounded-full overflow-hidden bg-[#f5eaf6] flex-shrink-0 flex items-center justify-center relative">
@@ -694,20 +716,31 @@ export default function SettingsPage() {
                 </svg>
               )}
             </div>
-            <div className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-2.5">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => fileInputRef.current?.click()}
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
                   disabled={isUploadingAvatar}
-                  className="text-sm font-medium text-brand hover:underline disabled:opacity-50"
+                  className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-brand/10 text-sm font-medium text-brand hover:bg-brand/20 transition-colors disabled:opacity-50"
                 >
-                  Đổi ảnh đại diện
+                  <Camera className="w-4 h-4" />
+                  Chụp ảnh
                 </button>
-                <div className="w-px h-2.5 bg-primary-3"></div>
                 <button
+                  type="button"
+                  onClick={() => libraryInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-brand/10 text-sm font-medium text-brand hover:bg-brand/20 transition-colors disabled:opacity-50"
+                >
+                  <ImageIcon className="w-4 h-4" />
+                  Chọn từ thư viện
+                </button>
+                <button
+                  type="button"
                   onClick={handleAvatarDelete}
                   disabled={isUploadingAvatar || !user.avatar_url}
-                  className="text-sm font-medium text-complementary-1 hover:underline disabled:opacity-50"
+                  className="h-9 px-3 rounded-full text-sm font-medium text-complementary-1 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50"
                 >
                   Xóa
                 </button>
@@ -1802,6 +1835,15 @@ export default function SettingsPage() {
           </a>
         </div>
       </footer>
+
+      {/* Modal điều chỉnh (kéo/phóng to) ảnh đại diện vừa chọn */}
+      {cropFile && (
+        <AvatarCropModal
+          file={cropFile}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropFile(null)}
+        />
+      )}
     </div>
   )
 }
