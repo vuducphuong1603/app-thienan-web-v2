@@ -195,6 +195,21 @@ export function listAttendanceDates(
   return dates
 }
 
+// Ngày cho báo cáo điểm danh: đủ mọi T5/CN trong kỳ (dù chưa điểm danh) + các ngày
+// lẻ có bản ghi hoặc nghỉ lễ, sắp xếp tăng dần. Thiếu khoảng ngày → chỉ dùng extraDates.
+export function mergeReportDates(
+  from: string | null | undefined,
+  to: string | null | undefined,
+  type: 'thu5' | 'cn' | 'all',
+  extraDates: Iterable<string>
+): string[] {
+  const set = new Set<string>(extraDates)
+  if (from && to) {
+    listAttendanceDates(from, to, type).forEach(d => set.add(d))
+  }
+  return Array.from(set).sort()
+}
+
 type ExcelJSModule = typeof import('exceljs')
 
 // Interop: bundle web (Next.js) trả module trực tiếp, Node/CJS trả { default }

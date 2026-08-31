@@ -1817,7 +1817,9 @@ export default function ActivitiesPage() {
         holidayMap.forEach((_, date) => {
           uniqueDates.add(date)
         })
-        const sortedDates = Array.from(uniqueDates).sort()
+        // Hiện đủ mọi ngày T5/CN của kỳ đã chọn (như file Excel), kể cả ngày chưa điểm danh
+        const { mergeReportDates } = await import('@/lib/score-report-excel')
+        const sortedDates = mergeReportDates(fromDate, toDate, reportAttendanceType, uniqueDates)
         setReportDates(sortedDates)
 
         // Map attendance to students

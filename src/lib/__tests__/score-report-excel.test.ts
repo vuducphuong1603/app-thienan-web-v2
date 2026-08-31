@@ -162,6 +162,34 @@ describe('listAttendanceDates', () => {
   })
 })
 
+import { mergeReportDates } from '../score-report-excel'
+
+describe('mergeReportDates', () => {
+  it('vẫn ra đủ mọi ngày T5/CN trong kỳ dù không có bản ghi điểm danh nào', () => {
+    expect(mergeReportDates('2026-09-01', '2026-09-30', 'cn', [])).toEqual([
+      '2026-09-06', '2026-09-13', '2026-09-20', '2026-09-27',
+    ])
+  })
+
+  it('gộp ngày có bản ghi/nghỉ lễ ngoài lịch T5-CN và sắp xếp tăng dần', () => {
+    expect(mergeReportDates('2026-09-01', '2026-09-13', 'thu5', ['2026-09-08', '2026-09-03'])).toEqual([
+      '2026-09-03', '2026-09-08', '2026-09-10',
+    ])
+  })
+
+  it('không nhân đôi ngày đã có bản ghi', () => {
+    expect(mergeReportDates('2026-09-01', '2026-09-13', 'thu5', ['2026-09-03'])).toEqual([
+      '2026-09-03', '2026-09-10',
+    ])
+  })
+
+  it('thiếu khoảng ngày thì chỉ trả các ngày được truyền vào, đã sắp xếp', () => {
+    expect(mergeReportDates('', '', 'all', ['2026-09-10', '2026-09-03'])).toEqual([
+      '2026-09-03', '2026-09-10',
+    ])
+  })
+})
+
 import { buildAttendanceExcelColumns } from '../score-report-excel'
 
 describe('buildAttendanceExcelColumns', () => {
