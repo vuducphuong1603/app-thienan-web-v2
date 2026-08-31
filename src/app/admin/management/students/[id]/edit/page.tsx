@@ -2,10 +2,15 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ChevronLeft, User } from 'lucide-react'
+import { Camera, ChevronLeft, Image as ImageIcon, User } from 'lucide-react'
 import { supabase, Class, BRANCHES } from '@/lib/supabase'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
 import { useAuth } from '@/lib/auth-context'
+import {
+  validateAvatarFile,
+  uploadStudentAvatar,
+  deleteStudentAvatar,
+} from '@/lib/student-avatar'
 
 interface StudentFormData {
   student_code: string
@@ -50,17 +55,21 @@ export default function EditStudentPage() {
   const { user } = useAuth()
   // GLV quay về danh sách lớp của mình, admin về trang quản lý chung
   const studentsListHref = user?.role === 'admin' ? '/admin/management/students' : '/dashboard/management'
-  // GLV chỉ sửa SĐT/địa chỉ/ghi chú + nhập điểm của thiếu nhi lớp mình;
-  // không đổi mã TN, lớp, tên thánh, họ tên, ngày sinh, ảnh (chỉ admin)
+  // GLV được sửa toàn bộ thông tin thiếu nhi lớp mình (họ tên, tên thánh,
+  // ngày sinh, ảnh đại diện...); riêng mã TN và chuyển lớp vẫn chỉ admin
   const isGLV = user?.role === 'giao_ly_vien'
-  const canEditCore = !isGLV
+  const canEditAdminFields = !isGLV
   const [formData, setFormData] = useState<StudentFormData>(initialFormData)
   const [classes, setClasses] = useState<Class[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [errors, setErrors] = useState<Partial<Record<keyof StudentFormData, string>>>({})
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  // avatar_url gốc trong DB, để xoá file cũ trên storage khi thay/xoá ảnh
+  const originalAvatarUrlRef = useRef<string | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const libraryInputRef = useRef<HTMLInputElement>(null)
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false)
 
   // Fetch student data and classes on mount
@@ -109,6 +118,7 @@ export default function EditStudentPage() {
           avatar_url: studentData.avatar_url || '',
         })
 
+        originalAvatarUrlRef.current = studentData.avatar_url || null
         if (studentData.avatar_url) {
           setAvatarPreview(studentData.avatar_url)
         }
@@ -153,29 +163,31 @@ export default function EditStudentPage() {
     }
   }
 
-  // Handle avatar change
+  // Nhận ảnh từ camera hoặc thư viện, validate rồi hiện preview
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File quá lớn. Dung lượng tối đa 5MB.')
-        return
-      }
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+    if (!file) return
+    const validationError = validateAvatarFile(file)
+    if (validationError) {
+      alert(validationError)
+      e.target.value = ''
+      return
     }
+    setAvatarFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
   }
 
   // Remove avatar
   const handleRemoveAvatar = () => {
     setAvatarPreview(null)
+    setAvatarFile(null)
     setFormData((prev) => ({ ...prev, avatar_url: '' }))
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
+    if (libraryInputRef.current) libraryInputRef.current.value = ''
   }
 
   // Validate form
@@ -210,8 +222,25 @@ export default function EditStudentPage() {
 
     setIsSubmitting(true)
     try {
-      // GLV chỉ gửi các trường được phép sửa theo bảng phân quyền
+      // Ảnh đại diện: có file mới thì upload lên storage (bucket student-photos),
+      // đã bấm Xóa thì avatar_url = null, còn lại giữ nguyên URL cũ
+      let avatarUrl: string | null = formData.avatar_url || null
+      if (avatarFile) {
+        try {
+          avatarUrl = await uploadStudentAvatar(supabase, studentId, avatarFile)
+        } catch (uploadErr) {
+          console.error('Error uploading avatar:', uploadErr)
+          alert('Không tải được ảnh lên. Vui lòng thử lại.')
+          return
+        }
+      }
+
+      // GLV được sửa toàn bộ thông tin; riêng mã TN và lớp chỉ admin
       const allowedForAll = {
+        saint_name: formData.saint_name.trim() || null,
+        full_name: formData.full_name.trim(),
+        date_of_birth: formData.date_of_birth || null,
+        avatar_url: avatarUrl,
         phone: formData.phone.trim() || null,
         parent_phone: formData.parent_phone.trim() || null,
         parent_phone_2: formData.parent_phone_2.trim() || null,
@@ -223,14 +252,10 @@ export default function EditStudentPage() {
         score_exam_hk2: parseFloat(formData.score_exam_hk2) || 0,
         updated_at: new Date().toISOString(),
       }
-      const adminOnly = canEditCore
+      const adminOnly = canEditAdminFields
         ? {
             student_code: formData.student_code.trim() || null,
             class_id: formData.class_id,
-            saint_name: formData.saint_name.trim() || null,
-            full_name: formData.full_name.trim(),
-            date_of_birth: formData.date_of_birth || null,
-            avatar_url: avatarPreview || null,
           }
         : {}
       const { error } = await supabase
@@ -242,6 +267,11 @@ export default function EditStudentPage() {
         console.error('Error updating student:', error)
         alert('Có lỗi xảy ra khi cập nhật thiếu nhi. Vui lòng thử lại.')
         return
+      }
+
+      // Dọn ảnh cũ trên storage nếu đã thay/xoá (best-effort)
+      if (avatarUrl !== originalAvatarUrlRef.current) {
+        await deleteStudentAvatar(supabase, originalAvatarUrlRef.current)
       }
 
       router.push(studentsListHref)
@@ -338,35 +368,52 @@ export default function EditStudentPage() {
                 )}
               </div>
               {/* Avatar Actions */}
-              {canEditCore && (
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-sm font-medium text-brand hover:text-orange-600"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-brand/10 text-sm font-medium text-brand hover:bg-brand/20 transition-colors"
                   >
-                    Đổi ảnh đại diện
+                    <Camera className="w-4 h-4" />
+                    Chụp ảnh
                   </button>
-                  <span className="w-px h-3 bg-[#666d80]" />
                   <button
                     type="button"
-                    onClick={handleRemoveAvatar}
-                    className="text-sm font-medium text-[#df1c41] hover:text-red-600"
+                    onClick={() => libraryInputRef.current?.click()}
+                    className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-brand/10 text-sm font-medium text-brand hover:bg-brand/20 transition-colors"
                   >
-                    Xóa
+                    <ImageIcon className="w-4 h-4" />
+                    Chọn từ thư viện
                   </button>
+                  {avatarPreview && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveAvatar}
+                      className="h-9 px-3 rounded-full text-sm font-medium text-[#df1c41] hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                    >
+                      Xóa
+                    </button>
+                  )}
                 </div>
                 <p className="text-xs text-black/40 dark:text-white/40">Hỗ trợ JPG, PNG. Dung lượng tối đa 5MB.</p>
+                {/* Camera: trên điện thoại mở thẳng máy ảnh; trên máy tính mở chọn file */}
                 <input
-                  ref={fileInputRef}
+                  ref={cameraInputRef}
                   type="file"
-                  accept="image/jpeg,image/png"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
+                <input
+                  ref={libraryInputRef}
+                  type="file"
+                  accept="image/*"
                   onChange={handleAvatarChange}
                   className="hidden"
                 />
               </div>
-              )}
             </div>
 
             {/* Row 1: Mã thiếu nhi + Lớp */}
@@ -381,7 +428,7 @@ export default function EditStudentPage() {
                   value={formData.student_code}
                   onChange={(e) => handleChange('student_code', e.target.value)}
                   placeholder="VD: HA172336"
-                  disabled={!canEditCore}
+                  disabled={!canEditAdminFields}
                   className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
@@ -393,8 +440,8 @@ export default function EditStudentPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => canEditCore && setIsClassDropdownOpen(!isClassDropdownOpen)}
-                  disabled={!canEditCore}
+                  onClick={() => canEditAdminFields && setIsClassDropdownOpen(!isClassDropdownOpen)}
+                  disabled={!canEditAdminFields}
                   className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-left flex items-center justify-between disabled:opacity-60 disabled:cursor-not-allowed ${errors.class_id ? 'ring-1 ring-red-500' : ''}`}
                 >
                   <span className={formData.class_id ? 'text-black dark:text-white' : 'text-[#8B8685]'}>
@@ -443,8 +490,7 @@ export default function EditStudentPage() {
                   value={formData.saint_name}
                   onChange={(e) => handleChange('saint_name', e.target.value)}
                   placeholder="VD: Têrêsa Avila"
-                  disabled={!canEditCore}
-                  className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand"
                 />
               </div>
               <div className="flex-1">
@@ -456,8 +502,7 @@ export default function EditStudentPage() {
                   value={formData.full_name}
                   onChange={(e) => handleChange('full_name', e.target.value)}
                   placeholder="VD: Hoàng Nguyễn Khả Ái"
-                  disabled={!canEditCore}
-                  className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-60 disabled:cursor-not-allowed ${errors.full_name ? 'ring-1 ring-red-500' : ''}`}
+                  className={`w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white placeholder:text-[#8B8685] focus:outline-none focus:ring-1 focus:ring-brand ${errors.full_name ? 'ring-1 ring-red-500' : ''}`}
                 />
                 {errors.full_name && <p className="text-xs text-red-500 mt-1">{errors.full_name}</p>}
               </div>
@@ -469,20 +514,11 @@ export default function EditStudentPage() {
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">
                   Ngày sinh
                 </label>
-                {canEditCore ? (
-                  <CustomDatePicker
-                    value={formData.date_of_birth}
-                    onChange={(date) => handleChange('date_of_birth', date)}
-                    placeholder="Chọn ngày sinh"
-                  />
-                ) : (
-                  <input
-                    type="text"
-                    value={formData.date_of_birth ? formData.date_of_birth.split('-').reverse().join('/') : ''}
-                    disabled
-                    className="w-full h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-xs text-black dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
-                )}
+                <CustomDatePicker
+                  value={formData.date_of_birth}
+                  onChange={(date) => handleChange('date_of_birth', date)}
+                  placeholder="Chọn ngày sinh"
+                />
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-medium text-[#666d80] mb-1.5">

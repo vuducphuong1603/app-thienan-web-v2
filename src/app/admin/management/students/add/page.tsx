@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, User } from 'lucide-react'
 import { supabase, Class, BRANCHES } from '@/lib/supabase'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
+import { validateAvatarFile, uploadStudentAvatar } from '@/lib/student-avatar'
 
 interface StudentFormData {
   student_code: string
@@ -49,6 +50,7 @@ export default function AddStudentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<keyof StudentFormData, string>>>({})
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false)
 
@@ -91,22 +93,25 @@ export default function AddStudentPage() {
   // Handle avatar change
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File quá lớn. Dung lượng tối đa 5MB.')
-        return
-      }
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+    if (!file) return
+    const validationError = validateAvatarFile(file)
+    if (validationError) {
+      alert(validationError)
+      e.target.value = ''
+      return
     }
+    setAvatarFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
   }
 
   // Remove avatar
   const handleRemoveAvatar = () => {
     setAvatarPreview(null)
+    setAvatarFile(null)
     setFormData((prev) => ({ ...prev, avatar_url: '' }))
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -145,7 +150,7 @@ export default function AddStudentPage() {
 
     setIsSubmitting(true)
     try {
-      const { error } = await supabase.from('thieu_nhi').insert({
+      const { data: inserted, error } = await supabase.from('thieu_nhi').insert({
         student_code: formData.student_code.trim() || null,
         class_id: formData.class_id,
         saint_name: formData.saint_name.trim() || null,
@@ -160,14 +165,25 @@ export default function AddStudentPage() {
         score_exam_hk1: parseFloat(formData.score_exam_hk1) || 0,
         score_45_hk2: parseFloat(formData.score_45_hk2) || 0,
         score_exam_hk2: parseFloat(formData.score_exam_hk2) || 0,
-        avatar_url: avatarPreview || null,
+        avatar_url: null,
         status: 'ACTIVE',
-      })
+      }).select('id').single()
 
-      if (error) {
+      if (error || !inserted) {
         console.error('Error adding student:', error)
         alert('Có lỗi xảy ra khi thêm thiếu nhi. Vui lòng thử lại.')
         return
+      }
+
+      // Upload ảnh lên storage sau khi có id thiếu nhi (không lưu base64 vào DB)
+      if (avatarFile) {
+        try {
+          const avatarUrl = await uploadStudentAvatar(supabase, inserted.id, avatarFile)
+          await supabase.from('thieu_nhi').update({ avatar_url: avatarUrl }).eq('id', inserted.id)
+        } catch (uploadErr) {
+          console.error('Error uploading avatar:', uploadErr)
+          alert('Đã thêm thiếu nhi nhưng chưa tải được ảnh. Có thể cập nhật ảnh sau ở trang chỉnh sửa.')
+        }
       }
 
       router.push('/admin/management/students')
