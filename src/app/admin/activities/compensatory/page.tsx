@@ -8,6 +8,7 @@ import { Search, Calendar, Check, X, ArrowLeft, AlertCircle, CheckCircle2 } from
 import Link from 'next/link'
 import CustomCalendar from '@/components/ui/CustomCalendar'
 import { normalizeSearchText } from '@/lib/search'
+import { compareByGivenName } from '@/lib/student-sort'
 
 interface StudentWithCompensatoryStatus extends ThieuNhiProfile {
   class_name?: string
@@ -132,6 +133,9 @@ export default function CompensatoryAttendancePage() {
         showNotification('error', 'Không thể tải danh sách thiếu nhi')
         return
       }
+
+      // Xếp theo tên gọi đúng bảng chữ cái tiếng Việt
+      studentsData?.sort(compareByGivenName)
 
       // Get class name
       const selectedClass = classes.find(c => c.id === selectedClassId)

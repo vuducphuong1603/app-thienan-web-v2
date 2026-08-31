@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { sundayFullyPresentIds } from '@/lib/sunday-attendance'
 import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord, NotificationWithStatus, Notification, UserNote, Holiday, SchoolYear, AttendanceRecord, ThieuNhiProfile, BRANCHES } from './supabase'
 import { CLASS_TEACHER_ROLES } from './class-teachers'
+import { sortByGivenName } from './student-sort'
 
 // ============ Helper: Count weekdays between two dates ============
 export function countWeekdays(startDate: string, endDate: string, dayOfWeek: number): number {
@@ -285,7 +286,7 @@ export function useGLVPerStudentStats(classId: string | undefined, enabled = tru
       const effectiveThu5Days = Math.max(1, totalThu5 - thu5Holidays)
       const effectiveCnDays = Math.max(1, totalCn - cnHolidays)
 
-      const students = studentsRes.data || []
+      const students = sortByGivenName(studentsRes.data || [])
       const records = attendanceRes.data || []
 
       // Build per-student attendance counts
@@ -366,7 +367,7 @@ export function useAbsentStudents(classId: string | undefined, dayType: 'cn' | '
       if (studentsRes.error) throw studentsRes.error
       if (attendanceRes.error) throw attendanceRes.error
 
-      const students = (studentsRes.data || []) as AbsentStudent[]
+      const students = sortByGivenName((studentsRes.data || []) as AbsentStudent[])
       // Chủ nhật: có mặt = đủ cả học giáo lý lẫn đi lễ
       const presentIds = dayType === 'cn'
         ? sundayFullyPresentIds(attendanceRes.data || [])
@@ -463,7 +464,8 @@ export function useUsers() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      return (data || []) as UserProfile[]
+      // Xếp theo tên gọi đúng bảng chữ cái tiếng Việt (như danh sách thiếu nhi)
+      return sortByGivenName((data || []) as UserProfile[])
     },
   })
 }
@@ -574,7 +576,8 @@ export function useStudentsWithDetails() {
       // Build class lookup map for O(1) access instead of O(n) find per student
       const classMap = new Map(classesData.map(c => [c.id, c]))
 
-      const studentsWithDetails = studentsData.map((student) => {
+      // Xếp theo TÊN GỌI đúng bảng chữ cái tiếng Việt (DB order theo họ)
+      const studentsWithDetails = sortByGivenName(studentsData).map((student) => {
         const studentClass = student.class_id ? classMap.get(student.class_id) : undefined
         const birthDate = student.date_of_birth ? new Date(student.date_of_birth) : null
         const age = birthDate ? Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : undefined
@@ -1734,8 +1737,9 @@ export function useAttendanceStudents(
 
       if (studentsError) throw studentsError
 
+      const sortedStudents = sortByGivenName(studentsData || [])
       const selectedClass = classes.find(c => c.id === classId)
-      const studentIds = (studentsData || []).map(s => s.id)
+      const studentIds = sortedStudents.map(s => s.id)
 
       if (isCompensatoryMode) {
         // Compensatory mode
@@ -1798,7 +1802,7 @@ export function useAttendanceStudents(
           if (usersData) usersData.forEach(u => userNameMap.set(u.id, u.full_name))
         }
 
-        return (studentsData || []).map(student => {
+        return sortedStudents.map(student => {
           const thursdayRecord = thursdayAttendanceMap.get(student.id)
           const hasThursday = !!thursdayRecord
           const compensatory = compensatoryMap.get(student.id)
@@ -1877,7 +1881,7 @@ export function useAttendanceStudents(
           if (usersData) usersData.forEach(u => attendanceUserNameMap.set(u.id, u.full_name))
         }
 
-        return (studentsData || []).map(student => {
+        return sortedStudents.map(student => {
           const attendance = attendanceMap.get(student.id)
           const mass = massMap.get(student.id)
           const compensatory = compensatoryMap.get(student.id)

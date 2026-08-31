@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { todayForAttendance } from '@/lib/debug-date'
 import { mergeSundayRecords, isSundayDate, countSundayReport, DayType, SundaySession, SUNDAY_SESSION_SHORT_LABELS, sundayStatus, SUNDAY_STATUS_LABELS } from '@/lib/sunday-attendance'
+import { sortByGivenName, compareByGivenName } from '@/lib/student-sort'
 import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear, Holiday } from '@/lib/supabase'
 import { useActiveClasses, useSchoolYears, countWeekdays } from '@/lib/queries'
@@ -112,7 +113,7 @@ function AttendanceHistoryContent({ classId, className }: { classId: string; cla
         supabase.from('attendance_records').select('*').eq('class_id', classId).gte('attendance_date', startStr).lte('attendance_date', endStr).order('attendance_date', { ascending: true }),
       ])
 
-      setStudents(studentsRes.data || [])
+      setStudents(sortByGivenName(studentsRes.data || []))
       setHistoryData(attendanceRes.data || [])
       setLoading(false)
     }
@@ -650,6 +651,9 @@ export default function ActivitiesPage() {
         showNotification('error', 'Không thể tải danh sách thiếu nhi')
         return
       }
+
+      // Xếp theo tên gọi đúng bảng chữ cái tiếng Việt
+      studentsData?.sort(compareByGivenName)
 
       // Get class name
       const selectedClass = classes.find(c => c.id === selectedClassId)
@@ -1617,7 +1621,8 @@ export default function ActivitiesPage() {
         }
         const { attendanceScores } = await import('@/lib/score-report-excel')
 
-        const studentsData = studentsResult.data
+        // Xếp theo tên gọi đúng bảng chữ cái tiếng Việt
+        const studentsData = studentsResult.data && sortByGivenName(studentsResult.data)
         const studentsError = studentsResult.error
 
         if (studentsError) {
@@ -1769,7 +1774,8 @@ export default function ActivitiesPage() {
             : Promise.resolve({ data: [] as Holiday[], error: null }),
         ])
 
-        const studentsData = studentsResult.data
+        // Xếp theo tên gọi đúng bảng chữ cái tiếng Việt
+        const studentsData = studentsResult.data && sortByGivenName(studentsResult.data)
         const studentsError = studentsResult.error
 
         if (studentsError) {
