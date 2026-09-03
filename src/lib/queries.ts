@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { sundayFullyPresentIds } from '@/lib/sunday-attendance'
 import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord, NotificationWithStatus, Notification, UserNote, Holiday, SchoolYear, AttendanceRecord, ThieuNhiProfile, BRANCHES } from './supabase'
 import { CLASS_TEACHER_ROLES } from './class-teachers'
+import type { DirectoryClass, DirectoryUser } from './teacher-directory'
 import { sortByGivenName } from './student-sort'
 import { useAuth } from './auth-context'
 import {
@@ -86,6 +87,7 @@ export const queryKeys = {
   attendanceStudents: (classId: string, date: string) => ['attendanceStudents', classId, date] as const,
   holidayCheck: (schoolYearId: string, date: string) => ['holidayCheck', schoolYearId, date] as const,
   classDetail: (classId: string) => ['classDetail', classId] as const,
+  teacherDirectory: ['teacherDirectory'] as const,
 }
 
 // ============ Dashboard Stats ============
@@ -2101,4 +2103,28 @@ export function useInvalidateQueries() {
     invalidateGLVPerStudentStats: () => queryClient.invalidateQueries({ queryKey: ['glvPerStudentStats'] }),
     invalidateAll: () => queryClient.invalidateQueries(),
   }
+}
+
+// ============ Danh bạ giáo lý viên ============
+// KHÔNG scope theo ngành: mục đích là GLV lớp này tra được SĐT GLV lớp khác.
+export function useTeacherDirectory() {
+  return useQuery({
+    queryKey: queryKeys.teacherDirectory,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const [classesRes, usersRes] = await Promise.all([
+        supabase.from('classes').select('id, name, branch, display_order, status').eq('status', 'ACTIVE'),
+        supabase
+          .from('users')
+          .select('id, full_name, saint_name, phone, avatar_url, role, status, branch, class_id, class_name')
+          .eq('status', 'ACTIVE'),
+      ])
+      if (classesRes.error) throw classesRes.error
+      if (usersRes.error) throw usersRes.error
+      return {
+        classes: (classesRes.data || []) as DirectoryClass[],
+        users: (usersRes.data || []) as DirectoryUser[],
+      }
+    },
+  })
 }

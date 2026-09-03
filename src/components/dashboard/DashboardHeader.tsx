@@ -22,6 +22,7 @@ const adminNavTabs = [
   { id: 'overview', label: 'Tổng quan', href: '/admin/dashboard' },
   { id: 'management', label: 'Quản lý', href: '/admin/management/users' },
   { id: 'activities', label: 'Hoạt động', href: '/admin/activities' },
+  { id: 'directory', label: 'Danh bạ', href: '/admin/directory' },
   { id: 'system', label: 'Hệ thống', href: '/admin/settings' },
 ]
 
@@ -29,6 +30,7 @@ const glvNavTabs = [
   { id: 'overview', label: 'Tổng quản', href: '/dashboard' },
   { id: 'management', label: 'Quản lý', href: '/dashboard/management' },
   { id: 'activities', label: 'Hoạt động', href: '/admin/activities' },
+  { id: 'directory', label: 'Danh bạ', href: '/admin/directory' },
   { id: 'system', label: 'Hệ thống', href: '/admin/settings' },
 ]
 
