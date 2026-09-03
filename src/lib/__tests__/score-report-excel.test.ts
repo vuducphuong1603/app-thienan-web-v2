@@ -22,7 +22,7 @@ describe('buildScoreColumns', () => {
     expect(keys).toEqual([
       'stt', 'saintName', 'hoDem', 'ten',
       'diLeT5', 'hocGL', 'diLeCN', 'diemTB',
-      's45HK1', 'examHK1', 's45HK2', 'examHK2', 'tbHK2',
+      's45HK1', 'examHK1', 's45HK2', 'examHK2',
       'tbNam', 'hang',
     ])
   })
@@ -32,11 +32,13 @@ describe('buildScoreColumns', () => {
     expect(cols.map(c => c.key)).toContain('ketQua')
   })
 
-  it('never adds TB HK1 (tạm ẩn tới khi sơ kết HKI)', () => {
-    const cols = buildScoreColumns({ ...noneSelected, score45HK1: true, scoreExamHK1: true })
+  it('never adds TB HK1 / TB HK2 (không hiển thị khi xuất báo cáo)', () => {
+    const cols = buildScoreColumns({ ...noneSelected, score45HK1: true, scoreExamHK1: true, score45HK2: true, scoreExamHK2: true })
     const keys = cols.map(c => c.key)
     expect(keys).toContain('s45HK1')
     expect(keys).toContain('examHK1')
+    expect(keys).toContain('s45HK2')
+    expect(keys).toContain('examHK2')
     expect(keys).not.toContain('tbHK1')
     expect(keys).not.toContain('tbHK2')
     expect(keys).not.toContain('hang')
@@ -75,7 +77,7 @@ describe('buildScoreColumns', () => {
     expect(byKey.diLeCN).toBe('diemdanh')
     expect(byKey.diemTB).toBe('diemdanh')
     expect(byKey.s45HK1).toBe('giaoly')
-    expect(byKey.tbHK2).toBe('giaoly')
+    expect(byKey.examHK2).toBe('giaoly')
     expect(byKey.tbNam).toBe('tongket')
     expect(byKey.hang).toBe('tongket')
   })
@@ -99,13 +101,13 @@ describe('buildRowFormulas', () => {
     // Data starts at Excel row 10; first student is row 10
     const f = buildRowFormulas(cols, 10, 10, 12)
     // Layout: A stt, B saint, C họ, D tên, E diLeT5, F hocGL, G diLeCN, H diemTB,
-    //         I 45HK1, J thiHK1, K 45HK2, L thiHK2, M tbHK2, N tbNam, O hang, P ketQua
+    //         I 45HK1, J thiHK1, K 45HK2, L thiHK2, M tbNam, N hang, O ketQua
     expect(f.diemTB).toBe('(E10*0.4)+(((F10+G10)/2)*0.6)')
     expect(f.tbHK1).toBeUndefined()
-    expect(f.tbHK2).toBe('(K10+L10*2)/3')
-    // TB Năm vẫn tính được dù cột TB HKI bị ẩn: TB HKI được nội suy từ 45' và Thi HKI
-    expect(f.tbNam).toBe('((I10+J10*2)/3+M10*2)/3')
-    expect(f.hang).toBe('IF(N10="","",RANK(N10,$N$10:$N$12,0))')
+    expect(f.tbHK2).toBeUndefined()
+    // TB Năm vẫn tính được dù cột TB HKI/HKII bị ẩn: nội suy từ 45' và Thi mỗi kỳ
+    expect(f.tbNam).toBe('((I10+J10*2)/3+(K10+L10*2)/3*2)/3')
+    expect(f.hang).toBe('IF(M10="","",RANK(M10,$M$10:$M$12,0))')
     expect(f.ketQua).toContain('E10<2.5')
     expect(f.ketQua).toContain('"Ở Lại"')
   })

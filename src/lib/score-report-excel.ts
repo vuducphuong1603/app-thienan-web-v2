@@ -104,7 +104,8 @@ export function buildScoreColumns(sel: ScoreColumnSelection): ReportColumn[] {
   // if (show('score45HK1') || show('scoreExamHK1')) cols.push({ key: 'tbHK1', label: 'TB HKI', group: 'giaoly', width: 6.9, numFmt: '0.0' })
   if (show('score45HK2')) cols.push({ key: 's45HK2', label: "45' HKII", group: 'giaoly', width: 6.9, numFmt: '0.0' })
   if (show('scoreExamHK2')) cols.push({ key: 'examHK2', label: 'Thi HKII', group: 'giaoly', width: 6.9, numFmt: '0.0' })
-  if (show('score45HK2') || show('scoreExamHK2')) cols.push({ key: 'tbHK2', label: 'TB HKII', group: 'giaoly', width: 6.9, numFmt: '0.0' })
+  // Cột TB HKII ẩn khi xuất báo cáo (yêu cầu 2026-09-03). Khi cần hiện lại:
+  // if (show('score45HK2') || show('scoreExamHK2')) cols.push({ key: 'tbHK2', label: 'TB HKII', group: 'giaoly', width: 6.9, numFmt: '0.0' })
   if (show('diemTong')) {
     cols.push({ key: 'tbNam', label: 'TB Năm', group: 'tongket', width: 7.6, numFmt: '0.0' })
     cols.push({ key: 'hang', label: 'Hạng', group: 'tongket', width: 7.7, numFmt: '0' })

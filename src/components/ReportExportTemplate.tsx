@@ -316,7 +316,6 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
           {showExamHK1 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Thi<br/>HK1</th>}
           {show45HK2 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">45p<br/>HK2</th>}
           {showExamHK2 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Thi<br/>HK2</th>}
-          {(show45HK2 || showExamHK2) && <th className="border border-gray-400 px-1 py-2 text-center w-[50px] bg-[#e8f5e9]">TB<br/>HK2</th>}
           {showDiemTong && <th className="border border-gray-400 px-1 py-2 text-center w-[55px] bg-[#ffecb3]">TB<br/>Năm</th>}
           {showKetQua && <th className="border border-gray-400 px-1 py-2 text-center w-[60px] bg-[#e3f2fd]">Kết<br/>quả</th>}
         </tr>
@@ -371,11 +370,6 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
               {showExamHK2 && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
                   {student.score_exam_hk2 !== null ? student.score_exam_hk2 : '-'}
-                </td>
-              )}
-              {(show45HK2 || showExamHK2) && (
-                <td className="border border-gray-400 px-1 py-2 text-center font-semibold bg-[#e8f5e9]">
-                  {student.average_hk2 !== null ? student.average_hk2 : '-'}
                 </td>
               )}
               {showDiemTong && (
