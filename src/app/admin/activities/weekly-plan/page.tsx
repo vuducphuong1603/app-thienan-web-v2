@@ -30,8 +30,9 @@ function formatWeekRange(weekStart: Date) {
 }
 
 export default function WeeklyPlanPage() {
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
+  const { isManager } = useAuth()
+  // admin + phân đoàn trưởng được thêm/sửa/xoá kế hoạch (PĐT chỉ trong phân đoàn mình)
+  const isAdmin = isManager
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 

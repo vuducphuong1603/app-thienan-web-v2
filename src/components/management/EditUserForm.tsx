@@ -3,10 +3,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, Camera, ChevronDown, Image as ImageIcon, User } from 'lucide-react'
 import Image from 'next/image'
-import { supabase, UserProfile, UserRole, ROLE_LABELS, BRANCHES, Class } from '@/lib/supabase'
+import { supabase, UserProfile, UserRole, ROLE_LABELS, Class } from '@/lib/supabase'
+
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
 import AvatarCropModal from '@/components/ui/AvatarCropModal'
 import { validateAvatarFile } from '@/lib/student-avatar'
+import { useAuth } from '@/lib/auth-context'
+import { scopedBranches, assignableRoles } from '@/lib/branch-scope'
 
 interface EditUserFormProps {
   user: UserProfile
@@ -30,7 +33,12 @@ interface FormData {
 }
 
 export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormProps) {
+  // Phân đoàn trưởng: chỉ chỉnh trong ngành mình và không nâng vai trò lên admin/PĐT
+  const { scope } = useAuth()
+  const branchOptions = scopedBranches(scope)
+  const roleOptions = assignableRoles(scope).map((r) => [r, ROLE_LABELS[r]] as const)
   const [formData, setFormData] = useState<FormData>({
+
     username: user.username || '',
     role: user.role,
     password: '',
@@ -331,7 +339,7 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
                   </button>
                   {isRoleDropdownOpen && (
                     <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden">
-                      {Object.entries(ROLE_LABELS).map(([key, label]) => (
+                      {roleOptions.map(([key, label]) => (
                         <button
                           key={key}
                           onClick={() => {
@@ -485,11 +493,12 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
                   </button>
                   {isBranchDropdownOpen && (
                     <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden">
-                      {BRANCHES.map((branch) => (
+                      {branchOptions.map((branch) => (
                         <button
                           key={branch}
                           onClick={() => {
                             handleInputChange('branch', branch)
+
                             handleInputChange('class_id', '') // Reset class when branch changes
                             handleInputChange('class_name', '')
                             setIsBranchDropdownOpen(false)

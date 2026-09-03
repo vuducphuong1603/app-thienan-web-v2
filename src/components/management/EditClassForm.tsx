@@ -3,7 +3,9 @@
 import { CLASS_TEACHER_ROLES } from '@/lib/class-teachers'
 import { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft, ChevronDown, Search, UserMinus } from 'lucide-react'
-import { supabase, Class, BRANCHES, Branch } from '@/lib/supabase'
+import { supabase, Class, Branch } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
+import { scopedBranches } from '@/lib/branch-scope'
 
 interface EditClassFormProps {
   classData: Class
@@ -27,6 +29,10 @@ interface Teacher {
 }
 
 export default function EditClassForm({ classData, onBack, onSuccess }: EditClassFormProps) {
+  // Phân đoàn trưởng không chuyển lớp sang ngành khác
+  const { scope } = useAuth()
+  const BRANCHES = scopedBranches(scope)
+
   const [formData, setFormData] = useState<FormData>({
     name: classData.name,
     branch: classData.branch,

@@ -124,8 +124,9 @@ export interface UserProfile {
 }
 
 // Branch options (with Vietnamese diacritics)
-export const BRANCHES = ['Chiên Con', 'Ấu Nhi', 'Thiếu Nhi', 'Nghĩa Sĩ'] as const
-export type Branch = typeof BRANCHES[number]
+import { BRANCHES, type Branch } from './branches'
+export { BRANCHES }
+export type { Branch }
 
 // Class interface
 export interface Class {

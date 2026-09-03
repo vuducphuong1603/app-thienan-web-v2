@@ -7,6 +7,7 @@ import { supabase, Class, BRANCHES } from '@/lib/supabase'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
 import AvatarCropModal from '@/components/ui/AvatarCropModal'
 import { useAuth } from '@/lib/auth-context'
+import { isManagerRole, filterByBranch } from '@/lib/branch-scope'
 import {
   validateAvatarFile,
   uploadStudentAvatar,
@@ -53,9 +54,9 @@ export default function EditStudentPage() {
   const params = useParams()
   const studentId = params.id as string
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, scope } = useAuth()
   // GLV quay về danh sách lớp của mình, admin về trang quản lý chung
-  const studentsListHref = user?.role === 'admin' ? '/admin/management/students' : '/dashboard/management'
+  const studentsListHref = isManagerRole(user?.role) ? '/admin/management/students' : '/dashboard/management'
   // GLV được sửa toàn bộ thông tin thiếu nhi lớp mình (họ tên, tên thánh,
   // ngày sinh, ảnh đại diện...); riêng mã TN và chuyển lớp vẫn chỉ admin
   const isGLV = user?.role === 'giao_ly_vien'
@@ -86,7 +87,9 @@ export default function EditStudentPage() {
           .select('*')
           .eq('status', 'ACTIVE')
           .order('display_order', { ascending: true })
-        setClasses(classesData || [])
+        // Phân đoàn trưởng chỉ chuyển lớp trong ngành mình
+        const scopedClasses = filterByBranch(classesData || [], scope)
+        setClasses(scopedClasses)
 
         // Fetch student data
         const { data: studentData, error } = await supabase
@@ -99,6 +102,13 @@ export default function EditStudentPage() {
           console.error('Error fetching student:', error)
           alert('Không tìm thấy thiếu nhi')
           router.push(studentsListHref)
+          return
+        }
+
+        // Phân đoàn trưởng không sửa thiếu nhi ngoài ngành mình
+        if (!scope.all && !scopedClasses.some((c) => c.id === studentData.class_id)) {
+          alert('Thiếu nhi này không thuộc phân đoàn của bạn')
+          router.replace(studentsListHref)
           return
         }
 
@@ -133,7 +143,8 @@ export default function EditStudentPage() {
     }
 
     fetchData()
-  }, [studentId, router])
+  }, [studentId, router, scope]) // eslint-disable-line react-hooks/exhaustive-deps
+
 
   // GLV chỉ được thao tác với thiếu nhi thuộc lớp mình phụ trách
   useEffect(() => {

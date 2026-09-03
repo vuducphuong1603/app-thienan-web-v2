@@ -1,8 +1,9 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo, ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase, UserProfile, UserRole, resetAuthDead } from './supabase'
+import { getBranchScope, isManagerRole, type BranchScope } from './branch-scope'
 import { useRouter, usePathname } from 'next/navigation'
 import {
   StoredAccount,
@@ -25,6 +26,10 @@ interface AuthContextType {
   isAdmin: boolean
   isGiaoLyVien: boolean
   isPhanDoanTruong: boolean
+  /** admin hoặc phân đoàn trưởng: dùng giao diện quản trị */
+  isManager: boolean
+  /** Phạm vi phân đoàn được thấy/quản lý (admin: tất cả) */
+  scope: BranchScope
   // Multi-account
   storedAccounts: StoredAccount[]
   switchAccount: (userId: string) => Promise<{ success: boolean; error?: string }>
@@ -126,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Redirect user based on their role
   const redirectBasedOnRole = useCallback((role: UserRole) => {
-    if (role === 'admin') {
+    if (isManagerRole(role)) {
       router.push('/admin/dashboard')
     } else {
       router.push('/dashboard')
@@ -680,6 +685,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = user?.role === 'admin'
   const isGiaoLyVien = user?.role === 'giao_ly_vien'
   const isPhanDoanTruong = user?.role === 'phan_doan_truong'
+  const isManager = isManagerRole(user?.role)
+  const scope = useMemo(() => getBranchScope(user), [user])
 
   return (
     <AuthContext.Provider value={{
@@ -695,6 +702,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       isGiaoLyVien,
       isPhanDoanTruong,
+      isManager,
+      scope,
       storedAccounts,
       switchAccount,
       removeAccount,

@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, UserProfile, UserRole, ROLE_LABELS, BRANCHES } from '@/lib/supabase'
+import { supabase, UserProfile, UserRole, ROLE_LABELS } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
+import { scopedBranches } from '@/lib/branch-scope'
 import { Search, ChevronDown, FileSpreadsheet, Plus, Edit2, KeyRound, Trash2, X } from 'lucide-react'
 import Image from 'next/image'
 import ImportUsersModal from '@/components/management/ImportUsersModal'
@@ -34,8 +36,12 @@ const STATUS_BADGE_STYLES = {
 
 export default function UsersPage() {
   const router = useRouter()
+  // Phân đoàn trưởng: bộ lọc ngành chỉ có ngành mình (danh sách đã lọc ở hook)
+  const { scope } = useAuth()
+  const BRANCHES = scopedBranches(scope)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterRole, setFilterRole] = useState<FilterRole>('all')
+
   const [filterBranch, setFilterBranch] = useState<FilterBranch>('all')
   const [filterClass, setFilterClass] = useState<string>('all')
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false)

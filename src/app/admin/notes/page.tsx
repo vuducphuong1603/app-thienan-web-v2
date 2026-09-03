@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useAuth } from '@/lib/auth-context'
+import { isManagerRole } from '@/lib/branch-scope'
 import { ROLE_LABELS, UserNote } from '@/lib/supabase'
 import { useFilteredUserNotes, useInvalidateQueries } from '@/lib/queries'
 import { supabase } from '@/lib/supabase'
@@ -543,7 +544,7 @@ export default function NotesPage() {
 
   const firstName = user.full_name?.split(' ').pop() || user.full_name
   const todayFormatted = formatVietnameseDate(new Date())
-  const isAdmin = user.role === 'admin'
+  const isAdmin = isManagerRole(user.role)
   const dashboardHref = isAdmin ? '/admin/dashboard' : '/dashboard'
 
   const viewModeLabels: Record<ViewMode, string> = { day: 'Ngày', week: 'Tuần', month: 'Tháng' }

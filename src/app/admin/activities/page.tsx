@@ -8,6 +8,8 @@ import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear, Holiday } from '@/lib/supabase'
 import { useActiveClasses, useSchoolYears, countWeekdays } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
+import { scopedBranches } from '@/lib/branch-scope'
+
 import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarDays, Bell, ShieldAlert, History, ChevronDown, ScanLine, BookOpen, Church } from 'lucide-react'
 import Link from 'next/link'
 import CustomCalendar from '@/components/ui/CustomCalendar'
@@ -434,8 +436,10 @@ function AttendanceHistoryContent({ classId, className }: { classId: string; cla
 }
 
 export default function ActivitiesPage() {
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
+  const { user, isManager, scope } = useAuth()
+  // admin + phân đoàn trưởng: được chọn lớp (danh sách lớp đã lọc theo phân đoàn ở hook)
+  const isAdmin = isManager
+  const reportBranches = scopedBranches(scope)
   const reportExportRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab] = useState<TabType>('attendance')
   const [loading, setLoading] = useState(false)
@@ -3586,13 +3590,14 @@ export default function ActivitiesPage() {
                     }}
                     className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
                   >
-                    <span className="text-sm text-black dark:text-white">{reportBranch || 'Tất cả ngành'}</span>
+                    <span className="text-sm text-black dark:text-white">{reportBranch || (scope.all ? 'Tất cả ngành' : 'Chọn ngành')}</span>
                     <svg className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isReportBranchDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 9 18" fill="none">
                       <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="black" transform="translate(-4, -2)" />
                     </svg>
                   </button>
                   {isReportBranchDropdownOpen && (
                     <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden max-h-[200px] overflow-y-auto">
+                      {scope.all && (
                       <button
                         onClick={() => {
                           setReportBranch('')
@@ -3603,7 +3608,8 @@ export default function ActivitiesPage() {
                       >
                         Tất cả ngành
                       </button>
-                      {BRANCHES.map((branch) => (
+                      )}
+                      {reportBranches.map((branch) => (
                         <button
                           key={branch}
                           onClick={() => {

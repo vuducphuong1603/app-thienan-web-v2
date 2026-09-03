@@ -2,7 +2,8 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase, Class, BRANCHES, Branch } from '@/lib/supabase'
+import { supabase, Class, BRANCHES as ALL_BRANCHES, Branch } from '@/lib/supabase'
+import { scopedBranches } from '@/lib/branch-scope'
 import { Search, ChevronDown, Plus, Edit2, Eye, Trash2 } from 'lucide-react'
 import AddClassForm from '@/components/management/AddClassForm'
 import EditClassForm from '@/components/management/EditClassForm'
@@ -38,8 +39,11 @@ function ClassesPageContent() {
   const searchParams = useSearchParams()
   const branchParam = searchParams.get('branch')
   const editParam = searchParams.get('edit')
+  // Phân đoàn trưởng chỉ thấy ngành mình
+  const { user, scope } = useAuth()
+  const BRANCHES = scopedBranches(scope)
   const matchedBranch = branchParam
-    ? BRANCHES.find(b => b.toLowerCase() === branchParam.toLowerCase())
+    ? ALL_BRANCHES.find(b => b.toLowerCase() === branchParam.toLowerCase())
     : undefined
   const initialBranch: FilterBranch = matchedBranch || 'all'
 
@@ -53,8 +57,8 @@ function ClassesPageContent() {
   const [classToDelete, setClassToDelete] = useState<ClassWithDetails | null>(null)
   const [handledEditParam, setHandledEditParam] = useState(false)
 
-  const { user } = useAuth()
   const { data: classes = [], isLoading: loading, isError, error, refetch } = useClassesWithDetails()
+
   const { invalidateClasses } = useInvalidateQueries()
 
   const fetchClasses = invalidateClasses

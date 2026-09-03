@@ -1,9 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+
 import { useRouter, useParams } from 'next/navigation'
 import { ChevronLeft, Search, User, Users, GraduationCap, CalendarCheck, Award, Eye, Phone, Mail } from 'lucide-react'
 import { useClassDetail } from '@/lib/queries'
+import { useAuth } from '@/lib/auth-context'
+import { inScope } from '@/lib/branch-scope'
 import { normalizeSearchText } from '@/lib/search'
 
 const STATUS_BADGE_STYLES = {
@@ -32,6 +35,14 @@ export default function ViewClassPage() {
   const [searchQuery, setSearchQuery] = useState('')
 
   const { data, isLoading, isError, error, refetch } = useClassDetail(classId)
+  // Phân đoàn trưởng chỉ xem lớp thuộc ngành mình
+  const { scope } = useAuth()
+  useEffect(() => {
+    if (data?.classInfo && !inScope(scope, data.classInfo.branch)) {
+      alert('Lớp này không thuộc phân đoàn của bạn')
+      router.replace('/admin/management/classes')
+    }
+  }, [data, scope, router])
 
   const trimmedQuery = searchQuery.trim()
   const searchNormalized = normalizeSearchText(trimmedQuery)

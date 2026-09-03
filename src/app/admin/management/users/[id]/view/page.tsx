@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation'
 import { ChevronLeft, User } from 'lucide-react'
 import Image from 'next/image'
 import { supabase, UserProfile, ROLE_LABELS } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
+import { inScope } from '@/lib/branch-scope'
 
 const ROLE_BADGE_STYLES: Record<string, { bg: string; text: string }> = {
   admin: { bg: 'bg-[#FFF0EB]', text: 'text-brand' },
@@ -25,6 +27,7 @@ export default function ViewUserPage() {
   const params = useParams()
   const userId = params.id as string
   const router = useRouter()
+  const { scope } = useAuth()
   const [user, setUser] = useState<UserWithDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -45,6 +48,13 @@ export default function ViewUserPage() {
           return
         }
 
+        // Phân đoàn trưởng chỉ xem GLV thuộc ngành mình
+        if (!scope.all && (data.role === 'admin' || !inScope(scope, data.branch))) {
+          alert('Người dùng này không thuộc phân đoàn của bạn')
+          router.replace('/admin/management/users')
+          return
+        }
+
         setUser(data)
       } catch (err) {
         console.error('Error:', err)
@@ -54,7 +64,8 @@ export default function ViewUserPage() {
     }
 
     fetchUser()
-  }, [userId, router])
+  }, [userId, router, scope])
+
 
   if (isLoading) {
     return (

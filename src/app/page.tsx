@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
+import { isManagerRole } from '@/lib/branch-scope'
 
 export default function Home() {
   const { user, loading } = useAuth()
@@ -12,7 +13,7 @@ export default function Home() {
     if (!loading) {
       if (user) {
         // Redirect based on role
-        if (user.role === 'admin') {
+        if (isManagerRole(user.role)) {
           router.push('/admin/dashboard')
         } else {
           router.push('/dashboard')

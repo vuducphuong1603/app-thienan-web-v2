@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { ArrowLeft, ChevronDown } from 'lucide-react'
-import { supabase, BRANCHES, Branch } from '@/lib/supabase'
+import { supabase, Branch } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
+import { scopedBranches } from '@/lib/branch-scope'
 
 interface AddClassFormProps {
   onBack: () => void
@@ -15,10 +17,14 @@ interface FormData {
 }
 
 export default function AddClassForm({ onBack, onSuccess }: AddClassFormProps) {
+  // Phân đoàn trưởng chỉ tạo lớp trong ngành mình
+  const { scope } = useAuth()
+  const BRANCHES = scopedBranches(scope)
   const [formData, setFormData] = useState<FormData>({
     name: '',
-    branch: '',
+    branch: scope.all ? '' : (scope.branch as Branch),
   })
+
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})

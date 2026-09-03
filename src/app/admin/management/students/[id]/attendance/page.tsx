@@ -7,6 +7,8 @@ import { mergeSundayRecords, computeSundayCount } from '@/lib/sunday-attendance'
 import { supabase, ThieuNhiProfile, SchoolYear, AttendanceRecord, Holiday } from '@/lib/supabase'
 import { countWeekdays } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
+import { inScope } from '@/lib/branch-scope'
+
 
 interface StudentWithClass extends ThieuNhiProfile {
   class_name?: string
@@ -21,8 +23,22 @@ export default function StudentAttendancePage() {
   const params = useParams()
   const studentId = params.id as string
 
-  const { user } = useAuth()
+  const { user, scope } = useAuth()
   const [student, setStudent] = useState<StudentWithClass | null>(null)
+  // Phân đoàn trưởng chỉ xem thiếu nhi thuộc ngành mình
+  useEffect(() => {
+    if (!student || scope.all) return
+    let cancelled = false
+    supabase.from('classes').select('branch').eq('id', student.class_id).maybeSingle().then(({ data }) => {
+      if (cancelled) return
+      if (!inScope(scope, data?.branch)) {
+        alert('Thiếu nhi này không thuộc phân đoàn của bạn')
+        router.replace('/admin/management/students')
+      }
+    })
+    return () => { cancelled = true }
+  }, [student, scope, router])
+
   const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([])
   const [selectedYearId, setSelectedYearId] = useState<string>('')
 

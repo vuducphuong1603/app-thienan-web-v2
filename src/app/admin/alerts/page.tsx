@@ -676,7 +676,9 @@ function HistoryTabContent({
 
 // ============ Main Page ============
 export default function AlertsPage() {
-  const { user, logout, isAdmin } = useAuth()
+  // isAdmin: chỉ Ban điều hành mới quản lý quy tắc / chạy engine.
+  // isManager: admin + phân đoàn trưởng được xử lý cảnh báo (PĐT chỉ thấy cảnh báo ngành mình, lọc ở hook).
+  const { user, logout, isAdmin, isManager } = useAuth()
   const {
     invalidateAlerts,
     invalidateAlertRules,
@@ -910,7 +912,7 @@ export default function AlertsPage() {
                         { value: '30days', label: '30 ngày qua' },
                       ]}
                     />
-                    {isAdmin && unreadCount > 0 && (
+                    {isManager && unreadCount > 0 && (
                       <button
                         onClick={handleMarkAllRead}
                         className="h-[38px] px-4 bg-brand text-white rounded-full text-sm font-medium hover:bg-brand/90 transition-colors"
@@ -936,14 +938,15 @@ export default function AlertsPage() {
                       <p className="text-sm font-medium text-[#8a8c90]">Không có cảnh báo nào</p>
                     </div>
                   ) : (
-                    (isAdmin ? alertsData : alertsData.filter(a => a.class_name === user.class_name)).map(alert => (
+                    (isManager ? alertsData : alertsData.filter(a => a.class_name === user.class_name)).map(alert => (
                       <AlertItem
                         key={alert.id}
                         alert={alert}
                         onMarkRead={handleMarkRead}
                         onResolve={handleResolve}
                         onDismiss={handleDismiss}
-                        showActions={isAdmin}
+                        showActions={isManager}
+
                       />
                     ))
                   )}

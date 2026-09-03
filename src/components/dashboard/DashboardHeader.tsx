@@ -40,13 +40,12 @@ export default function DashboardHeader({
   userEmail = '',
   onLogout = () => {},
 }: DashboardHeaderProps) {
-  const { user } = useAuth()
+  const { user, isManager } = useAuth()
   const router = useRouter()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false)
-  const isAdmin = user?.role === 'admin'
-  const navTabs = isAdmin ? adminNavTabs : glvNavTabs
-  const homeHref = isAdmin ? '/admin/dashboard' : '/dashboard'
+  const navTabs = isManager ? adminNavTabs : glvNavTabs
+  const homeHref = isManager ? '/admin/dashboard' : '/dashboard'
 
   const handleAvatarClick = () => {
     setIsDropdownOpen(!isDropdownOpen)

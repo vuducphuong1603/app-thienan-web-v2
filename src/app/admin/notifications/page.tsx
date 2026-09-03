@@ -237,7 +237,8 @@ function FilterDropdown({
 // ============ Main Page ============
 export default function NotificationManagementPage() {
   const router = useRouter()
-  const { user, loading, isAdmin, logout } = useAuth()
+  // Ban điều hành: toàn quyền. Phân đoàn trưởng: tạo thông báo cho ngành mình, chỉ xoá thông báo do mình tạo.
+  const { user, loading, isAdmin, isManager, logout } = useAuth()
   const { data: notifications, isLoading } = useAllNotifications()
   const { invalidateNotifications } = useInvalidateQueries()
 
@@ -341,7 +342,7 @@ export default function NotificationManagementPage() {
               ]}
             />
           </div>
-          {isAdmin && (
+          {isManager && (
             <button
               onClick={() => setIsCreateOpen(true)}
               className="flex items-center gap-2 h-[38px] px-4 bg-brand text-white rounded-full hover:bg-brand/90 transition-colors text-sm font-medium"
@@ -380,15 +381,16 @@ export default function NotificationManagementPage() {
               <NotificationAdminItem
                 key={notification.id}
                 notification={notification}
-                onDelete={isAdmin ? (id) => setDeleteTarget({ id, title: notification.title }) : undefined}
+                onDelete={(isAdmin || (isManager && notification.created_by === user.id)) ? (id) => setDeleteTarget({ id, title: notification.title }) : undefined}
               />
             ))
           )}
         </div>
       </main>
 
-      {/* Modals - admin only */}
-      {isAdmin && (
+      {/* Modals - admin / phân đoàn trưởng */}
+      {isManager && (
+
         <>
           <CreateNotificationModal
             isOpen={isCreateOpen}

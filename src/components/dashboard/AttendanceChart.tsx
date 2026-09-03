@@ -18,17 +18,28 @@ function toLocalDateString(date: Date) {
 
 interface AttendanceChartProps {
   classId?: string
+  /** Giới hạn theo phân đoàn (phân đoàn trưởng). Bỏ qua nếu đã có classId. */
+  branch?: string
 }
 
-export default function AttendanceChart({ classId }: AttendanceChartProps) {
+export default function AttendanceChart({ classId, branch }: AttendanceChartProps) {
   const router = useRouter()
 
   const { data = [
     { label: 'Thứ 5', present: 0, absent: 0 },
     { label: 'Chúa nhật', present: 0, absent: 0 },
   ], isLoading: loading, isError, refetch } = useQuery<DayData[]>({
-    queryKey: ['attendanceChart7Days', classId || 'all'],
+    queryKey: ['attendanceChart7Days', classId || (branch ? `branch:${branch}` : 'all')],
     queryFn: async () => {
+      // Phạm vi phân đoàn: lấy id các lớp trong ngành để lọc
+      let branchClassIds: string[] | null = null
+      if (!classId && branch) {
+        const { data: branchClasses, error: bcErr } = await supabase
+          .from('classes').select('id').eq('branch', branch).eq('status', 'ACTIVE')
+        if (bcErr) throw bcErr
+        branchClassIds = (branchClasses || []).map((c) => c.id)
+        if (branchClassIds.length === 0) branchClassIds = ['__none__']
+      }
       // Find most recent Thursday (day 4) and Sunday (day 0) within last 7 days
       function getRecentDay(targetDay: number): string | null {
         const today = new Date()
@@ -48,7 +59,9 @@ export default function AttendanceChart({ classId }: AttendanceChartProps) {
       // Count total students and present counts for each specific date
       const totalStudentsQuery = classId
         ? supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('class_id', classId).eq('status', 'ACTIVE')
-        : supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE')
+        : branchClassIds
+          ? supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).in('class_id', branchClassIds).eq('status', 'ACTIVE')
+          : supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE')
 
       const buildPresentQuery = (date: string, dayType: string) => {
         let q = supabase.from('attendance_records').select('*', { count: 'exact', head: true })
@@ -56,6 +69,7 @@ export default function AttendanceChart({ classId }: AttendanceChartProps) {
           .eq('day_type', dayType)
           .eq('status', 'present')
         if (classId) q = q.eq('class_id', classId)
+        else if (branchClassIds) q = q.in('class_id', branchClassIds)
         return q
       }
 
@@ -66,10 +80,12 @@ export default function AttendanceChart({ classId }: AttendanceChartProps) {
           .in('day_type', ['cn', 'cn_le'])
           .eq('status', 'present')
         if (classId) q = q.eq('class_id', classId)
+        else if (branchClassIds) q = q.in('class_id', branchClassIds)
         return q
       }
 
-      const [totalRes, thu5PresentRes, cnRowsRes] = await Promise.all([
+      const [totalRes
+, thu5PresentRes, cnRowsRes] = await Promise.all([
         totalStudentsQuery,
         lastThu5 ? buildPresentQuery(lastThu5, 'thu5') : Promise.resolve({ count: 0, error: null }),
         lastCN ? buildSundayQuery(lastCN) : Promise.resolve({ data: [] as { student_id: string; day_type: string }[], error: null }),

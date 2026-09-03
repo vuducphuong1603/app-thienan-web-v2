@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import { X, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download, ChevronLeft } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase, Class } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
+import { filterByBranch } from '@/lib/branch-scope'
 
 interface ImportStudentsModalProps {
   isOpen: boolean
@@ -60,6 +62,8 @@ function normalizeClassName(name: string): string {
 }
 
 export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: ImportStudentsModalProps) {
+  // Phân đoàn trưởng: chỉ khớp lớp thuộc ngành mình (lớp ngoài ngành → "không khớp lớp")
+  const { scope } = useAuth()
   const [step, setStep] = useState<'upload' | 'preview' | 'importing' | 'result'>('upload')
   const [parsedData, setParsedData] = useState<ParsedStudent[]>([])
   const [importResult, setImportResult] = useState<{ success: number; failed: number; skipped: number; errors: string[] }>({
@@ -93,11 +97,12 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
         return
       }
 
-      setClasses(data || [])
+      setClasses(filterByBranch(data || [], scope))
     } catch (err) {
       console.error('Error:', err)
     } finally {
       setClassesLoading(false)
+
     }
   }
 

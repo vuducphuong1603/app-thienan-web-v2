@@ -3,10 +3,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, Camera, ChevronDown, Image as ImageIcon, User } from 'lucide-react'
 import Image from 'next/image'
-import { supabase, UserRole, ROLE_LABELS, BRANCHES, Class } from '@/lib/supabase'
+import { supabase, UserRole, ROLE_LABELS, Class } from '@/lib/supabase'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
 import AvatarCropModal from '@/components/ui/AvatarCropModal'
 import { validateAvatarFile } from '@/lib/student-avatar'
+import { useAuth } from '@/lib/auth-context'
+import { scopedBranches, assignableRoles } from '@/lib/branch-scope'
 
 interface AddUserFormProps {
   onBack: () => void
@@ -29,9 +31,14 @@ interface FormData {
 }
 
 export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
+  // Phân đoàn trưởng: chỉ tạo GLV trong ngành mình, ngành được điền sẵn
+  const { scope } = useAuth()
+  const branchOptions = scopedBranches(scope)
+  const roleOptions = assignableRoles(scope).map((r) => [r, ROLE_LABELS[r]] as const)
   const [formData, setFormData] = useState<FormData>({
     username: '',
     role: 'giao_ly_vien',
+
     password: '',
     confirmPassword: '',
     saint_name: '',
@@ -39,7 +46,8 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
     birthday: '',
     phone: '',
     address: '',
-    branch: '',
+    branch: scope.all ? '' : scope.branch,
+
     class_id: '',
     class_name: '',
   })
@@ -325,7 +333,7 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                   </button>
                   {isRoleDropdownOpen && (
                     <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden">
-                      {Object.entries(ROLE_LABELS).map(([key, label]) => (
+                      {roleOptions.map(([key, label]) => (
                         <button
                           key={key}
                           onClick={() => {
@@ -479,11 +487,12 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
                   </button>
                   {isBranchDropdownOpen && (
                     <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden">
-                      {BRANCHES.map((branch) => (
+                      {branchOptions.map((branch) => (
                         <button
                           key={branch}
                           onClick={() => {
                             handleInputChange('branch', branch)
+
                             handleInputChange('class_id', '') // Reset class when branch changes
                             handleInputChange('class_name', '')
                             setIsBranchDropdownOpen(false)

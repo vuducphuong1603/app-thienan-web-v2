@@ -7,6 +7,8 @@ import { supabase, Class, BRANCHES } from '@/lib/supabase'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
 import AvatarCropModal from '@/components/ui/AvatarCropModal'
 import { validateAvatarFile, uploadStudentAvatar } from '@/lib/student-avatar'
+import { useAuth } from '@/lib/auth-context'
+import { filterByBranch } from '@/lib/branch-scope'
 
 interface StudentFormData {
   student_code: string
@@ -46,6 +48,8 @@ const initialFormData: StudentFormData = {
 
 export default function AddStudentPage() {
   const router = useRouter()
+  const { scope } = useAuth()
+
   const [formData, setFormData] = useState<StudentFormData>(initialFormData)
   const [classes, setClasses] = useState<Class[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -65,10 +69,12 @@ export default function AddStudentPage() {
         .select('*')
         .eq('status', 'ACTIVE')
         .order('display_order', { ascending: true })
-      setClasses(data || [])
+      // Phân đoàn trưởng chỉ thêm thiếu nhi vào lớp thuộc ngành mình
+      setClasses(filterByBranch(data || [], scope))
     }
     fetchClasses()
-  }, [])
+  }, [scope])
+
 
   // Group classes by branch
   const classesGroupedByBranch = BRANCHES.reduce((acc, branch) => {

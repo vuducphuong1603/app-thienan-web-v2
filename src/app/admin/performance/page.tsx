@@ -1,7 +1,9 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
-import { ROLE_LABELS, Branch, BRANCHES } from '@/lib/supabase'
+import { scopedBranches } from '@/lib/branch-scope'
+
+import { ROLE_LABELS, Branch } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 import { usePerformanceTrendData, useClassAttendanceData } from '@/lib/queries'
 import Link from 'next/link'
@@ -754,13 +756,16 @@ const branchDisplayNames: Record<Branch, string> = {
 }
 
 export default function PerformancePage() {
-  const { user, loading, isAdmin, logout } = useAuth()
+  const { user, loading, isManager, logout, scope } = useAuth()
+  // admin + phân đoàn trưởng (dữ liệu lọc theo phân đoàn trong hook)
+  const isAdmin = isManager
+  const allowedBranches = scopedBranches(scope)
 
   const [activeView, setActiveView] = useState<ViewType>('trend')
   const [chartType, setChartType] = useState<ChartType>('sunday')
 
   // States for class view
-  const [selectedBranch, setSelectedBranch] = useState<Branch>('Ấu Nhi')
+  const [selectedBranch, setSelectedBranch] = useState<Branch>(() => (scope.all ? 'Ấu Nhi' : (scopedBranches(scope)[0] || 'Ấu Nhi')))
   const [selectedDayType, setSelectedDayType] = useState<DayType>('cn')
   const [selectedDate, setSelectedDate] = useState<string>('')
 
@@ -1018,7 +1023,7 @@ export default function PerformancePage() {
                     {/* Branch dropdown */}
                     <Dropdown
                       value={selectedBranch}
-                      options={BRANCHES.map(b => ({ value: b, label: branchDisplayNames[b] }))}
+                      options={allowedBranches.map(b => ({ value: b, label: branchDisplayNames[b] }))}
                       onChange={(val) => setSelectedBranch(val as Branch)}
                     />
 

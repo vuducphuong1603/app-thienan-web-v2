@@ -6,6 +6,7 @@ import { ChevronLeft, User } from 'lucide-react'
 import { supabase, Class, Holiday } from '@/lib/supabase'
 import { countWeekdays } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
+import { isManagerRole, inScope } from '@/lib/branch-scope'
 
 interface StudentData {
   id: string
@@ -42,9 +43,9 @@ export default function ViewStudentPage() {
   const params = useParams()
   const studentId = params.id as string
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, scope } = useAuth()
   // GLV quay về danh sách lớp của mình, admin về trang quản lý chung
-  const studentsListHref = user?.role === 'admin' ? '/admin/management/students' : '/dashboard/management'
+  const studentsListHref = isManagerRole(user?.role) ? '/admin/management/students' : '/dashboard/management'
   const [student, setStudent] = useState<StudentData | null>(null)
 
   // GLV chỉ xem chi tiết thiếu nhi thuộc lớp mình phụ trách
@@ -55,8 +56,18 @@ export default function ViewStudentPage() {
     }
   }, [student, user, router])
   const [classes, setClasses] = useState<Class[]>([])
+  // Phân đoàn trưởng chỉ xem thiếu nhi thuộc ngành mình
+  useEffect(() => {
+    if (!student || scope.all || classes.length === 0) return
+    const cls = classes.find((c) => c.id === student.class_id)
+    if (!inScope(scope, cls?.branch)) {
+      alert('Thiếu nhi này không thuộc phân đoàn của bạn')
+      router.replace('/admin/management/students')
+    }
+  }, [student, classes, scope, router])
   const [isLoading, setIsLoading] = useState(true)
   const [effectiveThu5Days, setEffectiveThu5Days] = useState(40)
+
   const [effectiveCnDays, setEffectiveCnDays] = useState(40)
 
   useEffect(() => {

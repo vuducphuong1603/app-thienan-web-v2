@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, Check, X } from 'lucide-react'
-import { supabase, PlanCategory, WeeklyPlan, Class, BRANCHES } from '@/lib/supabase'
+import { supabase, PlanCategory, WeeklyPlan, Class } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
+import { scopedBranches } from '@/lib/branch-scope'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
 
 interface PlanModalProps {
@@ -35,6 +37,9 @@ function formatTimeDisplay(time: string): string {
 }
 
 export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, categories, classes }: PlanModalProps) {
+  // Phân đoàn trưởng chỉ gán kế hoạch cho phân đoàn / lớp thuộc ngành mình
+  const { scope } = useAuth()
+  const BRANCHES = scopedBranches(scope)
   const [title, setTitle] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [planDate, setPlanDate] = useState('')
@@ -89,8 +94,10 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
         setLocation('')
         setDescription('')
         setNotes('')
-        setAssignType('none')
-        setSelectedBranch('')
+        // Phân đoàn trưởng không có lựa chọn "Tất cả": mặc định gán cho ngành mình
+        setAssignType(scope.all ? 'none' : 'branch')
+        setSelectedBranch(scope.all ? '' : scope.branch)
+
         setSelectedClassIds([])
       }
     }
@@ -307,6 +314,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
               <span className="text-[#DF1C41]">*</span>
             </p>
             <div className="flex items-center gap-3 mb-1">
+              {scope.all && (
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input
                   type="radio"
@@ -317,6 +325,8 @@ export default function PlanModal({ isOpen, onClose, onSuccess, mode, plan, cate
                 />
                 <span className="text-[12px] text-black dark:text-white">Tất cả</span>
               </label>
+              )}
+
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input
                   type="radio"

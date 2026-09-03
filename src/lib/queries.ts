@@ -3,6 +3,24 @@ import { sundayFullyPresentIds } from '@/lib/sunday-attendance'
 import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRule, AlertRecord, NotificationWithStatus, Notification, UserNote, Holiday, SchoolYear, AttendanceRecord, ThieuNhiProfile, BRANCHES } from './supabase'
 import { CLASS_TEACHER_ROLES } from './class-teachers'
 import { sortByGivenName } from './student-sort'
+import { useAuth } from './auth-context'
+import {
+  type BranchScope, scopeKey, inScope, filterByBranch, filterByClassId, filterByClassName,
+  planInScope, notificationInScope,
+} from './branch-scope'
+
+// Phạm vi phân đoạn của người đang đăng nhập (admin: tất cả; phân đoàn trưởng: ngành mình).
+// Các hook danh sách bên dưới tự lọc theo phạm vi này nên trang gọi hook không cần biết role.
+function useScope(): BranchScope {
+  return useAuth().scope
+}
+
+/** Lấy các lớp ACTIVE trong phạm vi (dùng để lọc bản ghi chỉ có class_id / class_name). */
+async function fetchScopedClasses(scope: BranchScope) {
+  const { data, error } = await supabase.from('classes').select('id, name, branch').eq('status', 'ACTIVE')
+  if (error) throw error
+  return filterByBranch(data || [], scope)
+}
 
 // ============ Helper: Count weekdays between two dates ============
 export function countWeekdays(startDate: string, endDate: string, dayOfWeek: number): number {
@@ -72,10 +90,31 @@ export const queryKeys = {
 
 // ============ Dashboard Stats ============
 export function useDashboardStats(enabled = true) {
+  const scope = useScope()
   return useQuery({
-    queryKey: queryKeys.dashboardStats,
+    queryKey: [...queryKeys.dashboardStats, scopeKey(scope)],
     staleTime: 5 * 60 * 1000, // Dashboard stats don't change often
     queryFn: async () => {
+      if (!scope.all) {
+        // Phân đoàn trưởng: đếm trong ngành mình
+        const classes = await fetchScopedClasses(scope)
+        const ids = classes.map((c) => c.id)
+        const [glvRes, thieuNhiRes] = await Promise.all([
+          supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'giao_ly_vien').eq('status', 'ACTIVE').eq('branch', scope.branch),
+          ids.length > 0
+            ? supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE').in('class_id', ids)
+            : Promise.resolve({ count: 0, error: null }),
+        ])
+        if (glvRes.error) throw glvRes.error
+        if (thieuNhiRes.error) throw thieuNhiRes.error
+        return {
+          totalBranches: scope.branch ? 1 : 0,
+          totalClasses: ids.length,
+          totalThieuNhi: thieuNhiRes.count || 0,
+          totalGiaoLyVien: glvRes.count || 0,
+        }
+      }
+
       const [glvRes, thieuNhiRes, classesRes] = await Promise.all([
         supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'giao_ly_vien').eq('status', 'ACTIVE'),
         supabase.from('thieu_nhi').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
@@ -389,8 +428,9 @@ export function useAbsentStudents(classId: string | undefined, dayType: 'cn' | '
 
 // ============ Class Stats (for ClassStats component) ============
 export function useClassStats(enabled = true) {
+  const scope = useScope()
   return useQuery({
-    queryKey: queryKeys.classStats,
+    queryKey: [...queryKeys.classStats, scopeKey(scope)],
     staleTime: 10 * 60 * 1000, // Stats rarely change
     enabled,
     queryFn: async () => {
@@ -408,7 +448,8 @@ export function useClassStats(enabled = true) {
       if (classesRes.error) throw classesRes.error
       if (teachersRes.error) throw teachersRes.error
 
-      const branches = branchesRes.data
+      // Phân đoàn trưởng chỉ thấy ngành mình
+      const branches = branchesRes.data?.filter((b) => inScope(scope, b.name))
       if (!branches) return []
 
       const classes = classesRes.data
@@ -454,8 +495,9 @@ export function useClassStats(enabled = true) {
 
 // ============ Users ============
 export function useUsers() {
+  const scope = useScope()
   return useQuery({
-    queryKey: queryKeys.users,
+    queryKey: [...queryKeys.users, scopeKey(scope)],
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -464,16 +506,20 @@ export function useUsers() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
+      // Phân đoàn trưởng: chỉ GLV/PĐT trong ngành mình, không thấy Ban điều hành
+      const rows = (data || []) as UserProfile[]
+      const scoped = scope.all ? rows : filterByBranch(rows, scope).filter((u) => u.role !== 'admin')
       // Xếp theo tên gọi đúng bảng chữ cái tiếng Việt (như danh sách thiếu nhi)
-      return sortByGivenName((data || []) as UserProfile[])
+      return sortByGivenName(scoped)
     },
   })
 }
 
 // ============ Classes (all) ============
 export function useClasses() {
+  const scope = useScope()
   return useQuery({
-    queryKey: queryKeys.classes,
+    queryKey: [...queryKeys.classes, scopeKey(scope)],
     staleTime: 10 * 60 * 1000, // Classes rarely change
     queryFn: async () => {
       const { data, error } = await supabase
@@ -482,15 +528,16 @@ export function useClasses() {
         .order('display_order', { ascending: true })
 
       if (error) throw error
-      return (data || []) as Class[]
+      return filterByBranch((data || []) as Class[], scope)
     },
   })
 }
 
 // ============ Active Classes ============
 export function useActiveClasses() {
+  const scope = useScope()
   return useQuery({
-    queryKey: queryKeys.activeClasses,
+    queryKey: [...queryKeys.activeClasses, scopeKey(scope)],
     staleTime: 10 * 60 * 1000, // Classes rarely change
     queryFn: async () => {
       const { data, error } = await supabase
@@ -500,7 +547,7 @@ export function useActiveClasses() {
         .order('display_order', { ascending: true })
 
       if (error) throw error
-      return (data || []) as Class[]
+      return filterByBranch((data || []) as Class[], scope)
     },
   })
 }
@@ -528,8 +575,9 @@ export function useClassesByBranch(branch: string) {
 
 // ============ Students with details ============
 export function useStudentsWithDetails() {
+  const scope = useScope()
   return useQuery({
-    queryKey: queryKeys.students,
+    queryKey: [...queryKeys.students, scopeKey(scope)],
     queryFn: async () => {
       console.log('[useStudentsWithDetails] queryFn START')
       const t0 = Date.now()
@@ -606,15 +654,20 @@ export function useStudentsWithDetails() {
         }
       })
 
-      return { students: studentsWithDetails, classes: classesData }
+      // Phân đoàn trưởng: chỉ thiếu nhi và lớp trong ngành mình
+      return {
+        students: filterByClassId(studentsWithDetails, classesData, scope),
+        classes: filterByBranch(classesData, scope),
+      }
     },
   })
 }
 
 // ============ Classes with details (teachers + student counts) ============
 export function useClassesWithDetails() {
+  const scope = useScope()
   return useQuery({
-    queryKey: ['classes', 'withDetails'],
+    queryKey: ['classes', 'withDetails', scopeKey(scope)],
     staleTime: 10 * 60 * 1000, // Class details rarely change
     queryFn: async () => {
       // Supabase chỉ trả tối đa 1000 dòng mỗi request nên phải lấy hết theo trang,
@@ -655,7 +708,7 @@ export function useClassesWithDetails() {
         }
       })
 
-      const classesWithDetails = (classesRes.data || []).map((cls) => {
+      const classesWithDetails = filterByBranch(classesRes.data || [], scope).map((cls) => {
         // Merge teachers by id and name, deduplicate
         const byId = teachersByClassId.get(cls.id) || []
         const byName = teachersByClassName.get(cls.name) || []
@@ -879,8 +932,9 @@ export function useCurrentSchoolYear(enabled = true) {
 
 // ============ Plan Categories + Classes (static data for weekly plan) ============
 export function usePlanStaticData() {
+  const scope = useScope()
   return useQuery({
-    queryKey: ['planStaticData'],
+    queryKey: ['planStaticData', scopeKey(scope)],
     staleTime: 10 * 60 * 1000, // Categories and classes rarely change
     queryFn: async () => {
       const [catRes, classRes] = await Promise.all([
@@ -893,7 +947,7 @@ export function usePlanStaticData() {
 
       return {
         categories: catRes.data || [],
-        classes: classRes.data || [],
+        classes: filterByBranch(classRes.data || [], scope),
       }
     },
   })
@@ -908,9 +962,10 @@ export function useWeeklyPlans(weekStart: Date) {
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
   const startStr = toDateString(weekStart)
+  const scope = useScope()
 
   return useQuery({
-    queryKey: queryKeys.weeklyPlans(startStr),
+    queryKey: [...queryKeys.weeklyPlans(startStr), scopeKey(scope)],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('weekly_plans')
@@ -921,7 +976,10 @@ export function useWeeklyPlans(weekStart: Date) {
         .order('time_start')
 
       if (error) throw error
-      return data || []
+      if (scope.all) return data || []
+      // Phân đoàn trưởng: kế hoạch chung, kế hoạch ngành mình, hoặc có lớp trong ngành
+      const classes = await fetchScopedClasses(scope)
+      return (data || []).filter((p) => planInScope(p, classes, scope))
     },
   })
 }
@@ -963,8 +1021,9 @@ const branchDisplayNames: Record<Branch, string> = {
 }
 
 export function usePerformanceTrendData(chartType: 'sunday' | 'thursday', enabled = true) {
+  const scope = useScope()
   return useQuery({
-    queryKey: queryKeys.performanceTrend(chartType),
+    queryKey: [...queryKeys.performanceTrend(chartType), scopeKey(scope)],
     staleTime: 5 * 60 * 1000, // Attendance trends don't change frequently
     queryFn: async () => {
       const dayType: 'thu5' | 'cn' = chartType === 'sunday' ? 'cn' : 'thu5'
@@ -972,6 +1031,8 @@ export function usePerformanceTrendData(chartType: 'sunday' | 'thursday', enable
 
       const classesRes = await supabase.from('classes').select('id, name, branch').eq('status', 'ACTIVE')
       if (classesRes.error) throw classesRes.error
+      // Phân đoàn trưởng: chỉ tính lớp trong ngành mình (ngành khác về 0)
+      classesRes.data = filterByBranch(classesRes.data || [], scope)
 
       const allStudents = await fetchAllRows<{ id: string; class_id: string }>(
         (from, to) => supabase.from('thieu_nhi').select('id, class_id').eq('status', 'ACTIVE').range(from, to)
@@ -1324,8 +1385,9 @@ export function useAlertRules() {
 
 // ============ Alerts (with filters) ============
 export function useAlerts(filters: Record<string, string> = {}) {
+  const scope = useScope()
   return useQuery({
-    queryKey: queryKeys.alerts(filters),
+    queryKey: [...queryKeys.alerts(filters), scopeKey(scope)],
     queryFn: async () => {
       let query = supabase
         .from('alerts')
@@ -1363,16 +1425,34 @@ export function useAlerts(filters: Record<string, string> = {}) {
 
       const { data, error } = await query
       if (error) throw error
-      return (data || []) as AlertRecord[]
+      const rows = (data || []) as AlertRecord[]
+      if (scope.all) return rows
+      return filterByClassName(rows, await fetchScopedClasses(scope), scope)
     },
   })
 }
 
 // ============ Alert Stats ============
 export function useAlertStats() {
+  const scope = useScope()
   return useQuery({
-    queryKey: queryKeys.alertStats,
+    queryKey: [...queryKeys.alertStats, scopeKey(scope)],
     queryFn: async () => {
+      if (!scope.all) {
+        // Phân đoàn trưởng: đếm trên cảnh báo của lớp trong ngành mình
+        const [{ data, error }, classes] = await Promise.all([
+          supabase.from('alerts').select('id, class_name, status, severity'),
+          fetchScopedClasses(scope),
+        ])
+        if (error) throw error
+        const rows = filterByClassName((data || []) as Pick<AlertRecord, 'id' | 'class_name' | 'status' | 'severity'>[], classes, scope)
+        return {
+          total: rows.length,
+          unread: rows.filter((a) => a.status === 'unread').length,
+          high: rows.filter((a) => a.severity === 'high' && (a.status === 'unread' || a.status === 'read')).length,
+          resolved: rows.filter((a) => a.status === 'resolved' || a.status === 'dismissed').length,
+        }
+      }
       const [totalRes, unreadRes, highRes, resolvedRes] = await Promise.all([
         supabase.from('alerts').select('*', { count: 'exact', head: true }),
         supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('status', 'unread'),
@@ -1397,8 +1477,9 @@ export function useAlertStats() {
 
 // ============ Alert History ============
 export function useAlertHistory() {
+  const scope = useScope()
   return useQuery({
-    queryKey: queryKeys.alertHistory,
+    queryKey: [...queryKeys.alertHistory, scopeKey(scope)],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('alerts')
@@ -1408,16 +1489,33 @@ export function useAlertHistory() {
         .limit(50)
 
       if (error) throw error
-      return (data || []) as AlertRecord[]
+      const rows = (data || []) as AlertRecord[]
+      if (scope.all) return rows
+      return filterByClassName(rows, await fetchScopedClasses(scope), scope)
     },
   })
 }
 
 // ============ Dashboard Alerts (latest 2) ============
 export function useDashboardAlerts(enabled = true) {
+  const scope = useScope()
   return useQuery({
-    queryKey: ['dashboardAlerts'],
+    queryKey: ['dashboardAlerts', scopeKey(scope)],
     queryFn: async () => {
+      if (!scope.all) {
+        // Phân đoàn trưởng: 2 cảnh báo mới nhất thuộc lớp trong ngành mình
+        const classes = await fetchScopedClasses(scope)
+        const names = classes.map((c) => c.name)
+        if (names.length === 0) return [] as AlertRecord[]
+        const { data, error } = await supabase
+          .from('alerts')
+          .select('*')
+          .in('class_name', names)
+          .order('created_at', { ascending: false })
+          .limit(2)
+        if (error) throw error
+        return (data || []) as AlertRecord[]
+      }
       const { data, error } = await supabase
         .from('alerts')
         .select('*')
@@ -1608,8 +1706,11 @@ export function useUnreadNotifications(userId?: string) {
 
 // ============ All Notifications (admin management) ============
 export function useAllNotifications() {
+  const scope = useScope()
+  const { user } = useAuth()
+  const userId = user?.id || ''
   return useQuery({
-    queryKey: queryKeys.allNotifications,
+    queryKey: [...queryKeys.allNotifications, scopeKey(scope), userId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('notifications')
@@ -1618,8 +1719,23 @@ export function useAllNotifications() {
 
       if (error) throw error
 
+      let notifications = (data || []) as Notification[]
+      if (!scope.all) {
+        // Phân đoàn trưởng: thông báo mình tạo, gửi tất cả, hoặc gửi cho ngành / lớp / thiếu nhi trong ngành
+        const classes = await fetchScopedClasses(scope)
+        const studentIds = Array.from(new Set(
+          notifications.filter((n) => n.target_type === 'student').flatMap((n) => n.target_values || [])
+        ))
+        const studentClassIds = new Map<string, string>()
+        if (studentIds.length > 0) {
+          const { data: students } = await supabase.from('thieu_nhi').select('id, class_id').in('id', studentIds)
+          ;(students || []).forEach((s) => { if (s.class_id) studentClassIds.set(s.id, s.class_id) })
+        }
+        notifications = notifications.filter((n) => notificationInScope(n, { userId, classes, studentClassIds }, scope))
+      }
+
       // Get creator names
-      const notifications = (data || []) as Notification[]
+
       const creatorIds = Array.from(new Set(notifications.map(n => n.created_by).filter(Boolean)))
       if (creatorIds.length > 0) {
         const { data: creators } = await supabase

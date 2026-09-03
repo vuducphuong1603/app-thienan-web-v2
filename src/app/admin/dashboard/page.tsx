@@ -16,10 +16,11 @@ import NotificationPopup from '@/components/notifications/NotificationPopup'
 import NotificationListModal from '@/components/notifications/NotificationListModal'
 
 export default function AdminDashboard() {
-  const { user, loading, isAdmin, logout } = useAuth()
+  const { user, loading, isManager, scope, logout } = useAuth()
   const [isNotificationListOpen, setIsNotificationListOpen] = useState(false)
 
-  const { data: stats, isLoading: loadingStats } = useDashboardStats(!!user && isAdmin)
+  // admin + phân đoàn trưởng; số liệu đã lọc theo phân đoàn trong hook
+  const { data: stats, isLoading: loadingStats } = useDashboardStats(!!user && isManager)
 
   if (!user && !loading) {
     return null
@@ -136,7 +137,8 @@ export default function AdminDashboard() {
               <ClassStats />
             </div>
             {/* Row 2, Col 1 - Attendance Chart */}
-            <AttendanceChart />
+            <AttendanceChart branch={scope.all ? undefined : scope.branch} />
+
             {/* Row 2, Col 2 - Alerts Section */}
             <AlertsSection />
           </div>

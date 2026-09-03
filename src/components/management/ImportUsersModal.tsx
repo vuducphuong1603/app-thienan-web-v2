@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import { X, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download, ChevronLeft } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase, UserRole, ROLE_LABELS, Class } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
+import { filterByBranch, inScope } from '@/lib/branch-scope'
 
 interface ImportUsersModalProps {
   isOpen: boolean
@@ -82,6 +84,8 @@ function normalizeClassName(name: string): string {
 }
 
 export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportUsersModalProps) {
+  // Phân đoàn trưởng: chỉ nhập GLV cho ngành mình
+  const { scope } = useAuth()
   const [step, setStep] = useState<'upload' | 'preview' | 'importing' | 'result'>('upload')
   const [parsedData, setParsedData] = useState<ParsedUser[]>([])
   const [importResult, setImportResult] = useState<{ success: number; failed: number; skipped: number; errors: string[] }>({
@@ -115,7 +119,7 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
         return
       }
 
-      setClasses(data || [])
+      setClasses(filterByBranch(data || [], scope))
     } catch (err) {
       console.error('Error:', err)
     } finally {
@@ -190,8 +194,10 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
           // Validation - only full_name is required, phone is optional
           if (!fullName || fullName === ' ') errors.push('Thiếu họ tên')
 
-          const branch = getBranchFromClassName(className)
-          const role = getRoleFromNotes(notes)
+          const branch = className || scope.all ? getBranchFromClassName(className) : scope.branch
+          const role: UserRole = scope.all ? getRoleFromNotes(notes) : 'giao_ly_vien'
+          if (!inScope(scope, branch)) errors.push(`Lớp "${className}" không thuộc phân đoàn của bạn`)
+
 
           // Check if class exists in database
           const classMatched = className ? classes.some(cls =>

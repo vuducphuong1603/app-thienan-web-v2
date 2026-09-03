@@ -70,12 +70,13 @@ const sidebarItems = [
 ]
 
 export default function ManagementLayout({ children }: ManagementLayoutProps) {
-  const { user, loading, logout } = useAuth()
+  const { user, loading, logout, isManager } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
-  const isAdmin = user?.role === 'admin'
+  // admin + phân đoàn trưởng (dữ liệu đã lọc theo phân đoàn ở tầng hook)
+  const isAdmin = isManager
 
-  // Chỉ admin (Ban điều hành) mới được vào Người dùng / Lớp học,
+  // Chỉ admin (Ban điều hành) / phân đoàn trưởng mới được vào Người dùng / Lớp học,
   // danh sách toàn bộ thiếu nhi và trang thêm thiếu nhi.
   // GLV vẫn dùng được các trang con /students/[id]/(view|edit|attendance).
   const isAdminOnlyPath =

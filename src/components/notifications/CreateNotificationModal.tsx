@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
-import { supabase, BRANCHES, ROLE_LABELS, UserRole, NotificationTargetType, NotificationPriority } from '@/lib/supabase'
+import { supabase, ROLE_LABELS, UserRole, NotificationTargetType, NotificationPriority } from '@/lib/supabase'
 import { useActiveClasses, useInvalidateQueries } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
+import { scopedBranches, filterByClassId } from '@/lib/branch-scope'
 
 interface CreateNotificationModalProps {
   isOpen: boolean
@@ -12,9 +13,13 @@ interface CreateNotificationModalProps {
 }
 
 export default function CreateNotificationModal({ isOpen, onClose }: CreateNotificationModalProps) {
-  const { user } = useAuth()
+  const { user, scope } = useAuth()
   const { invalidateNotifications } = useInvalidateQueries()
   const { data: activeClasses } = useActiveClasses()
+  // Phân đoàn trưởng: chỉ gửi cho ngành / lớp / thiếu nhi thuộc ngành mình
+  const BRANCHES = scopedBranches(scope)
+  const targetTypes: NotificationTargetType[] = scope.all ? ['all', 'role', 'branch', 'class', 'student'] : ['branch', 'class', 'student']
+  const defaultTargetType: NotificationTargetType = scope.all ? 'all' : 'branch'
 
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -45,10 +50,10 @@ export default function CreateNotificationModal({ isOpen, onClose }: CreateNotif
         .eq('status', 'ACTIVE')
         .order('full_name')
         .then(({ data }) => {
-          setStudents(data || [])
+          setStudents(filterByClassId(data || [], activeClasses || [], scope))
         })
     }
-  }, [targetType])
+  }, [targetType, activeClasses, scope])
 
   // Reset form when opening
   useEffect(() => {
@@ -56,7 +61,7 @@ export default function CreateNotificationModal({ isOpen, onClose }: CreateNotif
       setTitle('')
       setContent('')
       setPriority('normal')
-      setTargetType('all')
+      setTargetType(defaultTargetType)
       setSelectedValues([])
       setStudentSearch('')
       setError(null)
@@ -259,7 +264,8 @@ export default function CreateNotificationModal({ isOpen, onClose }: CreateNotif
               Đối tượng nhận
             </label>
             <div className="flex flex-wrap items-center gap-3">
-              {(['all', 'role', 'branch', 'class', 'student'] as const).map(t => (
+              {targetTypes.map(t => (
+
                 <label key={t} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
