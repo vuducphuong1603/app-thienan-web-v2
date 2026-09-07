@@ -297,7 +297,69 @@ export default function ViewClassPage() {
           ) : filteredStudents.length === 0 ? (
             <p className="text-sm text-primary-3 py-8 text-center">Không tìm thấy thiếu nhi phù hợp</p>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            {/* Mobile: card list — full name, no truncation */}
+            <div className="md:hidden divide-y divide-[#E5E1DC] dark:divide-white/10">
+              {filteredStudents.map((student, index) => (
+                <div
+                  key={student.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => router.push(`/admin/management/students/${student.id}/view`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      router.push(`/admin/management/students/${student.id}/view`)
+                    }
+                  }}
+                  className="flex items-start gap-3 py-3 cursor-pointer active:bg-[#FAFAFA] dark:active:bg-white/5"
+                >
+                  <div className="w-6 pt-2.5 text-xs text-primary-3 text-right flex-shrink-0">{index + 1}</div>
+                  <div className="w-10 h-10 rounded-full bg-[#F5EAF6] overflow-hidden flex items-center justify-center flex-shrink-0">
+                    {student.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={student.avatar_url} alt={student.full_name} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-4 h-4 text-[#C4B5C7]" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-black dark:text-white break-words">
+                      {student.saint_name ? `${student.saint_name} ` : ''}
+                      {student.full_name}
+                    </p>
+                    <p className="text-xs text-primary-3 mt-0.5">
+                      {student.student_code || '-'} · {formatDate(student.date_of_birth)}
+                    </p>
+                    {(student.parent_name || student.parent_phone) && (
+                      <p className="text-xs text-primary-3 mt-0.5 break-words">
+                        PH: {student.parent_name || '-'}
+                        {student.parent_phone ? ` · ${student.parent_phone}` : ''}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs">
+                      <span className="text-primary-3">
+                        ĐD: <span className="text-black dark:text-white">{student.attendance_thu5 || 0} / {student.attendance_cn || 0}</span>
+                      </span>
+                      <span className="text-primary-3">
+                        TB: <span className="font-semibold text-brand">{student.totalAvg.toFixed(1)}</span>
+                      </span>
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${
+                          STATUS_BADGE_STYLES[student.status].bg
+                        } ${STATUS_BADGE_STYLES[student.status].text}`}
+                      >
+                        {STATUS_BADGE_STYLES[student.status].label}
+                      </span>
+                    </div>
+                  </div>
+                  <Eye className="w-4 h-4 text-primary-3 flex-shrink-0 mt-3" />
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden md:block overflow-x-auto">
               <div className="min-w-[840px]">
                 {/* Table Header */}
                 <div className="grid grid-cols-[50px_1.7fr_110px_1.3fr_110px_90px_110px_70px] gap-3 px-3 py-3 bg-[#FAFAFA] dark:bg-white/5 rounded-xl">
@@ -330,7 +392,7 @@ export default function ViewClassPage() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-black dark:text-white truncate">
+                          <p className="text-sm font-medium text-black dark:text-white break-words">
                             {student.saint_name ? `${student.saint_name} ` : ''}
                             {student.full_name}
                           </p>
@@ -375,6 +437,7 @@ export default function ViewClassPage() {
                 </div>
               </div>
             </div>
+            </>
           )}
         </div>
       </div>
