@@ -2519,8 +2519,7 @@ export default function ActivitiesPage() {
             {/* Filter Row */}
             <div className="px-4 sm:px-6 pb-5">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                {/* Class Selector - hidden for GLV (auto-selected) */}
-                {isAdmin ? (
+                {/* Class Selector - GLV cũng chọn được lớp khác; lớp phụ trách được chọn sẵn */}
                   <div className="relative flex-1" data-dropdown>
                     <button
                       onClick={() => {
@@ -2530,7 +2529,7 @@ export default function ActivitiesPage() {
                       className="flex items-center justify-between w-full h-[52px] px-6 bg-white dark:bg-white/10 rounded-full"
                     >
                       <span className="text-base text-black dark:text-white">
-                        {selectedClassId ? getClassName(selectedClassId) : 'Chọn lớp'}
+                        {selectedClassId ? getClassName(selectedClassId) : (isAdmin ? 'Chọn lớp' : 'Chưa phân lớp - chọn lớp')}
                       </span>
                       <svg
                         className={`w-[9px] h-[18px] text-black dark:text-white transition-transform ${isClassDropdownOpen ? 'rotate-180' : ''}`}
@@ -2571,13 +2570,6 @@ export default function ActivitiesPage() {
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="flex-1 h-[52px] px-6 bg-white dark:bg-white/10 rounded-full flex items-center">
-                    <span className="text-base text-black dark:text-white">
-                      {selectedClassId ? getClassName(selectedClassId) : 'Chưa phân lớp'}
-                    </span>
-                  </div>
-                )}
 
                 {/* Date Picker */}
                 <div className="relative flex-1" data-dropdown>
