@@ -2,14 +2,15 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import jsQR from 'jsqr'
-import { X, Camera, CameraOff, CheckCircle2, Clock, XCircle, Users, ScanLine, Search, UserPlus, Phone, Loader2 } from 'lucide-react'
-import { supabase, SchoolYear, UserProfile } from '@/lib/supabase'
+import { X, Camera, CameraOff, CheckCircle2, Clock, XCircle, Users, ScanLine, Search, UserPlus, Phone, Loader2, ChevronDown } from 'lucide-react'
+import { supabase, SchoolYear, UserProfile, Class } from '@/lib/supabase'
+import { getBranchScope, filterByBranch } from '@/lib/branch-scope'
 import { todayForAttendance } from '@/lib/debug-date'
 import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { playFeedback, primeAudio } from '@/lib/attendance-feedback'
 import { SundaySession, SUNDAY_SESSION_LABELS, SUNDAY_SESSIONS, holidayDayTypesFor, DayType } from '@/lib/sunday-attendance'
 import { BookOpen, Church } from 'lucide-react'
-import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, matchesStudentSearch, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory } from '@/lib/qr-attendance'
+import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, matchesStudentSearch, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit } from '@/lib/qr-attendance'
 
 type ScanEntry = {
   id: string
@@ -69,6 +70,12 @@ export default function QRScanAttendanceModal({
   const [manualMarking, setManualMarking] = useState<string | null>(null)
   const [markedStudents, setMarkedStudents] = useState<Set<string>>(new Set())
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Lọc lớp trong điểm danh thủ công
+  const [classOptions, setClassOptions] = useState<Pick<Class, 'id' | 'name'>[]>([])
+  const [filterClassId, setFilterClassId] = useState('')
+  const filterClassRef = useRef('')
+  const searchQueryRef = useRef('')
+  searchQueryRef.current = searchQuery
 
   // Chủ nhật: phải chọn buổi (học giáo lý / đi lễ) trước khi điểm danh
   const [sundaySession, setSundaySession] = useState<SundaySession | null>(null)
@@ -221,12 +228,28 @@ export default function QRScanAttendanceModal({
     run()
   }, [schoolYear?.id, user?.id, showFeedback, updateAttendanceCount])
 
-  // --- Điểm danh thủ công: tìm kiếm theo tên / tên thánh / mã ---
-  const handleSearch = useCallback((text: string) => {
-    setSearchQuery(text)
+  // Danh sách lớp cho bộ lọc (theo phạm vi ngành của user)
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    supabase
+      .from('classes')
+      .select('id, name, branch')
+      .eq('status', 'ACTIVE')
+      .order('display_order', { ascending: true })
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        const scoped = filterByBranch(data as Pick<Class, 'id' | 'name' | 'branch'>[], getBranchScope(user))
+        setClassOptions(scoped.map(c => ({ id: c.id, name: c.name })))
+      })
+    return () => { cancelled = true }
+  }, [isOpen, user])
+
+  // --- Điểm danh thủ công: tìm kiếm theo tên / tên thánh / mã, có thể lọc theo lớp ---
+  const runSearch = useCallback((text: string, classId: string) => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
 
-    if (text.trim().length < 2) {
+    if (!shouldRunManualSearch(text, classId)) {
       setSearchResults([])
       return
     }
@@ -238,14 +261,17 @@ export default function QRScanAttendanceModal({
           .from('thieu_nhi')
           .select('id, full_name, saint_name, student_code, class_id, parent_phone, classes(name)')
           .eq('status', 'ACTIVE')
+        if (classId) query = query.eq('class_id', classId)
 
         // Tìm lớp có tên khớp từ khóa để hỗ trợ tìm theo lớp
         const words = splitSearchWords(text)
         const matchedClassIds: string[] = []
-        const { data: classRows } = await supabase
-          .from('classes')
-          .select('id, name')
-          .or(words.map(w => `name.ilike.%${w.replace(/[,()]/g, '')}%`).join(','))
+        const { data: classRows } = words.length > 0
+          ? await supabase
+              .from('classes')
+              .select('id, name')
+              .or(words.map(w => `name.ilike.%${w.replace(/[,()]/g, '')}%`).join(','))
+          : { data: [] as { id: string; name: string }[] }
         for (const word of words) {
           const lw = word.toLowerCase()
           const classIds = (classRows || [])
@@ -255,7 +281,7 @@ export default function QRScanAttendanceModal({
           query = query.or(studentSearchOrFilter(word, classIds))
         }
 
-        const { data: rawData, error } = await query.order('full_name').limit(50)
+        const { data: rawData, error } = await query.order('full_name').limit(classId ? 500 : 50)
         // DB ilike khớp cả họ / tên đệm → lọc lại: chỉ lấy khớp tên cuối (hoặc tên thánh / mã / SĐT / lớp)
         const data = rawData?.filter((s) => matchesStudentSearch({
           full_name: s.full_name as string,
@@ -264,7 +290,7 @@ export default function QRScanAttendanceModal({
           class_id: s.class_id as string,
           className: (s as { classes?: { name?: string } | null }).classes?.name,
           parent_phone: s.parent_phone as string | null,
-        }, text, matchedClassIds)).slice(0, 20)
+        }, text, matchedClassIds)).slice(0, manualSearchLimit(classId))
 
         if (!error && data) {
           const { dateStr } = scanTarget.current
@@ -302,8 +328,19 @@ export default function QRScanAttendanceModal({
       } finally {
         setSearchLoading(false)
       }
-    }, 300)
+    }, classId && text.trim().length === 0 ? 0 : 300)
   }, [])
+
+  const handleSearch = useCallback((text: string) => {
+    setSearchQuery(text)
+    runSearch(text, filterClassRef.current)
+  }, [runSearch])
+
+  const handleFilterClass = useCallback((classId: string) => {
+    filterClassRef.current = classId
+    setFilterClassId(classId)
+    runSearch(searchQueryRef.current, classId)
+  }, [runSearch])
 
   const handleManualAttendance = useCallback(async (student: ManualStudent) => {
     if (manualMarking) return
@@ -512,6 +549,8 @@ export default function QRScanAttendanceModal({
     setSearchFocused(false)
     setSearchResults([])
     setSearchLoading(false)
+    setFilterClassId('')
+    filterClassRef.current = ''
     setManualMarking(null)
     setMarkedStudents(new Set())
     setSundaySession(null)
@@ -649,7 +688,7 @@ export default function QRScanAttendanceModal({
   if (!isOpen) return null
 
   // Trên mobile: khi đang tìm kiếm thì thu gọn camera để ô tìm + kết quả không bị bàn phím che
-  const searchActive = searchFocused || searchQuery.trim().length > 0
+  const searchActive = searchFocused || searchQuery.trim().length > 0 || filterClassId !== ''
 
   const { dateStr, dayType } = scanTarget.current
   const dateDisplay = dateStr.split('-').reverse().join('/')
@@ -807,27 +846,45 @@ export default function QRScanAttendanceModal({
                 <span className="text-sm font-bold text-white">Điểm danh thủ công</span>
               </div>
 
-              <div className="flex items-center gap-2.5 rounded-xl bg-white/10 px-3.5 py-2.5">
-                <Search className="w-4 h-4 text-[#94A3B8] shrink-0" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  onFocus={handleSearchFocus}
-                  onBlur={() => setSearchFocused(false)}
-                  placeholder="Tìm tên, mã, lớp, SĐT phụ huynh..."
-                  autoCorrect="off"
-                  className="flex-1 bg-transparent text-base sm:text-sm text-white placeholder-[#64748B] outline-none"
-                />
-                {searchQuery.length > 0 && (
+              <div className="flex items-center gap-2 mb-2">
+                <div className="relative shrink-0">
+                  <select
+                    value={filterClassId}
+                    onChange={(e) => handleFilterClass(e.target.value)}
+                    aria-label="Lọc theo lớp"
+                    className={`appearance-none rounded-xl pl-3 pr-8 py-2.5 text-sm font-semibold outline-none cursor-pointer transition-colors ${
+                      filterClassId ? 'bg-brand text-white' : 'bg-white/10 text-white hover:bg-white/15'
+                    }`}
+                  >
+                    <option value="" className="text-black">Tất cả lớp</option>
+                    {classOptions.map(c => (
+                      <option key={c.id} value={c.id} className="text-black">{c.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-white/80" />
+                </div>
+                <div className="flex-1 min-w-0 flex items-center gap-2.5 rounded-xl bg-white/10 px-3.5 py-2.5">
+                  <Search className="w-4 h-4 text-[#94A3B8] shrink-0" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    onFocus={handleSearchFocus}
+                    onBlur={() => setSearchFocused(false)}
+                    placeholder={filterClassId ? 'Tìm trong lớp...' : 'Tìm tên, mã, lớp, SĐT phụ huynh...'}
+                    autoCorrect="off"
+                    className="flex-1 min-w-0 bg-transparent text-base sm:text-sm text-white placeholder-[#64748B] outline-none"
+                  />
+                  {searchQuery.length > 0 && (
                   <button
-                    onClick={() => { setSearchQuery(''); setSearchResults([]) }}
+                    onClick={() => handleSearch('')}
                     className="shrink-0 text-[#64748B] hover:text-white transition-colors"
                     aria-label="Xóa tìm kiếm"
                   >
                     <XCircle className="w-4 h-4" />
                   </button>
                 )}
+                </div>
               </div>
 
               {searchLoading && (
@@ -837,12 +894,17 @@ export default function QRScanAttendanceModal({
                 </div>
               )}
 
-              {!searchLoading && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+              {!searchLoading && shouldRunManualSearch(searchQuery, filterClassId) && searchResults.length === 0 && (
                 <p className="text-center text-sm text-[#64748B] py-4">Không tìm thấy thiếu nhi nào</p>
               )}
 
               {searchResults.length > 0 && (
                 <div className="space-y-2 mt-2 sm:max-h-[240px] sm:overflow-y-auto pr-1">
+                  {filterClassId && (
+                    <p className="text-xs text-[#94A3B8] px-1">
+                      {searchResults.length} thiếu nhi • đã điểm danh {searchResults.filter(s => markedStudents.has(s.id)).length}
+                    </p>
+                  )}
                   {searchResults.map((student) => {
                     const isMarked = markedStudents.has(student.id)
                     const isMarking = manualMarking === student.id

@@ -153,3 +153,17 @@ export function removeStudentFromHistory<T extends { studentId?: string; status:
 ): T[] {
   return history.filter(e => !(e.status === 'success' && e.studentId === studentId))
 }
+
+/**
+ * Điểm danh thủ công có thêm bộ lọc lớp:
+ * - Chọn lớp → tải ngay danh sách thiếu nhi lớp đó (không cần gõ)
+ * - Không chọn lớp → cần gõ ít nhất 2 ký tự như cũ
+ */
+export function shouldRunManualSearch(text: string, classId: string | null | undefined): boolean {
+  return !!classId || text.trim().length >= 2
+}
+
+/** Giới hạn kết quả: có lọc lớp thì hiện cả lớp, còn lại tối đa 20 */
+export function manualSearchLimit(classId: string | null | undefined): number {
+  return classId ? 200 : 20
+}

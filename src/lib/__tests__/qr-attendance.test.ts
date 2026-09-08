@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch, removeStudentFromHistory } from '../qr-attendance'
+import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit } from '../qr-attendance'
 
 describe('parseStudentCode', () => {
   it('trả về nguyên mã khi QR chỉ chứa mã', () => {
@@ -203,5 +203,31 @@ describe('removeStudentFromHistory (hủy điểm danh khi bấm nhầm)', () =>
   it('không thay đổi khi thiếu nhi không có trong lịch sử', () => {
     const history = [entry('a', 's2')]
     expect(removeStudentFromHistory(history, 's1')).toEqual(history)
+  })
+})
+
+describe('shouldRunManualSearch (lọc lớp trong điểm danh thủ công)', () => {
+  it('chọn lớp → tìm ngay dù ô tìm kiếm trống', () => {
+    expect(shouldRunManualSearch('', 'class-1')).toBe(true)
+    expect(shouldRunManualSearch('   ', 'class-1')).toBe(true)
+  })
+
+  it('không chọn lớp → cần ít nhất 2 ký tự', () => {
+    expect(shouldRunManualSearch('', null)).toBe(false)
+    expect(shouldRunManualSearch('a', null)).toBe(false)
+    expect(shouldRunManualSearch('an', '')).toBe(true)
+  })
+})
+
+describe('manualSearchLimit', () => {
+  it('có lọc lớp thì trả về cả lớp, không thì 20', () => {
+    expect(manualSearchLimit('class-1')).toBe(200)
+    expect(manualSearchLimit(null)).toBe(20)
+  })
+})
+
+describe('matchesStudentSearch với ô tìm kiếm trống', () => {
+  it('trả về true để giữ nguyên toàn bộ lớp khi chỉ lọc lớp', () => {
+    expect(matchesStudentSearch({ full_name: 'Nguyễn Văn A' }, '', [])).toBe(true)
   })
 })
