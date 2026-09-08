@@ -6,6 +6,7 @@ import { X, Camera, CameraOff, CheckCircle2, Clock, XCircle, Users, ScanLine, Se
 import { supabase, SchoolYear, UserProfile } from '@/lib/supabase'
 import { todayForAttendance } from '@/lib/debug-date'
 import { recalcAttendanceCount } from '@/lib/attendance-count'
+import { playFeedback, primeAudio } from '@/lib/attendance-feedback'
 import { SundaySession, SUNDAY_SESSION_LABELS, SUNDAY_SESSIONS, holidayDayTypesFor, DayType } from '@/lib/sunday-attendance'
 import { BookOpen, Church } from 'lucide-react'
 import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, matchesStudentSearch, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory } from '@/lib/qr-attendance'
@@ -90,6 +91,7 @@ export default function QRScanAttendanceModal({
 
   const showFeedback = useCallback((type: Feedback['type'], message: string, resumeDelay = 1500) => {
     setFeedback({ type, message })
+    playFeedback(type) // bíp + rung (rung chỉ có trên Android)
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
     feedbackTimerRef.current = setTimeout(() => {
       setFeedback({ type: null, message: '' })
@@ -499,6 +501,7 @@ export default function QRScanAttendanceModal({
     let cancelled = false
     scanTarget.current = getScanTarget(todayForAttendance())
     successCountRef.current = 0
+    primeAudio() // mở modal từ thao tác người dùng → trình duyệt di động cho phép phát tiếng
     setHolidayName(null)
     setScanHistory([])
     setScanCount(0)
@@ -846,7 +849,7 @@ export default function QRScanAttendanceModal({
                     return (
                       <button
                         key={student.id}
-                        onClick={() => (isMarked ? handleManualUnmark(student) : handleManualAttendance(student))}
+                        onClick={() => { primeAudio(); (isMarked ? handleManualUnmark(student) : handleManualAttendance(student)) }}
                         disabled={isMarking || (dayType === 'cn' && !sundaySession)}
                         title={isMarked ? 'Bấm lại để hủy điểm danh' : 'Điểm danh'}
                         className="w-full flex items-center gap-3 rounded-xl bg-white/5 hover:bg-white/10 px-3 py-2.5 text-left transition-colors disabled:cursor-default disabled:hover:bg-white/5"
