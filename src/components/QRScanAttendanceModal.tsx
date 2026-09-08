@@ -8,10 +8,12 @@ import { todayForAttendance } from '@/lib/debug-date'
 import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { SundaySession, SUNDAY_SESSION_LABELS, SUNDAY_SESSIONS, holidayDayTypesFor, DayType } from '@/lib/sunday-attendance'
 import { BookOpen, Church } from 'lucide-react'
-import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, matchesStudentSearch, mapRestoredScanEntry, RestoredAttendanceRecord } from '@/lib/qr-attendance'
+import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, matchesStudentSearch, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory } from '@/lib/qr-attendance'
 
 type ScanEntry = {
   id: string
+  /** id thiếu nhi — dùng để gỡ khỏi lịch sử khi hủy điểm danh */
+  studentId?: string
   studentName: string
   studentCode: string
   className: string
@@ -199,6 +201,7 @@ export default function QRScanAttendanceModal({
 
         setScanHistory(prev => [{
           id: `${Date.now()}`,
+          studentId: student.id,
           studentName: displayName,
           studentCode: student.student_code || studentCode,
           className,
@@ -356,6 +359,7 @@ export default function QRScanAttendanceModal({
 
       setScanHistory(prev => [{
         id: `${Date.now()}`,
+        studentId: student.id,
         studentName: displayName,
         studentCode: student.student_code || '',
         className: student.className,
@@ -374,6 +378,51 @@ export default function QRScanAttendanceModal({
     }
   }, [manualMarking, schoolYear?.id, user?.id, showFeedback, updateAttendanceCount])
 
+  /** Bấm nhầm: bấm lại nút xanh lần nữa để hủy điểm danh (xoá bản ghi vừa tạo từ quét QR / thủ công) */
+  const handleManualUnmark = useCallback(async (student: ManualStudent) => {
+    if (manualMarking) return
+    const dayType = resolveDayType()
+    if (!dayType) return
+    setManualMarking(student.id)
+    const { dateStr } = scanTarget.current
+
+    try {
+      const { data: removed, error } = await supabase
+        .from('attendance_records')
+        .delete()
+        .eq('attendance_date', dateStr)
+        .eq('day_type', dayType)
+        .eq('student_id', student.id)
+        .in('check_in_method', ['qr_scan', 'manual'])
+        .select('id')
+
+      if (error) {
+        showFeedback('not_found', `Lỗi hủy: ${error.message}`)
+        return
+      }
+      if (!removed || removed.length === 0) {
+        showFeedback('not_found', `${student.full_name} được điểm danh từ sổ lớp, hãy hủy trong tab Điểm danh`)
+        return
+      }
+
+      setMarkedStudents(prev => {
+        const next = new Set(prev)
+        next.delete(student.id)
+        return next
+      })
+      setScanHistory(prev => removeStudentFromHistory(prev, student.id))
+      setScanCount(c => Math.max(0, c - 1))
+      // Dữ liệu đã đổi → khi đóng modal vẫn báo cho trang cha tải lại
+      successCountRef.current += 1
+      showFeedback('success', `Đã hủy điểm danh: ${student.full_name}`, 800)
+      updateAttendanceCount(student.id)
+    } catch {
+      showFeedback('not_found', 'Có lỗi xảy ra. Thử lại.')
+    } finally {
+      setManualMarking(null)
+    }
+  }, [manualMarking, showFeedback, updateAttendanceCount])
+
   // Vòng lặp giải mã QR từ khung hình video
   /** Khôi phục lịch sử / danh sách đã điểm danh của buổi đang chọn (sau reload hoặc đổi buổi) */
   const restoreForDayType = useCallback(async (dayType: DayType, isCancelled: () => boolean = () => false) => {
@@ -384,7 +433,7 @@ export default function QRScanAttendanceModal({
     // markedStudents vẫn lấy toàn bộ để chặn điểm danh trùng.
     let histQuery = supabase
       .from('attendance_records')
-      .select('id, check_in_time, thieu_nhi(full_name, saint_name, student_code, classes(name))')
+      .select('id, student_id, check_in_time, thieu_nhi(full_name, saint_name, student_code, classes(name))')
       .eq('attendance_date', dateStr)
       .eq('day_type', dayType)
       .in('check_in_method', ['qr_scan', 'manual'])
@@ -797,8 +846,9 @@ export default function QRScanAttendanceModal({
                     return (
                       <button
                         key={student.id}
-                        onClick={() => handleManualAttendance(student)}
-                        disabled={isMarking || isMarked || (dayType === 'cn' && !sundaySession)}
+                        onClick={() => (isMarked ? handleManualUnmark(student) : handleManualAttendance(student))}
+                        disabled={isMarking || (dayType === 'cn' && !sundaySession)}
+                        title={isMarked ? 'Bấm lại để hủy điểm danh' : 'Điểm danh'}
                         className="w-full flex items-center gap-3 rounded-xl bg-white/5 hover:bg-white/10 px-3 py-2.5 text-left transition-colors disabled:cursor-default disabled:hover:bg-white/5"
                       >
                         <div className="min-w-0 flex-1">

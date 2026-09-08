@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch } from '../qr-attendance'
+import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch, removeStudentFromHistory } from '../qr-attendance'
 
 describe('parseStudentCode', () => {
   it('trả về nguyên mã khi QR chỉ chứa mã', () => {
@@ -110,6 +110,7 @@ describe('mapRestoredScanEntry', () => {
   it('khôi phục đầy đủ tên thánh, tên, mã, lớp và giờ', () => {
     expect(mapRestoredScanEntry({
       id: 'r1',
+      student_id: 's1',
       check_in_time: '08:15:30',
       thieu_nhi: {
         full_name: 'Nguyễn Văn A',
@@ -119,6 +120,7 @@ describe('mapRestoredScanEntry', () => {
       },
     })).toEqual({
       id: 'r1',
+      studentId: 's1',
       studentName: 'Giuse Nguyễn Văn A',
       studentCode: 'TN0123',
       className: 'Chiên Con 1',
@@ -128,8 +130,9 @@ describe('mapRestoredScanEntry', () => {
   })
 
   it('chịu được bản ghi thiếu thông tin (join null)', () => {
-    expect(mapRestoredScanEntry({ id: 'r2', check_in_time: null, thieu_nhi: null })).toEqual({
+    expect(mapRestoredScanEntry({ id: 'r2', student_id: 's2', check_in_time: null, thieu_nhi: null })).toEqual({
       id: 'r2',
+      studentId: 's2',
       studentName: 'Không xác định',
       studentCode: '',
       className: '',
@@ -180,5 +183,25 @@ describe('matchesStudentSearch', () => {
 
   it('chuỗi rỗng khớp tất cả', () => {
     expect(matchesStudentSearch(tram, '  ')).toBe(true)
+  })
+})
+
+describe('removeStudentFromHistory (hủy điểm danh khi bấm nhầm)', () => {
+  const entry = (id: string, studentId: string | undefined, status: 'success' | 'duplicate' = 'success') =>
+    ({ id, studentId, studentName: 'X', studentCode: '', className: '', time: '', status })
+
+  it('bỏ mục lịch sử thành công của đúng thiếu nhi đó, giữ các mục khác', () => {
+    const history = [entry('a', 's1'), entry('b', 's2'), entry('c', 's1')]
+    expect(removeStudentFromHistory(history, 's1').map(e => e.id)).toEqual(['b'])
+  })
+
+  it('không đụng mục không phải success (duplicate/not_found) và mục không có studentId', () => {
+    const history = [entry('a', 's1', 'duplicate'), entry('b', undefined), entry('c', 's1')]
+    expect(removeStudentFromHistory(history, 's1').map(e => e.id)).toEqual(['a', 'b'])
+  })
+
+  it('không thay đổi khi thiếu nhi không có trong lịch sử', () => {
+    const history = [entry('a', 's2')]
+    expect(removeStudentFromHistory(history, 's1')).toEqual(history)
   })
 })

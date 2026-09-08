@@ -72,6 +72,7 @@ export function shouldThrottleScan(
 /** Bản ghi điểm danh (kèm join thieu_nhi) đọc từ DB để khôi phục lịch sử quét */
 export type RestoredAttendanceRecord = {
   id: string
+  student_id?: string | null
   check_in_time: string | null
   thieu_nhi?: {
     full_name?: string
@@ -87,6 +88,7 @@ export type RestoredAttendanceRecord = {
  */
 export function mapRestoredScanEntry(record: RestoredAttendanceRecord): {
   id: string
+  studentId?: string
   studentName: string
   studentCode: string
   className: string
@@ -96,6 +98,7 @@ export function mapRestoredScanEntry(record: RestoredAttendanceRecord): {
   const tn = record.thieu_nhi
   return {
     id: record.id,
+    studentId: record.student_id || undefined,
     studentName: `${tn?.saint_name ? `${tn.saint_name} ` : ''}${tn?.full_name || 'Không xác định'}`,
     studentCode: tn?.student_code || '',
     className: tn?.classes?.name || '',
@@ -138,4 +141,15 @@ export function matchesStudentSearch(student: SearchableStudent, text: string, c
   const inClass = !!student.class_id && classIds.includes(student.class_id)
 
   return words.every(w => last.includes(w) || others.some(o => o.includes(w)) || inClass)
+}
+
+/**
+ * Hủy điểm danh (bấm nhầm): bỏ mọi mục lịch sử "success" của thiếu nhi đó.
+ * Mục duplicate / not_found và mục không gắn studentId được giữ nguyên.
+ */
+export function removeStudentFromHistory<T extends { studentId?: string; status: string }>(
+  history: T[],
+  studentId: string,
+): T[] {
+  return history.filter(e => !(e.status === 'success' && e.studentId === studentId))
 }
