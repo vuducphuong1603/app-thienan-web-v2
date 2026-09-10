@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
+import { getGreetingIcon } from '@/lib/greeting-icon'
 import { ROLE_LABELS } from '@/lib/supabase'
 import { useGLVDashboardStats } from '@/lib/queries'
 import { Calendar } from 'lucide-react'
@@ -56,7 +57,7 @@ export default function UserDashboard() {
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Chúc ngày tốt lành</p>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Chào mừng, Trưởng {firstName}. <span className="inline-block animate-wave">👋</span>
+                Chào mừng, Trưởng {firstName}. <span className="inline-block animate-wave">{getGreetingIcon(user.phone)}</span>
               </h1>
             </div>
             <div className="flex flex-wrap items-center gap-3">
