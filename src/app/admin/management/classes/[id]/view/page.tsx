@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { useRouter, useParams } from 'next/navigation'
-import { ChevronLeft, Search, User, Users, GraduationCap, CalendarCheck, Award, Eye, Phone, Mail } from 'lucide-react'
+import { ChevronLeft, Search, User, Users, GraduationCap, CalendarCheck, Award, Eye, Phone, Mail, Calendar, Pencil } from 'lucide-react'
+import { givenNameOf, familyNameOf } from '@/lib/student-sort'
 import { useClassDetail } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
 import { inScope } from '@/lib/branch-scope'
@@ -347,24 +348,40 @@ export default function ViewClassPage() {
                       </span>
                     </div>
                   </div>
-                  <Eye className="w-4 h-4 text-primary-3 flex-shrink-0 mt-3" />
+                  <div className="flex flex-col gap-1.5 flex-shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => router.push(`/admin/management/students/${student.id}/attendance`)}
+                      className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center"
+                      title="Xem điểm danh"
+                    >
+                      <Calendar className="w-4 h-4 text-primary-3" />
+                    </button>
+                    <button
+                      onClick={() => router.push(`/admin/management/students/${student.id}/edit`)}
+                      className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center"
+                      title="Chỉnh sửa thiếu nhi"
+                    >
+                      <Pencil className="w-4 h-4 text-primary-3" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
 
             {/* Desktop: table */}
             <div className="hidden md:block overflow-x-auto">
-              <div className="min-w-[840px]">
+              <div className="min-w-[960px]">
                 {/* Table Header */}
-                <div className="grid grid-cols-[50px_1.7fr_110px_1.3fr_110px_90px_110px_70px] gap-3 px-3 py-3 bg-[#FAFAFA] dark:bg-white/5 rounded-xl">
+                <div className="grid grid-cols-[50px_1.6fr_110px_110px_1.2fr_100px_70px_100px_140px] gap-3 px-3 py-3 bg-[#FAFAFA] dark:bg-white/5 rounded-xl">
                   <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">STT</div>
-                  <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Họ và tên</div>
+                  <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Tên thánh / Họ</div>
+                  <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Tên</div>
                   <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Ngày sinh</div>
                   <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider">Phụ huynh</div>
                   <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider text-center">Điểm danh</div>
                   <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider text-center">TB</div>
                   <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider text-center">Trạng thái</div>
-                  <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider text-center">Xem</div>
+                  <div className="text-xs font-semibold text-primary-3 uppercase tracking-wider text-center">Thao tác</div>
                 </div>
 
                 {/* Table Body */}
@@ -372,11 +389,15 @@ export default function ViewClassPage() {
                   {filteredStudents.map((student, index) => (
                     <div
                       key={student.id}
-                      className="grid grid-cols-[50px_1.7fr_110px_1.3fr_110px_90px_110px_70px] gap-3 px-3 py-3 items-center hover:bg-[#FAFAFA] dark:hover:bg-white/5 transition-colors"
+                      className="grid grid-cols-[50px_1.6fr_110px_110px_1.2fr_100px_70px_100px_140px] gap-3 px-3 py-3 items-center hover:bg-[#FAFAFA] dark:hover:bg-white/5 transition-colors"
                     >
                       <div className="text-sm text-primary-3">{index + 1}</div>
 
-                      <div className="flex items-center gap-2 min-w-0">
+                      {/* Tách "Tên thánh / Họ" và "Tên" thành 2 cột giống trang Quản lý thiếu nhi */}
+                      <div
+                        className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => router.push(`/admin/management/students/${student.id}/view`)}
+                      >
                         <div className="w-9 h-9 rounded-full bg-[#F5EAF6] overflow-hidden flex items-center justify-center flex-shrink-0">
                           {student.avatar_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -388,10 +409,14 @@ export default function ViewClassPage() {
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-black dark:text-white break-words">
                             {student.saint_name ? `${student.saint_name} ` : ''}
-                            {student.full_name}
+                            {familyNameOf(student.full_name)}
                           </p>
                           <p className="text-xs text-primary-3 truncate">{student.student_code || '-'}</p>
                         </div>
+                      </div>
+
+                      <div className="text-sm font-medium text-black dark:text-white break-words">
+                        {givenNameOf(student.full_name)}
                       </div>
 
                       <div className="text-sm text-primary-3">{formatDate(student.date_of_birth)}</div>
@@ -417,7 +442,21 @@ export default function ViewClassPage() {
                         </span>
                       </div>
 
-                      <div className="flex justify-center">
+                      <div className="flex justify-center gap-1.5">
+                        <button
+                          onClick={() => router.push(`/admin/management/students/${student.id}/attendance`)}
+                          className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                          title="Xem điểm danh"
+                        >
+                          <Calendar className="w-4 h-4 text-primary-3" />
+                        </button>
+                        <button
+                          onClick={() => router.push(`/admin/management/students/${student.id}/edit`)}
+                          className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                          title="Chỉnh sửa thiếu nhi"
+                        >
+                          <Pencil className="w-4 h-4 text-primary-3" />
+                        </button>
                         <button
                           onClick={() => router.push(`/admin/management/students/${student.id}/view`)}
                           className="w-8 h-8 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"

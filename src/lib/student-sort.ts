@@ -9,6 +9,12 @@ export function givenNameOf(fullName: string | null | undefined): string {
   return parts[parts.length - 1] ?? ''
 }
 
+/** Họ + tên đệm (phần trước chữ cuối): "Nguyễn Văn An" → "Nguyễn Văn" */
+export function familyNameOf(fullName: string | null | undefined): string {
+  const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean)
+  return parts.slice(0, -1).join(' ')
+}
+
 export function compareByGivenName(
   a: { full_name: string | null },
   b: { full_name: string | null }

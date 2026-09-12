@@ -844,7 +844,7 @@ export function useClassDetail(classId: string) {
         effectiveCnDays = Math.max(1, totalCn - cnHolidays)
       }
 
-      const studentList: ClassStudentDetail[] = students
+      const scoredStudents: ClassStudentDetail[] = students
         .map((s) => {
           const avgCatechism =
             ((s.score_45_hk1 || 0) +
@@ -862,7 +862,8 @@ export function useClassDetail(classId: string) {
             totalAvg: avgCatechism * 0.6 + avgAttendance * 0.4,
           }
         })
-        .sort((a, b) => a.full_name.localeCompare(b.full_name, 'vi'))
+      // Xếp theo tên gọi (chữ cuối) giống trang Quản lý thiếu nhi
+      const studentList: ClassStudentDetail[] = sortByGivenName(scoredStudents)
 
       const activeStudents = studentList.filter((s) => s.status === 'ACTIVE')
       const attendanceRows = (attendanceRes.data || []) as { student_id: string; day_type: string }[]

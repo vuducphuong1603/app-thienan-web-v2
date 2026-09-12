@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { givenNameOf, sortByGivenName } from '../student-sort'
+import { givenNameOf, familyNameOf, sortByGivenName } from '../student-sort'
 
 const s = (full_name: string) => ({ full_name })
 
@@ -9,6 +9,16 @@ describe('givenNameOf', () => {
     expect(givenNameOf('  Trần   Bình  ')).toBe('Bình')
     expect(givenNameOf('An')).toBe('An')
     expect(givenNameOf('')).toBe('')
+  })
+})
+
+describe('familyNameOf', () => {
+  it('lấy họ + tên đệm (bỏ chữ cuối) để tách cột "Họ" và cột "Tên"', () => {
+    expect(familyNameOf('Nguyễn Văn An')).toBe('Nguyễn Văn')
+    expect(familyNameOf('  Trần   Bình  ')).toBe('Trần')
+    expect(familyNameOf('An')).toBe('')
+    expect(familyNameOf('')).toBe('')
+    expect(familyNameOf(null)).toBe('')
   })
 })
 
