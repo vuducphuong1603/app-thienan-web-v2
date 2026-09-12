@@ -153,6 +153,12 @@ export default function CardReissuePage() {
         </a>
       </div>
 
+      {/* Mobile: nút mở Google Sheet full-width dưới tiêu đề */}
+      <a href={SHEET_URL} target="_blank" rel="noopener noreferrer"
+        className="sm:hidden flex items-center justify-center gap-1.5 w-full px-3 py-2.5 text-sm font-medium text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20">
+        <ExternalLink className="w-4 h-4" /> Mở Google Sheet
+      </a>
+
       {notice && (
         <div className={`fixed top-4 right-4 left-4 sm:left-auto sm:max-w-md z-[60] px-4 py-3 rounded-lg shadow-lg flex items-start gap-2 text-white ${
           notice.type === 'success' ? 'bg-green-500' : notice.type === 'warning' ? 'bg-amber-500' : 'bg-red-500'}`}>
