@@ -137,7 +137,7 @@ export default function QRScanAttendanceModal({
       try {
         const { data: student, error: lookupError } = await supabase
           .from('thieu_nhi')
-          .select('id, full_name, saint_name, student_code, class_id, classes(name)')
+          .select('id, full_name, saint_name, student_code, class_id, status, classes(name)')
           .eq('student_code', studentCode)
           .maybeSingle()
 
@@ -161,6 +161,20 @@ export default function QRScanAttendanceModal({
 
         const className = (student as { classes?: { name?: string } | null }).classes?.name || ''
         const displayName = `${student.saint_name ? `${student.saint_name} ` : ''}${student.full_name}`
+
+        // Em đã nghỉ học (kể cả em năm trước còn giữ thẻ QR cũ) không được ghi điểm danh
+        if (student.status !== 'ACTIVE') {
+          setScanHistory(prev => [{
+            id: `${Date.now()}`,
+            studentName: displayName,
+            studentCode: student.student_code || studentCode,
+            className,
+            time: timeDisplay,
+            status: 'not_found' as const,
+          }, ...prev.slice(0, 4)])
+          showFeedback('not_found', `${student.full_name} đã nghỉ học, không điểm danh`)
+          return
+        }
 
         const { data: existing } = await supabase
           .from('attendance_records')
