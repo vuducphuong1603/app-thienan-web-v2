@@ -2446,19 +2446,6 @@ export default function ActivitiesPage() {
           </span>
         </button>
 
-        {/* Kế hoạch Tab */}
-        <Link
-          href="/admin/activities/weekly-plan"
-          className="h-[56px] shrink-0 lg:w-full rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-4 lg:pr-2 whitespace-nowrap shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
-        >
-          <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
-            <CalendarDays className="w-5 h-5 text-brand" />
-          </div>
-          <span className="text-base font-semibold text-black dark:text-white opacity-80">
-            Kế hoạch
-          </span>
-        </Link>
-
         {/* Đăng ký làm lại thẻ Tab */}
         <Link
           href="/admin/activities/card-reissue"
@@ -2469,6 +2456,19 @@ export default function ActivitiesPage() {
           </div>
           <span className="text-base font-semibold text-black dark:text-white opacity-80">
             Đăng ký làm thẻ
+          </span>
+        </Link>
+
+        {/* Kế hoạch Tab */}
+        <Link
+          href="/admin/activities/weekly-plan"
+          className="h-[56px] shrink-0 lg:w-full rounded-full flex items-center gap-3 lg:gap-5 px-2 pr-4 lg:pr-2 whitespace-nowrap shadow-[0px_1px_2px_0px_rgba(13,13,18,0.06)] transition-colors bg-[#f6f6f6] dark:bg-white/5 hover:bg-[#eee] dark:hover:bg-white/10"
+        >
+          <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-[4.244px] bg-[rgba(250,134,94,0.2)]">
+            <CalendarDays className="w-5 h-5 text-brand" />
+          </div>
+          <span className="text-base font-semibold text-black dark:text-white opacity-80">
+            Kế hoạch
           </span>
         </Link>
 
