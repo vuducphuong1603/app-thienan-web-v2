@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CLASS_TEACHER_ROLES, isAssignedToClass, prioritizeAssignedClass, prioritizeAssignedBranch } from '../class-teachers'
+import { CLASS_TEACHER_ROLES, isAssignedToClass, prioritizeAssignedClass, prioritizeAssignedBranch, defaultAssignedClassId } from '../class-teachers'
 
 const classes = [
   { id: 'a', name: 'Ấu 1A', branch: 'Ấu Nhi' },
@@ -41,5 +41,21 @@ describe('prioritizeAssignedBranch', () => {
   })
   it('giữ nguyên khi không phân công', () => {
     expect(prioritizeAssignedBranch(BRANCHES, classes, null)).toEqual([...BRANCHES])
+  })
+})
+
+describe('defaultAssignedClassId', () => {
+  it('trả id lớp được phân công, không phụ thuộc role (GLV, admin, PĐT đều dùng chung)', () => {
+    expect(defaultAssignedClassId(classes, { class_id: 'b' })).toBe('b')
+  })
+  it('khớp theo class_name khi class_id trống', () => {
+    expect(defaultAssignedClassId(classes, { class_id: null, class_name: 'Thiếu 2B' })).toBe('c')
+  })
+  it('lớp được phân công không nằm trong danh sách được thấy (ngoài phạm vi ngành) thì trả rỗng', () => {
+    expect(defaultAssignedClassId(classes, { class_id: 'zzz' })).toBe('')
+  })
+  it('chưa phân công lớp hoặc chưa có user thì trả rỗng', () => {
+    expect(defaultAssignedClassId(classes, { class_id: null, class_name: null })).toBe('')
+    expect(defaultAssignedClassId(classes, null)).toBe('')
   })
 })

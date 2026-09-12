@@ -7,6 +7,7 @@ import { useActiveClasses, useSchoolYears } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
 import { sortByGivenName } from '@/lib/student-sort'
 import { filterCardStudents, toggleId } from '@/lib/card-reissue'
+import { defaultAssignedClassId, prioritizeAssignedBranch, prioritizeAssignedClass } from '@/lib/class-teachers'
 import { ArrowLeft, Search, Check, X, AlertCircle, CheckCircle2, IdCard, Loader2, ExternalLink, ChevronDown } from 'lucide-react'
 
 const SHEET_URL = process.env.NEXT_PUBLIC_CARD_REISSUE_SHEET_URL
@@ -22,7 +23,7 @@ interface ExistingRequest {
 type Notice = { type: 'success' | 'error' | 'warning'; message: string }
 
 export default function CardReissuePage() {
-  const { user, isGiaoLyVien } = useAuth()
+  const { user } = useAuth()
   const { data: classes = [] } = useActiveClasses()
   const { data: schoolYears = [] } = useSchoolYears()
   const schoolYear = schoolYears.find(y => y.is_current) || schoolYears[0] || null
@@ -39,23 +40,24 @@ export default function CardReissuePage() {
   const [submitting, setSubmitting] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
 
-  // GLV: mặc định chọn lớp của mình
+  // Ai được phân công lớp (GLV, admin kiêm nhiệm, phân đoàn trưởng) đều mặc định chọn lớp của mình
   useEffect(() => {
-    if (!selectedClassId && isGiaoLyVien && user?.class_id && classes.some(c => c.id === user.class_id)) {
-      setSelectedClassId(user.class_id)
-    }
-  }, [isGiaoLyVien, user?.class_id, classes, selectedClassId])
+    if (selectedClassId) return
+    const mine = defaultAssignedClassId(classes, user)
+    if (mine) setSelectedClassId(mine)
+  }, [classes, user, selectedClassId])
 
   const showNotice = (n: Notice, ms = 6000) => {
     setNotice(n)
     setTimeout(() => setNotice(null), ms)
   }
 
-  const classesGroupedByBranch = useMemo(() => BRANCHES.reduce((acc, branch) => {
-    const list = classes.filter(c => c.branch === branch)
+  // Dropdown: ngành và lớp được phân công lên đầu
+  const classesGroupedByBranch = useMemo(() => prioritizeAssignedBranch(BRANCHES, classes, user).reduce((acc, branch) => {
+    const list = prioritizeAssignedClass(classes.filter(c => c.branch === branch), user)
     if (list.length > 0) acc[branch] = list
     return acc
-  }, {} as Record<string, Class[]>), [classes])
+  }, {} as Record<string, Class[]>), [classes, user])
 
   const selectedClass = classes.find(c => c.id === selectedClassId)
 

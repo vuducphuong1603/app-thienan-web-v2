@@ -39,3 +39,12 @@ export function prioritizeAssignedBranch<B extends string>(
   if (!target) return [...branches]
   return [target, ...branches.filter((b) => b !== target)]
 }
+
+/**
+ * Lớp mặc định cho bộ lọc: lớp được phân công của người dùng, áp dụng cho MỌI role
+ * (GLV, admin kiêm nhiệm, phân đoàn trưởng). Trả '' nếu chưa phân công hoặc lớp đó
+ * không nằm trong danh sách người dùng được thấy.
+ */
+export function defaultAssignedClassId(classes: ClassLike[], user: AssignedUser | null | undefined): string {
+  return classes.find((c) => isAssignedToClass(user, c))?.id ?? ''
+}
