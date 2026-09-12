@@ -7,7 +7,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /** File "Danh sách làm lại thẻ thiếu nhi", tab "Làm Thẻ" */
-export const DEFAULT_CARD_SHEET_ID = '1VL99rao6-G0HPURXvIDenqyYlJtFhC0zaQ7HZjE4vzg'
+const DEFAULT_CARD_SHEET_ID = '1VL99rao6-G0HPURXvIDenqyYlJtFhC0zaQ7HZjE4vzg'
 const SHEET_ID = process.env.CARD_REISSUE_SHEET_ID || DEFAULT_CARD_SHEET_ID
 const SHEET_TAB = process.env.CARD_REISSUE_SHEET_TAB || 'Làm Thẻ'
 const MAX_PER_REQUEST = 100
