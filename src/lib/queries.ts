@@ -794,6 +794,10 @@ export function useClassDetail(classId: string) {
                 'id, student_code, full_name, saint_name, date_of_birth, parent_name, parent_phone, status, avatar_url, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn'
               )
               .eq('class_id', classId)
+              // Chỉ lấy em đang học: sau mỗi năm học, em cũ của lớp bị chuyển
+              // INACTIVE nhưng vẫn giữ class_id, nếu không lọc thì chi tiết lớp
+              // hiện cả em năm trước (lệch với sĩ số ở danh sách lớp)
+              .eq('status', 'ACTIVE')
               .order('id', { ascending: true })
               .range(from, to)
         ),
@@ -876,7 +880,6 @@ export function useClassDetail(classId: string) {
         teachers,
         students: studentList,
         activeCount: activeStudents.length,
-        inactiveCount: studentList.length - activeStudents.length,
         classAvg,
         attendance: {
           lastThu5,
