@@ -28,7 +28,6 @@ type Feedback = {
   message: string
 }
 
-type ScanMode = 'qr' | 'manual'
 
 type ManualStudent = {
   id: string
@@ -71,7 +70,6 @@ export default function QRScanAttendanceModal({
   const [scanHistory, setScanHistory] = useState<ScanEntry[]>([])
   const [scanCount, setScanCount] = useState(0)
   const [holidayName, setHolidayName] = useState<string | null>(null)
-  const [scanMode, setScanMode] = useState<ScanMode>('qr')
 
   // Điểm danh thủ công
   const [searchQuery, setSearchQuery] = useState('')
@@ -105,7 +103,6 @@ export default function QRScanAttendanceModal({
   const recentScansRef = useRef<Map<string, number>>(new Map())
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const successCountRef = useRef(0)
-  const scanModeRef = useRef<ScanMode>('qr')
   const decodePausedRef = useRef(false)
   const modalOpenRef = useRef(false)
   const unmarkConfirmRef = useRef<UnmarkTarget | null>(null)
@@ -124,12 +121,6 @@ export default function QRScanAttendanceModal({
     }, resumeDelay)
   }, [])
 
-  const setCameraTracksEnabled = useCallback((enabled: boolean) => {
-    streamRef.current?.getVideoTracks().forEach(track => {
-      track.enabled = enabled
-    })
-  }, [])
-
   const pauseDecode = useCallback(() => {
     decodePausedRef.current = true
     if (rafRef.current) {
@@ -138,20 +129,8 @@ export default function QRScanAttendanceModal({
     }
   }, [])
 
-  const stopCameraStream = useCallback(() => {
-    pauseDecode()
-    const stream = streamRef.current
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop())
-      streamRef.current = null
-    }
-    if (videoRef.current && (!stream || videoRef.current.srcObject === stream)) {
-      videoRef.current.srcObject = null
-    }
-  }, [pauseDecode])
-
   const scrollSearchInputIntoView = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    if (!modalOpenRef.current || scanModeRef.current !== 'manual') return
+    if (!modalOpenRef.current) return
     const panel = panelRef.current
     const input = searchInputRef.current
     if (!panel || !input) return
@@ -577,7 +556,7 @@ export default function QRScanAttendanceModal({
 
   const decodeLoop = useCallback(() => {
     rafRef.current = 0
-    if (!modalOpenRef.current || scanModeRef.current !== 'qr' || decodePausedRef.current) return
+    if (!modalOpenRef.current || decodePausedRef.current) return
 
     const video = videoRef.current
     if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -605,38 +584,12 @@ export default function QRScanAttendanceModal({
   }, [handleDecoded])
 
   const resumeDecode = useCallback(() => {
-    if (!modalOpenRef.current || scanModeRef.current !== 'qr' || unmarkConfirmRef.current) return
+    if (!modalOpenRef.current || unmarkConfirmRef.current) return
     decodePausedRef.current = false
     if (streamRef.current && videoRef.current && !rafRef.current) {
       rafRef.current = requestAnimationFrame(decodeLoop)
     }
   }, [decodeLoop])
-
-  const switchScanMode = useCallback((nextMode: ScanMode) => {
-    scanModeRef.current = nextMode
-    setScanMode(nextMode)
-
-    if (nextMode === 'manual') {
-      pauseDecode()
-      // Giữ nguyên MediaStream để chuyển lại QR không cần xin quyền camera lần nữa.
-      setCameraTracksEnabled(false)
-      return
-    }
-
-    setCameraTracksEnabled(true)
-    const video = videoRef.current
-    const stream = streamRef.current
-    if (video && stream && modalOpenRef.current) {
-      video.play().catch((error: unknown) => {
-        if (!modalOpenRef.current || scanModeRef.current !== 'qr' || streamRef.current !== stream) return
-        const err = error as { name?: string; message?: string }
-        stopCameraStream()
-        setCameraStatus('error')
-        setErrorMessage(err.message || 'Không thể phát camera')
-      })
-    }
-    resumeDecode()
-  }, [pauseDecode, resumeDecode, setCameraTracksEnabled, stopCameraStream])
 
   const setUnmarkDialog = useCallback((target: UnmarkTarget | null) => {
     unmarkConfirmRef.current = target
@@ -664,9 +617,7 @@ export default function QRScanAttendanceModal({
       return
     }
 
-    scanModeRef.current = 'qr'
     decodePausedRef.current = false
-    setScanMode('qr')
     scanTarget.current = getScanTarget(todayForAttendance())
     successCountRef.current = 0
     primeAudio() // mở modal từ thao tác người dùng → trình duyệt di động cho phép phát tiếng
@@ -738,9 +689,6 @@ export default function QRScanAttendanceModal({
         }
 
         streamRef.current = stream
-        stream.getVideoTracks().forEach(track => {
-          track.enabled = scanModeRef.current === 'qr'
-        })
 
         const video = videoRef.current
         if (!video) {
@@ -767,7 +715,7 @@ export default function QRScanAttendanceModal({
         }
 
         setCameraStatus('active')
-        if (scanModeRef.current === 'qr' && !unmarkConfirmRef.current) {
+        if (!unmarkConfirmRef.current) {
           decodePausedRef.current = false
           if (!rafRef.current) rafRef.current = requestAnimationFrame(decodeLoop)
         } else {
@@ -923,33 +871,6 @@ export default function QRScanAttendanceModal({
             </div>
           </div>
 
-          <div role="tablist" aria-label="Chế độ điểm danh" className="mt-2 grid grid-cols-2 gap-1 rounded-xl bg-white/10 p-1 sm:mt-3">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={scanMode === 'qr'}
-              onClick={() => switchScanMode('qr')}
-              className={`flex min-h-[40px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors sm:min-h-[44px] ${
-                scanMode === 'qr' ? 'bg-brand text-white shadow-sm' : 'text-[#CBD5E1] hover:bg-white/10'
-              }`}
-            >
-              <Camera className="h-4 w-4" />
-              Quét QR
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={scanMode === 'manual'}
-              onClick={() => switchScanMode('manual')}
-              className={`flex min-h-[40px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors sm:min-h-[44px] ${
-                scanMode === 'manual' ? 'bg-brand text-white shadow-sm' : 'text-[#CBD5E1] hover:bg-white/10'
-              }`}
-            >
-              <UserPlus className="h-4 w-4" />
-              Thủ công
-            </button>
-          </div>
-
           {feedback.type && (
             <div
               role="status"
@@ -980,25 +901,6 @@ export default function QRScanAttendanceModal({
         ) : (
           <>
             {dayType === 'cn' && (
-              scanMode === 'manual' ? (
-                <div className="mb-2 flex items-center gap-2">
-                  <label htmlFor="qr-attendance-session" className="shrink-0 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
-                    Buổi
-                  </label>
-                  <select
-                    id="qr-attendance-session"
-                    value={sundaySession ?? ''}
-                    onChange={(e) => chooseSession(e.target.value as SundaySession)}
-                    aria-label="Buổi điểm danh"
-                    className="min-h-[40px] min-w-0 flex-1 rounded-xl border border-white/10 bg-white/10 px-3 text-sm font-semibold text-white outline-none"
-                  >
-                    <option value="" disabled className="text-black">Chọn buổi</option>
-                    {SUNDAY_SESSIONS.map(session => (
-                      <option key={session} value={session} className="text-black">{SUNDAY_SESSION_LABELS[session]}</option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
                 <div className="mb-4">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Chọn buổi điểm danh</p>
                   <div className="grid grid-cols-2 gap-2">
@@ -1024,11 +926,10 @@ export default function QRScanAttendanceModal({
                     })}
                   </div>
                 </div>
-              )
             )}
 
-            {/* Giữ video trong DOM khi chuyển mode để stream không bị xin lại quyền camera. */}
-            <div className={`relative mb-4 aspect-[4/3] w-full shrink-0 overflow-hidden rounded-[16px] bg-black ${scanMode === 'qr' ? 'block' : 'hidden'}`}>
+            {/* Camera và tìm kiếm thủ công cùng hiển thị trên một màn hình. */}
+            <div className="relative mb-4 aspect-[4/3] w-full shrink-0 overflow-hidden rounded-[16px] bg-black">
               <video
                 ref={videoRef}
                 autoPlay
@@ -1083,7 +984,7 @@ export default function QRScanAttendanceModal({
             </div>
 
             {/* Điểm danh thủ công */}
-            {scanMode === 'manual' && <div className="mb-4">
+            <div className="mb-4">
               <div className="flex items-center gap-2 mb-2">
                 <UserPlus className="w-4 h-4 text-brand" />
                 <span className="text-sm font-bold text-white">Điểm danh thủ công</span>
@@ -1204,7 +1105,7 @@ export default function QRScanAttendanceModal({
                   })}
                 </div>
               )}
-            </div>}
+            </div>
 
             {/* Lịch sử quét */}
             <div className="mb-2 flex items-center justify-between">
