@@ -22,17 +22,48 @@ describe('thẻ in QR bằng bảng mã 1 byte (Đ = 0xD0, không phải UTF-8)'
     'd054303832313833202d204d6172696120d0693f75204e673f63204c616e205468616e6809', 'hex'))
 
   it('jsQR trả chuỗi rỗng → giải lại byte gốc theo Windows-1258', () => {
-    expect(parseStudentCode(decodeQrText('', cardBytes))).toBe('ĐT082183')
+    expect(parseStudentCode(decodeQrText({ data: '', binaryData: cardBytes }))).toBe('ĐT082183')
+  })
+
+  it('QR chia đoạn: đoạn byte chứa Đ giải lỗi bị jsQR bỏ mất → vẫn ra đủ mã', () => {
+    // Thẻ ĐK152283 thật: jsQR đọc ra "K152283 - ..." vì đoạn byte [D0] giải UTF-8 thất bại
+    const bytes = Array.from(Buffer.from(
+      'd04b313532323833202d20476975736520d0616e672051753f63204b68e16e6809', 'hex'))
+    const code = {
+      data: 'K152283 - Giuse ',
+      binaryData: bytes,
+      chunks: [
+        { type: 'byte', bytes: [0xd0], text: '' },
+        { type: 'alphanumeric', text: 'K152283 - G' },
+        { type: 'byte', bytes: bytes.slice(12), text: '' },
+      ],
+    }
+    expect(parseStudentCode(decodeQrText(code))).toBe('ĐK152283')
+  })
+
+  it('Đ ở giữa mã (NĐ...) cũng được khôi phục', () => {
+    const bytes = [0x4e, 0xd0, ...Buffer.from('152243')]
+    const code = {
+      data: 'N152243',
+      binaryData: bytes,
+      chunks: [
+        { type: 'alphanumeric', text: 'N' },
+        { type: 'byte', bytes: [0xd0], text: '' },
+        { type: 'numeric', text: '152243' },
+      ],
+    }
+    expect(parseStudentCode(decodeQrText(code))).toBe('NĐ152243')
   })
 
   it('giữ nguyên chuỗi jsQR đọc được khi QR là UTF-8', () => {
     const utf8 = Array.from(Buffer.from('ĐK122171', 'utf8'))
-    expect(decodeQrText('ĐK122171', utf8)).toBe('ĐK122171')
+    const code = { data: 'ĐK122171', binaryData: utf8, chunks: [{ type: 'byte', bytes: utf8, text: 'ĐK122171' }] }
+    expect(decodeQrText(code)).toBe('ĐK122171')
   })
 
-  it('không có byte gốc → trả chuỗi rỗng', () => {
-    expect(decodeQrText('', undefined)).toBe('')
-    expect(decodeQrText('', [])).toBe('')
+  it('không có kết quả / byte gốc → trả chuỗi rỗng', () => {
+    expect(decodeQrText(null)).toBe('')
+    expect(decodeQrText({ data: '', binaryData: [] })).toBe('')
   })
 
   it('Ð (U+00D0, bảng mã Latin-1) được đổi thành Đ (U+0110) như trong DB', () => {

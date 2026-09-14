@@ -538,7 +538,7 @@ export default function QRScanAttendanceModal({
           const code = jsQR(imageData.data, imageData.width, imageData.height, {
             inversionAttempts: 'dontInvert',
           })
-          const text = code ? decodeQrText(code.data, code.binaryData) : ''
+          const text = decodeQrText(code)
           if (text) handleDecoded(text)
         }
       }

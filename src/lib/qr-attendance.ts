@@ -16,12 +16,25 @@ export function parseStudentCode(raw: string): string {
   return normalizeStudentCode(raw.includes(' - ') ? raw.split(' - ')[0] : raw)
 }
 
+/** Phần kết quả jsQR cần dùng (data, byte gốc, các đoạn đã giải) */
+export interface QrDecodeResult {
+  data: string
+  binaryData?: ArrayLike<number>
+  chunks?: ReadonlyArray<{ type: string; text?: string; bytes?: ArrayLike<number> }>
+}
+
 /**
- * jsQR chỉ giải byte mode theo UTF-8; thẻ in bằng bảng mã 1 byte (Đ = 0xD0) làm nó
- * trả chuỗi rỗng. Khi đó giải lại byte gốc theo Windows-1258 (bảng mã tiếng Việt).
+ * jsQR chỉ giải đoạn byte theo UTF-8; thẻ in bằng bảng mã 1 byte (Đ = 0xD0) làm đoạn đó
+ * giải lỗi → jsQR bỏ mất chữ Đ (vd "ĐK152283" thành "K152283") hoặc trả chuỗi rỗng.
+ * Khi có đoạn byte giải lỗi, giải lại toàn bộ byte gốc theo Windows-1258 (bảng mã tiếng Việt).
  */
-export function decodeQrText(data: string, binary: ArrayLike<number> | undefined): string {
-  if (data || !binary || binary.length === 0) return data
+export function decodeQrText(code: QrDecodeResult | null | undefined): string {
+  if (!code) return ''
+  const binary = code.binaryData
+  const byteChunkFailed = (code.chunks || []).some(
+    c => c.type === 'byte' && !!c.bytes && c.bytes.length > 0 && !c.text,
+  )
+  if ((code.data && !byteChunkFailed) || !binary || binary.length === 0) return code.data
   try {
     return new TextDecoder('windows-1258').decode(Uint8Array.from(binary))
   } catch {
