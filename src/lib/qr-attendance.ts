@@ -3,9 +3,30 @@ import { normalizeSearchText } from './search'
 
 export const SCAN_THROTTLE_MS = 3000
 
+/**
+ * Chuẩn hoá mã về dạng lưu trong DB: NFC, và Ð/ð (U+00D0/F0, bảng mã Latin-1)
+ * → Đ/đ (U+0110/0111) — thẻ in bằng bảng mã 1 byte cho ra chữ Ð trông giống hệt Đ.
+ */
+export function normalizeStudentCode(code: string): string {
+  return code.normalize('NFC').replace(/Ð/g, 'Đ').replace(/ð/g, 'đ').trim()
+}
+
 /** QR có thể chứa "MÃ - Họ tên" hoặc chỉ mã thiếu nhi */
 export function parseStudentCode(raw: string): string {
-  return (raw.includes(' - ') ? raw.split(' - ')[0] : raw).trim()
+  return normalizeStudentCode(raw.includes(' - ') ? raw.split(' - ')[0] : raw)
+}
+
+/**
+ * jsQR chỉ giải byte mode theo UTF-8; thẻ in bằng bảng mã 1 byte (Đ = 0xD0) làm nó
+ * trả chuỗi rỗng. Khi đó giải lại byte gốc theo Windows-1258 (bảng mã tiếng Việt).
+ */
+export function decodeQrText(data: string, binary: ArrayLike<number> | undefined): string {
+  if (data || !binary || binary.length === 0) return data
+  try {
+    return new TextDecoder('windows-1258').decode(Uint8Array.from(binary))
+  } catch {
+    return String.fromCharCode(...Array.from(binary))
+  }
 }
 
 function toLocalDateStr(d: Date): string {

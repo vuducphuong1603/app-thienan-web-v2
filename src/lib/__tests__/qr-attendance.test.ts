@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit } from '../qr-attendance'
+import { parseStudentCode, normalizeStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit } from '../qr-attendance'
 
 describe('parseStudentCode', () => {
   it('trả về nguyên mã khi QR chỉ chứa mã', () => {
@@ -13,6 +13,36 @@ describe('parseStudentCode', () => {
   it('loại bỏ khoảng trắng thừa', () => {
     expect(parseStudentCode('  TN0123  ')).toBe('TN0123')
     expect(parseStudentCode(' TN0123 - Tên ')).toBe('TN0123')
+  })
+})
+
+describe('thẻ in QR bằng bảng mã 1 byte (Đ = 0xD0, không phải UTF-8)', () => {
+  // Byte thật đọc từ thẻ ĐT082183 (Điểu Ngọc Lan Thanh): "ÐT082183 - Maria Ði?u Ng?c Lan Thanh\t"
+  const cardBytes = Array.from(Buffer.from(
+    'd054303832313833202d204d6172696120d0693f75204e673f63204c616e205468616e6809', 'hex'))
+
+  it('jsQR trả chuỗi rỗng → giải lại byte gốc theo Windows-1258', () => {
+    expect(parseStudentCode(decodeQrText('', cardBytes))).toBe('ĐT082183')
+  })
+
+  it('giữ nguyên chuỗi jsQR đọc được khi QR là UTF-8', () => {
+    const utf8 = Array.from(Buffer.from('ĐK122171', 'utf8'))
+    expect(decodeQrText('ĐK122171', utf8)).toBe('ĐK122171')
+  })
+
+  it('không có byte gốc → trả chuỗi rỗng', () => {
+    expect(decodeQrText('', undefined)).toBe('')
+    expect(decodeQrText('', [])).toBe('')
+  })
+
+  it('Ð (U+00D0, bảng mã Latin-1) được đổi thành Đ (U+0110) như trong DB', () => {
+    expect(parseStudentCode('ÐT082183 - Maria Ði?u Ng?c Lan Thanh\t')).toBe('ĐT082183')
+    expect(parseStudentCode('NÐ152243')).toBe('NĐ152243')
+    expect(normalizeStudentCode('ðt1')).toBe('đt1')
+  })
+
+  it('chuẩn hoá Unicode NFC (tổ hợp dấu tách rời)', () => {
+    expect(normalizeStudentCode('ÁB')).toBe('ÁB')
   })
 })
 

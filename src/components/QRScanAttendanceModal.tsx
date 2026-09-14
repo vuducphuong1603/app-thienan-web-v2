@@ -10,7 +10,7 @@ import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { playFeedback, primeAudio } from '@/lib/attendance-feedback'
 import { SundaySession, SUNDAY_SESSION_LABELS, SUNDAY_SESSIONS, holidayDayTypesFor, DayType } from '@/lib/sunday-attendance'
 import { BookOpen, Church } from 'lucide-react'
-import { parseStudentCode, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, matchesStudentSearch, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit } from '@/lib/qr-attendance'
+import { parseStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, matchesStudentSearch, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit } from '@/lib/qr-attendance'
 
 type ScanEntry = {
   id: string
@@ -538,7 +538,8 @@ export default function QRScanAttendanceModal({
           const code = jsQR(imageData.data, imageData.width, imageData.height, {
             inversionAttempts: 'dontInvert',
           })
-          if (code?.data) handleDecoded(code.data)
+          const text = code ? decodeQrText(code.data, code.binaryData) : ''
+          if (text) handleDecoded(text)
         }
       }
     }
