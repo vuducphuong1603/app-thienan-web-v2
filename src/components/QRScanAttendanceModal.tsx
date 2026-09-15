@@ -10,7 +10,8 @@ import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { playFeedback, primeAudio } from '@/lib/attendance-feedback'
 import { SundaySession, SUNDAY_SESSION_LABELS, SUNDAY_SESSIONS, holidayDayTypesFor, DayType } from '@/lib/sunday-attendance'
 import { BookOpen, Church } from 'lucide-react'
-import { parseStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, matchesStudentSearch, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit, prependScanHistory, SCAN_HISTORY_LIMIT } from '@/lib/qr-attendance'
+import { parseStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, filterManualStudents, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory, shouldRunManualSearch, prependScanHistory, SCAN_HISTORY_LIMIT } from '@/lib/qr-attendance'
+import { fetchAllRows } from '@/lib/queries'
 
 type ScanEntry = {
   id: string
@@ -80,6 +81,11 @@ export default function QRScanAttendanceModal({
   // Xác nhận hủy điểm danh khi bấm lại vào nút đã điểm danh
   const [unmarkConfirm, setUnmarkConfirm] = useState<UnmarkTarget | null>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Cache toàn bộ em ACTIVE (tải 1 lần khi mở modal) để lọc thủ công phía client
+  const allStudentsRef = useRef<ManualStudent[]>([])
+  const [studentsLoaded, setStudentsLoaded] = useState(false)
+  const studentsLoadedRef = useRef(false)
+  const [studentsLoadError, setStudentsLoadError] = useState(false)
   // Lọc lớp trong điểm danh thủ công
   const [classOptions, setClassOptions] = useState<Pick<Class, 'id' | 'name'>[]>([])
   const [filterClassId, setFilterClassId] = useState('')
@@ -293,7 +299,7 @@ export default function QRScanAttendanceModal({
     return () => { cancelled = true }
   }, [isOpen, user])
 
-  // --- Điểm danh thủ công: tìm kiếm theo tên / tên thánh / mã, có thể lọc theo lớp ---
+  // --- Điểm danh thủ công: lọc phía client trên cache em ACTIVE đã tải, có thể lọc theo lớp ---
   const runSearch = useCallback((text: string, classId: string) => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
 
@@ -303,74 +309,32 @@ export default function QRScanAttendanceModal({
     }
 
     searchTimerRef.current = setTimeout(async () => {
+      if (!studentsLoadedRef.current) return
       setSearchLoading(true)
       try {
-        let query = supabase
-          .from('thieu_nhi')
-          .select('id, full_name, saint_name, student_code, class_id, parent_phone, classes(name)')
-          .eq('status', 'ACTIVE')
-        if (classId) query = query.eq('class_id', classId)
+        const data = filterManualStudents(allStudentsRef.current, text, classId || null)
 
-        // Tìm lớp có tên khớp từ khóa để hỗ trợ tìm theo lớp
-        const words = splitSearchWords(text)
-        const matchedClassIds: string[] = []
-        const { data: classRows } = words.length > 0
+        const { dateStr } = scanTarget.current
+        const dayType = resolveDayType()
+        const studentIds = data.map((s) => s.id)
+        const { data: attendanceData } = dayType && studentIds.length > 0
           ? await supabase
-              .from('classes')
-              .select('id, name')
-              .or(words.map(w => `name.ilike.%${w.replace(/[,()]/g, '')}%`).join(','))
-          : { data: [] as { id: string; name: string }[] }
-        for (const word of words) {
-          const lw = word.toLowerCase()
-          const classIds = (classRows || [])
-            .filter(c => (c.name as string).toLowerCase().includes(lw))
-            .map(c => c.id as string)
-          matchedClassIds.push(...classIds)
-          query = query.or(studentSearchOrFilter(word, classIds))
+              .from('attendance_records')
+              .select('student_id')
+              .eq('attendance_date', dateStr)
+              .eq('day_type', dayType)
+              .in('student_id', studentIds)
+          : { data: null }
+
+        if (attendanceData) {
+          setMarkedStudents(prev => {
+            const next = new Set(prev)
+            attendanceData.forEach((r) => next.add(r.student_id as string))
+            return next
+          })
         }
 
-        const { data: rawData, error } = await query.order('full_name').limit(classId ? 500 : 50)
-        // DB ilike khớp cả họ / tên đệm → lọc lại: chỉ lấy khớp tên cuối (hoặc tên thánh / mã / SĐT / lớp)
-        const data = rawData?.filter((s) => matchesStudentSearch({
-          full_name: s.full_name as string,
-          saint_name: s.saint_name as string | null,
-          student_code: s.student_code as string | null,
-          class_id: s.class_id as string,
-          className: (s as { classes?: { name?: string } | null }).classes?.name,
-          parent_phone: s.parent_phone as string | null,
-        }, text, matchedClassIds)).slice(0, manualSearchLimit(classId))
-
-        if (!error && data) {
-          const { dateStr } = scanTarget.current
-          const dayType = resolveDayType()
-          const studentIds = data.map((s) => s.id)
-          const { data: attendanceData } = dayType
-            ? await supabase
-                .from('attendance_records')
-                .select('student_id')
-                .eq('attendance_date', dateStr)
-                .eq('day_type', dayType)
-                .in('student_id', studentIds)
-            : { data: null }
-
-          if (attendanceData) {
-            setMarkedStudents(prev => {
-              const next = new Set(prev)
-              attendanceData.forEach((r) => next.add(r.student_id as string))
-              return next
-            })
-          }
-
-          setSearchResults(data.map((s) => ({
-            id: s.id as string,
-            full_name: s.full_name as string,
-            saint_name: (s.saint_name as string | null) ?? null,
-            student_code: (s.student_code as string | null) ?? null,
-            class_id: s.class_id as string,
-            className: (s as { classes?: { name?: string } | null }).classes?.name || '',
-            parent_phone: (s.parent_phone as string | null) ?? null,
-          })))
-        }
+        setSearchResults(data)
       } catch {
         // Bỏ qua lỗi tìm kiếm
       } finally {
@@ -378,6 +342,55 @@ export default function QRScanAttendanceModal({
       }
     }, classId && text.trim().length === 0 ? 0 : 300)
   }, [])
+
+  // Tải toàn bộ em ACTIVE MỘT lần khi modal mở, cache để lọc thủ công phía client
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    studentsLoadedRef.current = false
+    setStudentsLoaded(false)
+    setStudentsLoadError(false)
+    allStudentsRef.current = []
+
+    fetchAllRows<{
+      id: string
+      full_name: string
+      saint_name: string | null
+      student_code: string | null
+      class_id: string
+      parent_phone: string | null
+      classes: { name: string } | { name: string }[] | null
+    }>((from, to) =>
+      supabase
+        .from('thieu_nhi')
+        .select('id, full_name, saint_name, student_code, class_id, parent_phone, classes(name)')
+        .eq('status', 'ACTIVE')
+        .order('full_name')
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
+      .then((rows) => {
+        if (cancelled) return
+        allStudentsRef.current = rows.map((s) => ({
+          id: s.id,
+          full_name: s.full_name,
+          saint_name: s.saint_name,
+          student_code: s.student_code,
+          class_id: s.class_id,
+          className: (Array.isArray(s.classes) ? s.classes[0]?.name : s.classes?.name) || '',
+          parent_phone: s.parent_phone,
+        }))
+        studentsLoadedRef.current = true
+        setStudentsLoaded(true)
+        runSearch(searchQueryRef.current, filterClassRef.current)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setStudentsLoadError(true)
+      })
+
+    return () => { cancelled = true }
+  }, [isOpen, runSearch])
 
   const handleSearch = useCallback((text: string) => {
     setSearchQuery(text)
@@ -1024,7 +1037,15 @@ export default function QRScanAttendanceModal({
                 </div>
               )}
 
-              {!searchLoading && shouldRunManualSearch(searchQuery, filterClassId) && searchResults.length === 0 && (
+              {!searchLoading && studentsLoadError && shouldRunManualSearch(searchQuery, filterClassId) && (
+                <p className="text-center text-sm text-[#64748B] py-4">Không tải được danh sách, đóng và mở lại</p>
+              )}
+
+              {!searchLoading && !studentsLoaded && !studentsLoadError && shouldRunManualSearch(searchQuery, filterClassId) && (
+                <p className="text-center text-sm text-[#64748B] py-4">Đang tải danh sách…</p>
+              )}
+
+              {!searchLoading && studentsLoaded && shouldRunManualSearch(searchQuery, filterClassId) && searchResults.length === 0 && (
                 <p className="text-center text-sm text-[#64748B] py-4">Không tìm thấy thiếu nhi nào</p>
               )}
 

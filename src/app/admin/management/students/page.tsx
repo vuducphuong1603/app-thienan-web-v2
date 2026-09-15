@@ -48,7 +48,7 @@ export default function StudentsPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [filterClass, setFilterClass] = useState<FilterClass>('all')
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('ACTIVE')
   const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false)
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)

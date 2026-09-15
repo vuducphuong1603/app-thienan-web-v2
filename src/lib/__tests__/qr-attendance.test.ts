@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseStudentCode, normalizeStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit, prependScanHistory, SCAN_HISTORY_LIMIT } from '../qr-attendance'
+import { parseStudentCode, normalizeStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit, prependScanHistory, SCAN_HISTORY_LIMIT, filterManualStudents } from '../qr-attendance'
 
 describe('parseStudentCode', () => {
   it('trả về nguyên mã khi QR chỉ chứa mã', () => {
@@ -290,6 +290,116 @@ describe('manualSearchLimit', () => {
 describe('matchesStudentSearch với ô tìm kiếm trống', () => {
   it('trả về true để giữ nguyên toàn bộ lớp khi chỉ lọc lớp', () => {
     expect(matchesStudentSearch({ full_name: 'Nguyễn Văn A' }, '', [])).toBe(true)
+  })
+})
+
+describe('filterManualStudents (tìm thủ công phía client)', () => {
+  const students = [
+    {
+      id: 'quynh-anh',
+      full_name: 'Trần Ngọc Quỳnh Anh',
+      saint_name: 'Maria',
+      student_code: 'QA001',
+      class_id: 'class-1',
+      className: 'Ấu 1A',
+      parent_phone: '0912345678',
+    },
+    {
+      id: 'phuong',
+      full_name: 'Nguyễn Phương',
+      saint_name: 'Anna',
+      student_code: 'PH002',
+      class_id: 'class-1',
+      className: 'Ấu 1B',
+      parent_phone: '0987654321',
+    },
+    {
+      id: 'huyen-tram',
+      full_name: 'Mai Ngọc Huyền Trâm',
+      saint_name: 'Giuse',
+      student_code: 'HT003',
+      class_id: 'class-2',
+      className: 'Thiếu 2A',
+      parent_phone: '0901234567',
+    },
+  ]
+
+  it('tìm không dấu trong dữ liệu có dấu', () => {
+    expect(filterManualStudents(students, 'phuong').map(student => student.id)).toEqual(['phuong'])
+  })
+
+  it('chuẩn hóa cả dữ liệu và từ khóa NFD', () => {
+    const nfdStudent = {
+      id: 'nfd',
+      full_name: 'Nguye\u0303n Phu\u031bo\u0311ng',
+      class_id: 'class-nfd',
+    }
+    expect(filterManualStudents([nfdStudent], 'Phu\u031bo\u0311ng').map(student => student.id)).toEqual(['nfd'])
+  })
+
+  it('khớp tên kép theo tiền tố từ tên, nhưng không khớp họ', () => {
+    expect(filterManualStudents(students, 'quynh').map(student => student.id)).toEqual(['quynh-anh'])
+    expect(filterManualStudents(students, 'tran')).toEqual([])
+  })
+
+  it('không khớp hậu tố ký tự nằm giữa một từ tên', () => {
+    const lan = { id: 'lan', full_name: 'Trần Thị Lan' }
+    expect(filterManualStudents([lan], 'an')).toEqual([])
+    expect(filterManualStudents([lan], 'la').map(student => student.id)).toEqual(['lan'])
+  })
+
+  it('khớp cả cụm từ là phần cuối của họ tên', () => {
+    expect(filterManualStudents(students, 'huyen tram').map(student => student.id)).toEqual(['huyen-tram'])
+    expect(filterManualStudents(students, 'mai ngoc')).toEqual([])
+  })
+
+  it('khớp nội dung tên thánh, mã thiếu nhi và tên lớp', () => {
+    expect(filterManualStudents(students, 'maria').map(student => student.id)).toEqual(['quynh-anh'])
+    expect(filterManualStudents(students, 'ph002').map(student => student.id)).toEqual(['phuong'])
+    expect(filterManualStudents(students, 'thieu 2a').map(student => student.id)).toEqual(['huyen-tram'])
+  })
+
+  it('chỉ khớp SĐT khi chuỗi số có ít nhất 3 chữ số', () => {
+    const phoneStudent = {
+      id: 'phone',
+      full_name: 'Lê Bình',
+      saint_name: 'Giuse',
+      student_code: 'LB001',
+      className: 'Lớp A',
+      parent_phone: '090-123-4567',
+    }
+    expect(filterManualStudents([phoneStudent], '123').map(student => student.id)).toEqual(['phone'])
+    expect(filterManualStudents([phoneStudent], '12')).toEqual([])
+    expect(filterManualStudents([phoneStudent], 'tn123')).toEqual([])
+  })
+
+  it('lọc theo classId và trả cả lớp khi từ khóa rỗng', () => {
+    expect(filterManualStudents(students, '', 'class-1').map(student => student.id)).toEqual(['phuong', 'quynh-anh'])
+    expect(filterManualStudents(students, 'huyen', 'class-1')).toEqual([])
+    expect(filterManualStudents(students, '')).toEqual([])
+  })
+
+  it('sắp xếp theo full_name với locale vi và giữ nguyên object', () => {
+    const sortable = [
+      { id: 'tran', full_name: 'Trần An', class_id: 'sort-class' },
+      { id: 'nguyen', full_name: 'Nguyễn An', class_id: 'sort-class' },
+      { id: 'do', full_name: 'Đỗ An', class_id: 'sort-class' },
+      { id: 'bui', full_name: 'Bùi An', class_id: 'sort-class' },
+      { id: 'anh', full_name: 'Ánh An', class_id: 'sort-class' },
+    ]
+    const result = filterManualStudents(sortable, '', 'sort-class')
+    expect(result.map(student => student.full_name)).toEqual(['Ánh An', 'Bùi An', 'Đỗ An', 'Nguyễn An', 'Trần An'])
+    expect(result[0]).toBe(sortable[4])
+  })
+
+  it('giới hạn 20 kết quả không có lớp và 200 khi có lớp', () => {
+    const manyStudents = Array.from({ length: 205 }, (_, index) => ({
+      id: `student-${index}`,
+      full_name: `Nguyễn An ${String(index).padStart(3, '0')}`,
+      class_id: 'large-class',
+    }))
+    expect(filterManualStudents(manyStudents, 'an')).toHaveLength(20)
+    expect(filterManualStudents(manyStudents, 'an', 'large-class')).toHaveLength(200)
   })
 })
 

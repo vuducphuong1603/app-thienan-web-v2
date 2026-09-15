@@ -157,6 +157,44 @@ export interface SearchableStudent {
 }
 
 /**
+ * Lọc danh sách thiếu nhi đã tải về phía client cho tìm thủ công.
+ * Mỗi từ khóa phải khớp một tiền tố của từ trong tên (bỏ qua họ), một trường
+ * text phụ, hoặc một đoạn số điện thoại phụ huynh có ít nhất 3 chữ số.
+ */
+export function filterManualStudents<T extends SearchableStudent>(
+  students: readonly T[],
+  text: string,
+  classId?: string | null,
+): T[] {
+  const hasClassFilter = Boolean(classId)
+  const words = splitSearchWords(text).map(normalizeSearchText).filter(Boolean)
+  const normalizedQuery = words.join(' ')
+
+  return students
+    .filter(student => {
+      if (hasClassFilter && student.class_id !== classId) return false
+      if (words.length === 0) return hasClassFilter
+
+      const fullName = normalizeSearchText(student.full_name || '').trim()
+      if (fullName === normalizedQuery || fullName.endsWith(` ${normalizedQuery}`)) return true
+
+      const nameWords = fullName.split(/\s+/).filter(Boolean).slice(1)
+      const textFields = [student.saint_name, student.student_code, student.className]
+        .map(value => normalizeSearchText(value || ''))
+      const phoneDigits = (student.parent_phone || '').replace(/\D/g, '')
+
+      return words.every(word => {
+        const matchesName = nameWords.some(nameWord => nameWord.startsWith(word))
+        const matchesTextField = textFields.some(field => field.includes(word))
+        const matchesPhone = /^\d{3,}$/.test(word) && phoneDigits.includes(word)
+        return matchesName || matchesTextField || matchesPhone
+      })
+    })
+    .sort((a, b) => a.full_name.localeCompare(b.full_name, 'vi'))
+    .slice(0, manualSearchLimit(classId))
+}
+
+/**
  * Lọc phía client sau khi DB trả về (ilike trên full_name khớp cả tên đệm):
  * mỗi từ khóa chỉ được khớp tên cuối của thiếu nhi (không khớp họ / tên đệm),
  * hoặc khớp tên thánh, mã, SĐT phụ huynh, tên lớp / class_id.

@@ -36,7 +36,7 @@ export function countWeekdays(startDate: string, endDate: string, dayOfWeek: num
 }
 
 // ============ Helper: fetch all rows bypassing Supabase 1000-row default limit ============
-async function fetchAllRows<T = Record<string, unknown>>(
+export async function fetchAllRows<T = Record<string, unknown>>(
   buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
 ): Promise<T[]> {
   const PAGE_SIZE = 1000
