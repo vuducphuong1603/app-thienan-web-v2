@@ -1,0 +1,4 @@
+- [lead] fetchAllRows in src/lib/queries.ts gets `export` (only change) so the modal can page >1000 ACTIVE rows as SPEC A2 requires → git status will show 5 src files, not 4 (DoD 7 intent kept: no behaviour change in queries.ts).
+- [lead] filterManualStudents is generic <T extends SearchableStudent> and returns the input objects; ownership: core = qr-attendance.ts + test, ui = modal + students page + queries.ts export.
+- [lead] Added vitest.config.ts (resolve.alias '@'→./src) — pre-existing npm test fail from f94b2a7 (report-title.test.ts + ReportExportTemplate use '@/'); 6th file in git status, glue only.
+- [lead] Commit scope (QA #5): src = qr-attendance.ts + test, QRScanAttendanceModal.tsx, students/page.tsx, queries.ts (export), vitest.config.ts (glue), + qa's qr-attendance-qa.test.ts if added. .gitignore change is pre-existing (not this team) — orchestrator decides.
