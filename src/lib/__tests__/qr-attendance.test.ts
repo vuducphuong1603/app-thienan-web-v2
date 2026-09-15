@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseStudentCode, normalizeStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit } from '../qr-attendance'
+import { parseStudentCode, normalizeStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit, prependScanHistory, SCAN_HISTORY_LIMIT } from '../qr-attendance'
 
 describe('parseStudentCode', () => {
   it('trả về nguyên mã khi QR chỉ chứa mã', () => {
@@ -290,5 +290,23 @@ describe('manualSearchLimit', () => {
 describe('matchesStudentSearch với ô tìm kiếm trống', () => {
   it('trả về true để giữ nguyên toàn bộ lớp khi chỉ lọc lớp', () => {
     expect(matchesStudentSearch({ full_name: 'Nguyễn Văn A' }, '', [])).toBe(true)
+  })
+})
+
+describe('prependScanHistory (lịch sử điểm danh không bị cắt ở 5 dòng)', () => {
+  it('đưa lượt mới lên đầu và giữ nguyên toàn bộ lượt cũ', () => {
+    const prev = Array.from({ length: 30 }, (_, i) => ({ id: `h${i}`, status: 'success' }))
+    const next = prependScanHistory(prev, { id: 'new', status: 'success' })
+    expect(next).toHaveLength(31)
+    expect(next[0].id).toBe('new')
+    expect(next[30].id).toBe('h29')
+  })
+
+  it('chỉ cắt khi vượt trần SCAN_HISTORY_LIMIT', () => {
+    const prev = Array.from({ length: SCAN_HISTORY_LIMIT }, (_, i) => ({ id: `h${i}` }))
+    const next = prependScanHistory(prev, { id: 'new' })
+    expect(next).toHaveLength(SCAN_HISTORY_LIMIT)
+    expect(next[0].id).toBe('new')
+    expect(next.at(-1)?.id).toBe(`h${SCAN_HISTORY_LIMIT - 2}`)
   })
 })

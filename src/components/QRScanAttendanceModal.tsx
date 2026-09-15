@@ -10,7 +10,7 @@ import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { playFeedback, primeAudio } from '@/lib/attendance-feedback'
 import { SundaySession, SUNDAY_SESSION_LABELS, SUNDAY_SESSIONS, holidayDayTypesFor, DayType } from '@/lib/sunday-attendance'
 import { BookOpen, Church } from 'lucide-react'
-import { parseStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, matchesStudentSearch, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit } from '@/lib/qr-attendance'
+import { parseStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, matchesStudentSearch, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit, prependScanHistory, SCAN_HISTORY_LIMIT } from '@/lib/qr-attendance'
 
 type ScanEntry = {
   id: string
@@ -181,14 +181,14 @@ export default function QRScanAttendanceModal({
         }
 
         if (!student) {
-          setScanHistory(prev => [{
+          setScanHistory(prev => prependScanHistory(prev, {
             id: `${Date.now()}`,
             studentName: 'Không xác định',
             studentCode,
             className: '',
             time: timeDisplay,
             status: 'not_found' as const,
-          }, ...prev.slice(0, 4)])
+          }))
           showFeedback('not_found', `Mã QR không đúng: ${studentCode}`)
           return
         }
@@ -198,14 +198,14 @@ export default function QRScanAttendanceModal({
 
         // Em đã nghỉ học (kể cả em năm trước còn giữ thẻ QR cũ) không được ghi điểm danh
         if (student.status !== 'ACTIVE') {
-          setScanHistory(prev => [{
+          setScanHistory(prev => prependScanHistory(prev, {
             id: `${Date.now()}`,
             studentName: displayName,
             studentCode: student.student_code || studentCode,
             className,
             time: timeDisplay,
             status: 'not_found' as const,
-          }, ...prev.slice(0, 4)])
+          }))
           showFeedback('not_found', `${student.full_name} đã nghỉ học, không điểm danh`)
           return
         }
@@ -219,14 +219,14 @@ export default function QRScanAttendanceModal({
           .maybeSingle()
 
         if (existing) {
-          setScanHistory(prev => [{
+          setScanHistory(prev => prependScanHistory(prev, {
             id: `${Date.now()}`,
             studentName: displayName,
             studentCode: student.student_code || studentCode,
             className,
             time: timeDisplay,
             status: 'duplicate' as const,
-          }, ...prev.slice(0, 4)])
+          }))
           showFeedback('duplicate', `${student.full_name} đã điểm danh lúc ${existing.check_in_time?.substring(0, 5) || '--:--'}`)
           return
         }
@@ -256,7 +256,7 @@ export default function QRScanAttendanceModal({
           return
         }
 
-        setScanHistory(prev => [{
+        setScanHistory(prev => prependScanHistory(prev, {
           id: `${Date.now()}`,
           studentId: student.id,
           studentName: displayName,
@@ -264,7 +264,7 @@ export default function QRScanAttendanceModal({
           className,
           time: timeDisplay,
           status: 'success' as const,
-        }, ...prev.slice(0, 4)])
+        }))
         setScanCount(c => c + 1)
         successCountRef.current += 1
         showFeedback('success', `Đã điểm danh: ${student.full_name}`, 800)
@@ -444,7 +444,7 @@ export default function QRScanAttendanceModal({
         return
       }
 
-      setScanHistory(prev => [{
+      setScanHistory(prev => prependScanHistory(prev, {
         id: `${Date.now()}`,
         studentId: student.id,
         studentName: displayName,
@@ -452,7 +452,7 @@ export default function QRScanAttendanceModal({
         className: student.className,
         time: timeDisplay,
         status: 'success' as const,
-      }, ...prev.slice(0, 4)])
+      }))
       setScanCount(c => c + 1)
       successCountRef.current += 1
       setMarkedStudents(prev => new Set(prev).add(student.id))
@@ -535,7 +535,7 @@ export default function QRScanAttendanceModal({
       countQuery = countQuery.eq('created_by', user.id)
     }
     const [{ data: hist }, { count: todayCount }, { data: markedRows }] = await Promise.all([
-      histQuery.order('created_at', { ascending: false }).limit(5),
+      histQuery.order('created_at', { ascending: false }).limit(SCAN_HISTORY_LIMIT),
       countQuery,
       supabase
         .from('attendance_records')
@@ -871,22 +871,6 @@ export default function QRScanAttendanceModal({
             </div>
           </div>
 
-          {feedback.type && (
-            <div
-              role="status"
-              aria-live="polite"
-              className={`mt-2 flex items-start gap-2 rounded-xl px-3 py-2 text-xs sm:mt-3 sm:gap-2.5 sm:px-3.5 sm:py-3 sm:text-sm ${
-                feedback.type === 'success' ? 'bg-[#16A34A]/95'
-                : feedback.type === 'duplicate' ? 'bg-[#F59E0B]/95'
-                : 'bg-[#DC2626]/95'
-              }`}
-            >
-              {feedback.type === 'success' && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-white" />}
-              {feedback.type === 'duplicate' && <Clock className="mt-0.5 h-4 w-4 shrink-0 text-white" />}
-              {feedback.type === 'not_found' && <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-white" />}
-              <span className="min-w-0 break-words text-xs font-semibold leading-4 text-white sm:text-sm sm:leading-5">{feedback.message}</span>
-            </div>
-          )}
         </div>
 
         {holidayName ? (
@@ -1073,7 +1057,9 @@ export default function QRScanAttendanceModal({
                         disabled={isMarking || (dayType === 'cn' && !sundaySession)}
                         aria-label={isMarked ? `Mở xác nhận hủy điểm danh cho ${student.full_name}` : `Điểm danh cho ${student.full_name}`}
                         title={isMarked ? 'Bấm để hủy điểm danh' : 'Điểm danh'}
-                        className="w-full flex items-center gap-3 rounded-xl bg-white/5 hover:bg-white/10 px-3 py-2.5 text-left transition-colors disabled:cursor-default disabled:hover:bg-white/5"
+                        className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors disabled:cursor-default ${
+                          isMarked ? 'bg-[#16A34A]/10 hover:bg-[#16A34A]/15' : 'bg-white/5 hover:bg-white/10 disabled:hover:bg-white/5'
+                        }`}
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-white truncate">
@@ -1089,15 +1075,17 @@ export default function QRScanAttendanceModal({
                             </p>
                           )}
                         </div>
-                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                          isMarking ? 'bg-[#94A3B8]' : isMarked ? 'bg-white/10' : 'bg-[#16A34A]'
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors ${
+                          isMarking ? 'bg-[#94A3B8]'
+                          : isMarked ? 'bg-[#16A34A]'
+                          : 'bg-[#EF4444]/15 ring-1 ring-inset ring-[#EF4444]/50'
                         }`}>
                           {isMarking ? (
-                            <Loader2 className="w-4 h-4 text-white animate-spin" />
+                            <Loader2 className="h-5 w-5 animate-spin text-white" />
                           ) : isMarked ? (
-                            <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                            <CheckCircle2 className="h-5 w-5 text-white" />
                           ) : (
-                            <CheckCircle2 className="h-4 w-4 text-white" />
+                            <X className="h-5 w-5 text-[#F87171]" strokeWidth={2.5} />
                           )}
                         </div>
                       </button>
@@ -1157,10 +1145,10 @@ export default function QRScanAttendanceModal({
                           })
                         }}
                         title="Bấm để hủy điểm danh"
-                        className={`flex items-center gap-3 rounded-xl bg-white/5 hover:bg-white/10 px-3 py-2.5 border-l-[3px] text-left transition-colors ${borderCls}`}
+                        className={`flex w-full items-center gap-3 rounded-xl bg-white/5 hover:bg-white/10 px-3 py-2.5 border-l-[3px] text-left transition-colors ${borderCls}`}
                       >
                         {content}
-                        <Undo2 className="h-4 w-4 shrink-0 text-[#94A3B8] hover:text-white" />
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10"><Undo2 className="h-4 w-4 text-[#94A3B8]" /></span>
                       </button>
                     )
                   }
@@ -1179,6 +1167,24 @@ export default function QRScanAttendanceModal({
           </>
         )}
       </div>
+
+      {/* Thông báo kết quả — toast cố định phía dưới màn hình, luôn thấy dù đang cuộn tới đâu */}
+      {feedback.type && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`pointer-events-none fixed inset-x-4 bottom-[max(20px,env(safe-area-inset-bottom))] z-[55] mx-auto flex max-w-[480px] items-start gap-2.5 rounded-2xl px-4 py-3 shadow-2xl ${
+            feedback.type === 'success' ? 'bg-[#16A34A]'
+            : feedback.type === 'duplicate' ? 'bg-[#F59E0B]'
+            : 'bg-[#DC2626]'
+          }`}
+        >
+          {feedback.type === 'success' && <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-white" />}
+          {feedback.type === 'duplicate' && <Clock className="mt-0.5 h-5 w-5 shrink-0 text-white" />}
+          {feedback.type === 'not_found' && <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-white" />}
+          <span className="min-w-0 break-words text-sm font-semibold leading-5 text-white">{feedback.message}</span>
+        </div>
+      )}
 
       {/* Xác nhận hủy điểm danh */}
       {unmarkConfirm && (

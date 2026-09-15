@@ -201,3 +201,11 @@ export function shouldRunManualSearch(text: string, classId: string | null | und
 export function manualSearchLimit(classId: string | null | undefined): number {
   return classId ? 200 : 20
 }
+
+/** Trần số dòng lịch sử giữ trong bộ nhớ — đủ cho cả buổi, tránh phình DOM vô hạn. */
+export const SCAN_HISTORY_LIMIT = 500
+
+/** Thêm lượt điểm danh mới lên đầu lịch sử, giữ toàn bộ lượt cũ (chỉ cắt khi vượt trần). */
+export function prependScanHistory<T>(history: T[], entry: T): T[] {
+  return [entry, ...history].slice(0, SCAN_HISTORY_LIMIT)
+}
