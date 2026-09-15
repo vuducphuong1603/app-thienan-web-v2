@@ -17,7 +17,7 @@ import QRScanAttendanceModal from '@/components/QRScanAttendanceModal'
 import AttendanceConfirmModal from '@/components/AttendanceConfirmModal'
 import ImportExcelModal from '@/components/ImportExcelModal'
 import ExportSuccessModal from '@/components/ExportSuccessModal'
-import ReportExportTemplate from '@/components/ReportExportTemplate'
+import ReportExportTemplate, { getAttendanceReportTitle } from '@/components/ReportExportTemplate'
 import PriestReportTemplate from '@/components/PriestReportTemplate'
 import type { PriestReportData, PriestReportBranchData, PriestReportClassData } from '@/components/PriestReportTemplate'
 import html2canvas from 'html2canvas'
@@ -1970,11 +1970,7 @@ export default function ActivitiesPage() {
       }
 
       if (reportType === 'attendance') {
-        const title = reportAttendanceType === 'thu5'
-          ? 'ĐIỂM DANH ĐI LỄ THỨ NĂM'
-          : reportAttendanceType === 'cn'
-            ? 'ĐIỂM DANH HỌC GIÁO LÝ & ĐI LỄ CHÚA NHẬT'
-            : 'BẢNG ĐIỂM DANH'
+        const title = getAttendanceReportTitle(reportAttendanceType)
         const holidayNames = new Map<string, string>()
         reportHolidayMap.forEach((holiday, date) => holidayNames.set(date, holiday.name))
 
@@ -4636,6 +4632,7 @@ export default function ActivitiesPage() {
             students={reportStudents}
             dates={reportDates}
             holidayMap={reportHolidayMap}
+            attendanceType={reportAttendanceType}
             className={getReportClassName(reportClassId)}
             fromDate={reportTimeFilterMode === 'week' ? reportWeekStart : reportTimeFilterMode === 'month' ? new Date(reportYear, reportMonth, 1).toISOString().split('T')[0] : reportFromDate}
             toDate={reportTimeFilterMode === 'week' ? reportWeekEnd : reportTimeFilterMode === 'month' ? new Date(reportYear, reportMonth + 1, 0).toISOString().split('T')[0] : reportToDate}

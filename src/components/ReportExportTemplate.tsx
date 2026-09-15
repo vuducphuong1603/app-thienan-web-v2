@@ -39,6 +39,14 @@ interface AttendanceReportProps {
   className: string
   fromDate: string
   toDate: string
+  /** Loại buổi đang xuất: thu5 | cn | all — quyết định tiêu đề */
+  attendanceType?: 'all' | 'thu5' | 'cn'
+}
+
+export function getAttendanceReportTitle(attendanceType?: 'all' | 'thu5' | 'cn'): string {
+  if (attendanceType === 'thu5') return 'ĐIỂM DANH ĐI LỄ THỨ NĂM'
+  if (attendanceType === 'cn') return 'ĐIỂM DANH HỌC GIÁO LÝ & ĐI LỄ CHÚA NHẬT'
+  return 'ĐIỂM DANH THAM DỰ THÁNH LỄ THỨ NĂM VÀ CHÚA NHẬT'
 }
 
 interface ScoreColumns {
@@ -127,7 +135,7 @@ const ReportExportTemplate = forwardRef<HTMLDivElement, ReportExportTemplateProp
       {/* Title */}
       <h2 className="text-center text-[#c41e3a] font-bold text-xl mb-2">
         {props.type === 'attendance'
-          ? 'ĐIỂM DANH THAM DỰ THÁNH LỄ THỨ NĂM VÀ CHÚA NHẬT'
+          ? getAttendanceReportTitle(props.attendanceType)
           : 'BÁO CÁO ĐIỂM SỐ HỌC TẬP GIÁO LÝ'
         }
       </h2>
