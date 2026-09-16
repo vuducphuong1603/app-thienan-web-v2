@@ -58,9 +58,11 @@ export default function UsersPage() {
 
   const { data: users = [], isLoading: loading } = useUsers()
   const { data: classes = [] } = useClassesByBranch(filterBranch)
-  const { invalidateUsers } = useInvalidateQueries()
+  // Đổi lớp phụ trách của GLV làm sai cả danh sách lớp lẫn danh bạ, nên làm mới
+  // trọn bộ cache liên quan chứ không chỉ danh sách người dùng
+  const { invalidateUserData } = useInvalidateQueries()
 
-  const fetchUsers = invalidateUsers
+  const fetchUsers = invalidateUserData
 
   // Filter users based on search and filters
   // Chuẩn hoá một lần ngoài vòng lặp thay vì mỗi dòng

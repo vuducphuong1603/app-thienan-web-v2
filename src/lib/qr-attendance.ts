@@ -11,6 +11,24 @@ export function normalizeStudentCode(code: string): string {
   return code.normalize('NFC').replace(/Ð/g, 'Đ').replace(/ð/g, 'đ').trim()
 }
 
+/**
+ * Mẫu dùng cho `.ilike('student_code', ...)` khi tra mã quét được: Postgres `ilike`
+ * không phân biệt hoa thường nên "dl202650" khớp "DL202650" và ngược lại (mã in trên
+ * thẻ và mã trong DB từng lệch nhau ở chữ hoa/thường). Các ký tự đại diện của LIKE
+ * (\ % _) được thoát để mã lạ không khớp nhầm em khác.
+ */
+export function studentCodePattern(code: string): string {
+  return normalizeStudentCode(code).replace(/[\\%_]/g, (m) => `\\${m}`)
+}
+
+/**
+ * Dạng chuẩn của mã khi lưu vào DB: chuẩn hoá rồi viết HOA. Mã thiếu nhi theo quy ước
+ * luôn viết hoa; lưu thống nhất giúp danh sách, xuất Excel và thẻ QR không lệch nhau.
+ */
+export function canonicalStudentCode(code: string): string {
+  return normalizeStudentCode(code).toUpperCase()
+}
+
 /** QR có thể chứa "MÃ - Họ tên" hoặc chỉ mã thiếu nhi */
 export function parseStudentCode(raw: string): string {
   return normalizeStudentCode(raw.includes(' - ') ? raw.split(' - ')[0] : raw)

@@ -10,7 +10,7 @@ import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { playFeedback, primeAudio } from '@/lib/attendance-feedback'
 import { SundaySession, SUNDAY_SESSION_LABELS, SUNDAY_SESSIONS, holidayDayTypesFor, DayType } from '@/lib/sunday-attendance'
 import { BookOpen, Church } from 'lucide-react'
-import { parseStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, filterManualStudents, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory, shouldRunManualSearch, prependScanHistory, SCAN_HISTORY_LIMIT } from '@/lib/qr-attendance'
+import { parseStudentCode, studentCodePattern, decodeQrText, getScanTarget, shouldThrottleScan, filterManualStudents, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory, shouldRunManualSearch, prependScanHistory, SCAN_HISTORY_LIMIT } from '@/lib/qr-attendance'
 import { fetchAllRows } from '@/lib/queries'
 
 type ScanEntry = {
@@ -178,7 +178,8 @@ export default function QRScanAttendanceModal({
         const { data: student, error: lookupError } = await supabase
           .from('thieu_nhi')
           .select('id, full_name, saint_name, student_code, class_id, status, classes(name)')
-          .eq('student_code', studentCode)
+          // ilike: mã in trên thẻ và mã trong DB có thể lệch hoa/thường
+          .ilike('student_code', studentCodePattern(studentCode))
           .maybeSingle()
 
         if (lookupError) {

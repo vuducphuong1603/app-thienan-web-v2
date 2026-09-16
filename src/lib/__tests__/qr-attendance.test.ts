@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseStudentCode, normalizeStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit, prependScanHistory, SCAN_HISTORY_LIMIT, filterManualStudents } from '../qr-attendance'
+import { parseStudentCode, normalizeStudentCode, studentCodePattern, canonicalStudentCode, decodeQrText, getScanTarget, shouldThrottleScan, splitSearchWords, studentSearchOrFilter, mapRestoredScanEntry, lastNameOf, matchesStudentSearch, removeStudentFromHistory, shouldRunManualSearch, manualSearchLimit, prependScanHistory, SCAN_HISTORY_LIMIT, filterManualStudents } from '../qr-attendance'
 
 describe('parseStudentCode', () => {
   it('trả về nguyên mã khi QR chỉ chứa mã', () => {
@@ -74,6 +74,35 @@ describe('thẻ in QR bằng bảng mã 1 byte (Đ = 0xD0, không phải UTF-8)'
 
   it('chuẩn hoá Unicode NFC (tổ hợp dấu tách rời)', () => {
     expect(normalizeStudentCode('ÁB')).toBe('ÁB')
+  })
+})
+
+describe('studentCodePattern (quét QR không phân biệt hoa thường)', () => {
+  it('giữ nguyên mã để dùng cho ilike — hoa hay thường đều khớp', () => {
+    expect(studentCodePattern('DL202650')).toBe('DL202650')
+    expect(studentCodePattern('dl202650')).toBe('dl202650')
+  })
+
+  it('vẫn chuẩn hoá Ð→Đ và cắt khoảng trắng như normalizeStudentCode', () => {
+    expect(studentCodePattern(' ÐT082183\t')).toBe('ĐT082183')
+  })
+
+  it('thoát ký tự đại diện của LIKE để mã lạ không khớp bừa', () => {
+    expect(studentCodePattern('AB%')).toBe('AB\\%')
+    expect(studentCodePattern('AB_C')).toBe('AB\\_C')
+    expect(studentCodePattern('AB\\C')).toBe('AB\\\\C')
+  })
+})
+
+describe('canonicalStudentCode (dạng chuẩn khi lưu DB)', () => {
+  it('luôn viết hoa để mã trong DB đồng nhất', () => {
+    expect(canonicalStudentCode('dl202650')).toBe('DL202650')
+    expect(canonicalStudentCode(' Va192605 ')).toBe('VA192605')
+    expect(canonicalStudentCode('ðt082183')).toBe('ĐT082183')
+  })
+
+  it('mã rỗng vẫn trả chuỗi rỗng (để trang lưu null)', () => {
+    expect(canonicalStudentCode('   ')).toBe('')
   })
 })
 

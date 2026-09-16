@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 import { supabase, Class } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { filterByBranch } from '@/lib/branch-scope'
+import { canonicalStudentCode } from '@/lib/qr-attendance'
 
 interface ImportStudentsModalProps {
   isOpen: boolean
@@ -259,7 +260,7 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
         const classUuid = findClassId(student.class_name)
 
         const { error } = await supabase.from('thieu_nhi').insert({
-          student_code: student.student_code || null,
+          student_code: canonicalStudentCode(student.student_code || '') || null,
           full_name: student.full_name,
           saint_name: student.saint_name || null,
           date_of_birth: student.date_of_birth || null,

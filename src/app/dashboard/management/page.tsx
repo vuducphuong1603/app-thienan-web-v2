@@ -59,7 +59,7 @@ export default function GLVManagementPage() {
 
   const { data: queryData, isLoading: loading, isError, error } = useStudentsWithDetails()
   const allStudents = queryData?.students || []
-  const { invalidateStudents } = useInvalidateQueries()
+  const { invalidateStudentData } = useInvalidateQueries()
 
   // Auto-filter by user's class_id
   const classId = user?.class_id
@@ -128,7 +128,7 @@ export default function GLVManagementPage() {
       }
 
       cancelEditing()
-      invalidateStudents()
+      invalidateStudentData()
     } catch (err) {
       console.error('Error:', err)
     } finally {

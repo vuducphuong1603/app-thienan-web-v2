@@ -5,6 +5,7 @@ import { CLASS_TEACHER_ROLES } from './class-teachers'
 import type { DirectoryClass, DirectoryUser } from './teacher-directory'
 import { sortByGivenName } from './student-sort'
 import { useAuth } from './auth-context'
+import { invalidateStudentData, invalidateUserData } from './cache-invalidation'
 import {
   type BranchScope, scopeKey, inScope, filterByBranch, filterByClassId, filterByClassName,
   planInScope, notificationInScope,
@@ -2085,6 +2086,11 @@ export function useInvalidateQueries() {
     invalidateUsers: () => queryClient.invalidateQueries({ queryKey: queryKeys.users }),
     invalidateClasses: () => queryClient.invalidateQueries({ queryKey: ['classes'] }),
     invalidateStudents: () => queryClient.invalidateQueries({ queryKey: queryKeys.students }),
+    // Dùng sau khi thêm/sửa/chuyển lớp thiếu nhi: làm mới cả sĩ số lớp, chi tiết
+    // lớp và thống kê, tránh việc vừa chuyển lớp xong màn hình vẫn hiện lớp cũ
+    invalidateStudentData: () => invalidateStudentData(queryClient),
+    // Dùng sau khi thêm/sửa GLV (nhất là khi đổi lớp phụ trách)
+    invalidateUserData: () => invalidateUserData(queryClient),
     invalidateDashboard: () => queryClient.invalidateQueries({ queryKey: queryKeys.dashboardStats }),
     invalidateClassStats: () => queryClient.invalidateQueries({ queryKey: queryKeys.classStats }),
     invalidateWeeklyPlans: (weekStart: string) =>

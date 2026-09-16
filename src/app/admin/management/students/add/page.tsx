@@ -9,6 +9,8 @@ import AvatarCropModal from '@/components/ui/AvatarCropModal'
 import { validateAvatarFile, uploadStudentAvatar } from '@/lib/student-avatar'
 import { useAuth } from '@/lib/auth-context'
 import { filterByBranch } from '@/lib/branch-scope'
+import { useInvalidateQueries } from '@/lib/queries'
+import { canonicalStudentCode } from '@/lib/qr-attendance'
 
 interface StudentFormData {
   student_code: string
@@ -48,6 +50,7 @@ const initialFormData: StudentFormData = {
 
 export default function AddStudentPage() {
   const router = useRouter()
+  const { invalidateStudentData } = useInvalidateQueries()
   const { scope } = useAuth()
 
   const [formData, setFormData] = useState<StudentFormData>(initialFormData)
@@ -163,7 +166,7 @@ export default function AddStudentPage() {
     setIsSubmitting(true)
     try {
       const { data: inserted, error } = await supabase.from('thieu_nhi').insert({
-        student_code: formData.student_code.trim() || null,
+        student_code: canonicalStudentCode(formData.student_code) || null,
         class_id: formData.class_id,
         saint_name: formData.saint_name.trim() || null,
         full_name: formData.full_name.trim(),
@@ -197,6 +200,9 @@ export default function AddStudentPage() {
           alert('Đã thêm thiếu nhi nhưng chưa tải được ảnh. Có thể cập nhật ảnh sau ở trang chỉnh sửa.')
         }
       }
+
+      // Làm mới cache để danh sách và sĩ số lớp hiện ngay em vừa thêm
+      await invalidateStudentData()
 
       router.push('/admin/management/students')
     } catch (err) {

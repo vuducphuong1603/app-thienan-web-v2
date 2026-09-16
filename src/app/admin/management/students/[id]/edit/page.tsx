@@ -8,6 +8,8 @@ import CustomDatePicker from '@/components/ui/CustomDatePicker'
 import AvatarCropModal from '@/components/ui/AvatarCropModal'
 import { useAuth } from '@/lib/auth-context'
 import { isManagerRole, filterByBranch } from '@/lib/branch-scope'
+import { useInvalidateQueries } from '@/lib/queries'
+import { canonicalStudentCode } from '@/lib/qr-attendance'
 import {
   validateAvatarFile,
   uploadStudentAvatar,
@@ -55,6 +57,7 @@ export default function EditStudentPage() {
   const studentId = params.id as string
   const router = useRouter()
   const { user, scope } = useAuth()
+  const { invalidateStudentData } = useInvalidateQueries()
   // GLV quay về danh sách lớp của mình, admin về trang quản lý chung
   const studentsListHref = isManagerRole(user?.role) ? '/admin/management/students' : '/dashboard/management'
   // GLV được sửa toàn bộ thông tin thiếu nhi lớp mình (họ tên, tên thánh,
@@ -271,7 +274,7 @@ export default function EditStudentPage() {
       }
       const adminOnly = canEditAdminFields
         ? {
-            student_code: formData.student_code.trim() || null,
+            student_code: canonicalStudentCode(formData.student_code) || null,
             class_id: formData.class_id,
           }
         : {}
@@ -290,6 +293,10 @@ export default function EditStudentPage() {
       if (avatarUrl !== originalAvatarUrlRef.current) {
         await deleteStudentAvatar(supabase, originalAvatarUrlRef.current)
       }
+
+      // Xoá cache React Query trước khi quay lại danh sách, nếu không trang
+      // danh sách / chi tiết lớp vẫn hiện lớp cũ (staleTime 2-10 phút)
+      await invalidateStudentData()
 
       router.push(studentsListHref)
     } catch (err) {

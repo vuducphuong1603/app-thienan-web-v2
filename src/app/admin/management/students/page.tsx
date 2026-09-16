@@ -72,9 +72,9 @@ export default function StudentsPage() {
   const { data: queryData, isLoading: loading, isError, error } = useStudentsWithDetails()
   const students = queryData?.students ?? EMPTY_STUDENTS
   const classes = queryData?.classes ?? EMPTY_CLASSES
-  const { invalidateStudents } = useInvalidateQueries()
+  const { invalidateStudentData } = useInvalidateQueries()
 
-  const fetchData = invalidateStudents
+  const fetchData = invalidateStudentData
 
   // Filter students
   const trimmedQuery = searchQuery.trim()
