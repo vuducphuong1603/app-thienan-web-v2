@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react'
 import Image from 'next/image'
-import { HelpCircle, Moon, RefreshCcw, LogOut, CheckCircle } from 'lucide-react'
+import { Settings, HelpCircle, Moon, RefreshCcw, LogOut, CheckCircle } from 'lucide-react'
 import LogoutModal from './LogoutModal'
 
 interface UserDropdownProps {
@@ -13,6 +13,7 @@ interface UserDropdownProps {
   userEmail: string
   userAvatar?: string
   onLogout: () => void
+  onSettings?: () => void
   onHelp?: () => void
   onThemeToggle?: () => void
   onSwitchAccount?: () => void
@@ -26,6 +27,7 @@ export default function UserDropdown({
   userEmail,
   userAvatar,
   onLogout,
+  onSettings,
   onHelp,
   onThemeToggle,
   onSwitchAccount,
@@ -66,6 +68,11 @@ export default function UserDropdown({
   if (!isOpen) return null
 
   const menuItems = [
+    {
+      icon: Settings,
+      label: 'Cài đặt',
+      onClick: onSettings,
+    },
     {
       icon: HelpCircle,
       label: 'Trợ giúp và hỗ trợ',

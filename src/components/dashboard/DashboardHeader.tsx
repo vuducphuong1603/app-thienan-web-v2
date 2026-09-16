@@ -53,6 +53,11 @@ export default function DashboardHeader({
     setIsDropdownOpen(!isDropdownOpen)
   }
 
+  const handleSettings = () => {
+    setIsDropdownOpen(false)
+    router.push('/admin/settings')
+  }
+
   const handleHelp = () => {
     setIsDropdownOpen(false)
     router.push('/dashboard/help')
@@ -155,6 +160,7 @@ export default function DashboardHeader({
                 userEmail={userEmail}
                 userAvatar={userAvatar}
                 onLogout={onLogout}
+                onSettings={handleSettings}
                 onHelp={handleHelp}
                 onThemeToggle={handleDisplay}
                 onSwitchAccount={handleSwitchAccount}
