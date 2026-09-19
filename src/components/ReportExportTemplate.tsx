@@ -1,5 +1,6 @@
 import { forwardRef, Fragment } from 'react'
 import { isSundayDate } from '@/lib/sunday-attendance'
+import { getScoreReportTitle } from '@/lib/score-report-excel'
 
 interface AttendanceReportStudent {
   id: string
@@ -136,7 +137,7 @@ const ReportExportTemplate = forwardRef<HTMLDivElement, ReportExportTemplateProp
       <h2 className="text-center text-[#c41e3a] font-bold text-xl mb-2">
         {props.type === 'attendance'
           ? getAttendanceReportTitle(props.attendanceType)
-          : 'BÁO CÁO ĐIỂM SỐ HỌC TẬP GIÁO LÝ'
+          : getScoreReportTitle(props.schoolYear)
         }
       </h2>
 
@@ -174,11 +175,14 @@ function AttendanceTable({ students, dates, holidayMap }: { students: Attendance
   const topCls = 'border border-gray-400 border-b-0 px-2 py-2 text-center'
   const bottomCls = 'border border-gray-400 border-t-0 px-1 py-1 text-center'
   const renderCell = (status: 'present' | 'absent' | null | undefined, key: string) => (
-    <td key={key} className="border border-gray-400 px-2 py-2 text-center">
-      {status === 'absent' ? (
-        <span className="text-red-600 font-bold">x</span>
-      ) : status === 'present' ? (
-        <span className="text-green-600">&#10003;</span>
+    <td key={key} className="border border-gray-400 px-2 py-2 text-center align-middle">
+      {/* Giống file Excel: có mặt = X đen, vắng/chưa điểm danh = để trống */}
+      {status === 'present' ? (
+        // Vẽ X bằng 2 thanh xoay: html2canvas đặt chữ cỡ lớn lệch baseline và cắt SVG trong ô rộng
+        <div className="relative mx-auto" style={{ width: 16, height: 16 }} aria-label="X">
+          <div className="absolute bg-black rounded-full" style={{ left: -1, top: 6.5, width: 18, height: 3, transform: 'rotate(45deg)' }} />
+          <div className="absolute bg-black rounded-full" style={{ left: -1, top: 6.5, width: 18, height: 3, transform: 'rotate(-45deg)' }} />
+        </div>
       ) : (
         ''
       )}

@@ -4644,7 +4644,7 @@ export default function ActivitiesPage() {
             type="score"
             students={reportScoreStudents}
             className={getReportClassName(reportClassId)}
-            schoolYear={schoolYear?.name || ''}
+            schoolYear={reportSchoolYear?.name || ''}
             scoreColumns={scoreColumns}
           />
         )}

@@ -309,6 +309,11 @@ function addSheetHeader(
   return 7 // bảng bắt đầu từ dòng 7
 }
 
+/** Tiêu đề bảng điểm — dùng chung cho file Excel và file ảnh để luôn giống nhau */
+export function getScoreReportTitle(schoolYearName: string): string {
+  return `BẢNG ĐIỂM NĂM HỌC GIÁO LÝ ${schoolYearName}`.trim()
+}
+
 export async function buildScoreReportWorkbook(opts: {
   className: string
   schoolYearName: string
@@ -329,7 +334,7 @@ export async function buildScoreReportWorkbook(opts: {
   cols.forEach((c, i) => { ws.getColumn(i + 1).width = c.width })
 
   const tier1Row = addSheetHeader(ws, wb, {
-    title: `BẢNG ĐIỂM NĂM HỌC GIÁO LÝ ${schoolYearName}`.trim(),
+    title: getScoreReportTitle(schoolYearName),
     className,
     totalCols: cols.length,
     logoBase64,
