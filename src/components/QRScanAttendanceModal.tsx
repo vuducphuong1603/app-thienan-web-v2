@@ -100,6 +100,8 @@ export default function QRScanAttendanceModal({
   const videoRef = useRef<HTMLVideoElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
+  // Thanh lọc lớp + ô tìm kiếm — trên điện thoại chỉ thanh này được ghim khi cuộn
+  const searchBarRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -140,9 +142,14 @@ export default function QRScanAttendanceModal({
     const panel = panelRef.current
     const input = searchInputRef.current
     if (!panel || !input) return
-    const inputRect = input.getBoundingClientRect()
-    const headerBottom = headerRef.current?.getBoundingClientRect().bottom ?? panel.getBoundingClientRect().top
-    const targetTop = panel.scrollTop + inputRect.top - headerBottom - 8
+    const panelTop = panel.getBoundingClientRect().top
+    const bar = searchBarRef.current
+    const isMobile = !window.matchMedia('(min-width: 640px)').matches
+    // Điện thoại: header cuộn đi, đưa thanh lọc + tìm kiếm lên sát mép trên
+    const targetTop = isMobile && bar
+      ? panel.scrollTop + bar.getBoundingClientRect().top - panelTop
+      : panel.scrollTop + input.getBoundingClientRect().top
+        - (headerRef.current?.getBoundingClientRect().bottom ?? panelTop) - 8
     panel.scrollTo({ top: Math.max(0, targetTop), behavior })
   }, [])
 
@@ -812,7 +819,7 @@ export default function QRScanAttendanceModal({
   }
 
   const handleSearchFocus = () => {
-    // Sau khi bàn phím mở, đưa ô tìm kiếm xuống ngay dưới header sticky.
+    // Sau khi bàn phím mở, đưa ô tìm kiếm lên vị trí ghim.
     setTimeout(() => {
       window.scrollTo(0, 0)
       if (document.activeElement === searchInputRef.current) scrollSearchInputIntoView('smooth')
@@ -849,8 +856,8 @@ export default function QRScanAttendanceModal({
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
 
       <div ref={panelRef} className="relative flex h-full w-full flex-col overflow-y-auto overscroll-contain bg-[#0F172A] p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:h-auto sm:max-h-[calc(100vh-32px)] sm:w-[520px] sm:max-w-[calc(100vw-32px)] sm:rounded-[24px] sm:p-6 shadow-2xl">
-        {/* Header stays visible while the manual list or keyboard is scrolling. */}
-        <div ref={headerRef} className="sticky top-0 z-30 -mx-4 -mt-4 mb-3 shrink-0 bg-[#0F172A]/95 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 backdrop-blur sm:-mx-6 sm:-mt-6 sm:px-6 sm:pt-6 sm:pb-3">
+        {/* Máy tính: header ghim khi cuộn. Điện thoại: header cuộn đi, chỉ ghim thanh lọc + tìm kiếm. */}
+        <div ref={headerRef} className="relative z-30 sm:sticky sm:top-0 -mx-4 -mt-4 mb-3 shrink-0 bg-[#0F172A]/95 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 backdrop-blur sm:-mx-6 sm:-mt-6 sm:px-6 sm:pt-6 sm:pb-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -988,7 +995,11 @@ export default function QRScanAttendanceModal({
                 <span className="text-sm font-bold text-white">Điểm danh thủ công</span>
               </div>
 
-              <div className="mb-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+              {/* Điện thoại: ghim lọc lớp + ô tìm kiếm ở mép trên khi cuộn danh sách kết quả */}
+              <div
+                ref={searchBarRef}
+                className="sticky top-0 z-20 pt-[max(0.5rem,env(safe-area-inset-top))] -mx-4 mb-2 flex flex-col items-stretch gap-2 bg-[#0F172A] px-4 pb-2 sm:static sm:mx-0 sm:flex-row sm:items-center sm:bg-transparent sm:px-0 sm:py-0 sm:pt-0"
+              >
                 <div className="relative w-full shrink-0 sm:w-auto">
                   <select
                     value={filterClassId}

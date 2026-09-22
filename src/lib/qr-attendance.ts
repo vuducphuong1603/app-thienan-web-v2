@@ -174,10 +174,38 @@ export interface SearchableStudent {
   parent_phone?: string | null
 }
 
+type LetterCluster = { base: string; marks: string }
+
+/** Tách chữ thành từng cụm "chữ gốc + dấu" (NFD): "yến" → y, e+̂+́, n */
+function toLetterClusters(text: string): LetterCluster[] {
+  const clusters: LetterCluster[] = []
+  for (const ch of text.toLowerCase().normalize('NFD')) {
+    if (/[\u0300-\u036f]/.test(ch) && clusters.length > 0) clusters[clusters.length - 1].marks += ch
+    else clusters.push({ base: ch, marks: '' })
+  }
+  return clusters
+}
+
+/**
+ * Từ khóa khớp đầu một từ trong tên, tôn trọng dấu người dùng đã gõ:
+ * chữ gõ không dấu khớp mọi dấu ("yen" → Yên, Yến; "d" → Đ), chữ gõ có dấu
+ * thì từ trong tên phải có đủ các dấu đó ("yến" không ra "Yên", "yê" vẫn ra "Yến").
+ */
+function accentPrefixMatch(query: LetterCluster[], word: LetterCluster[], whole = false): boolean {
+  if (query.length > word.length || (whole && query.length !== word.length)) return false
+  return query.every((q, i) => {
+    const w = word[i]
+    const sameBase = q.base === w.base || (q.base === 'd' && w.base === 'đ')
+    return sameBase && [...q.marks].every(mark => w.marks.includes(mark))
+  })
+}
+
 /**
  * Lọc danh sách thiếu nhi đã tải về phía client cho tìm thủ công.
  * Mỗi từ khóa phải khớp một tiền tố của từ trong tên (bỏ qua họ), một trường
  * text phụ, hoặc một đoạn số điện thoại phụ huynh có ít nhất 3 chữ số.
+ * Kết quả ưu tiên em có TÊN RIÊNG (từ cuối) khớp đúng, rồi khớp đầu tên riêng,
+ * rồi mới tới em chỉ khớp tên đệm / trường phụ — để giới hạn số dòng không cắt mất em cần tìm.
  */
 export function filterManualStudents<T extends SearchableStudent>(
   students: readonly T[],
@@ -185,31 +213,53 @@ export function filterManualStudents<T extends SearchableStudent>(
   classId?: string | null,
 ): T[] {
   const hasClassFilter = Boolean(classId)
-  const words = splitSearchWords(text).map(normalizeSearchText).filter(Boolean)
-  const normalizedQuery = words.join(' ')
+  const rawWords = splitSearchWords(text).filter(word => normalizeSearchText(word))
+  const words = rawWords.map(normalizeSearchText)
+  const queryClusters = rawWords.map(toLetterClusters)
 
-  return students
-    .filter(student => {
-      if (hasClassFilter && student.class_id !== classId) return false
-      if (words.length === 0) return hasClassFilter
+  const ranked: { student: T; rank: number }[] = []
+  for (const student of students) {
+    if (hasClassFilter && student.class_id !== classId) continue
+    if (words.length === 0) {
+      if (hasClassFilter) ranked.push({ student, rank: 0 })
+      continue
+    }
 
-      const fullName = normalizeSearchText(student.full_name || '').trim()
-      if (fullName === normalizedQuery || fullName.endsWith(` ${normalizedQuery}`)) return true
+    const allNameWords = (student.full_name || '').trim().split(/\s+/).filter(Boolean).map(toLetterClusters)
+    const givenName = allNameWords[allNameWords.length - 1]
 
-      const nameWords = fullName.split(/\s+/).filter(Boolean).slice(1)
-      const textFields = [student.saint_name, student.student_code, student.className]
-        .map(value => normalizeSearchText(value || ''))
-      const phoneDigits = (student.parent_phone || '').replace(/\D/g, '')
+    // Cả cụm từ khóa là phần cuối họ tên ("huyền trâm" → "Mai Ngọc Huyền Trâm"), kể cả họ.
+    const tail = allNameWords.slice(-queryClusters.length)
+    const matchesTail = tail.length === queryClusters.length
+      && queryClusters.every((q, i) => accentPrefixMatch(q, tail[i], true))
 
-      return words.every(word => {
-        const matchesName = nameWords.some(nameWord => nameWord.startsWith(word))
-        const matchesTextField = textFields.some(field => field.includes(word))
-        const matchesPhone = /^\d{3,}$/.test(word) && phoneDigits.includes(word)
-        return matchesName || matchesTextField || matchesPhone
-      })
+    const nameWords = allNameWords.slice(1)
+    const textFields = [student.saint_name, student.student_code, student.className]
+      .map(value => normalizeSearchText(value || ''))
+    const phoneDigits = (student.parent_phone || '').replace(/\D/g, '')
+
+    const matches = matchesTail || words.every((word, i) => {
+      const matchesName = nameWords.some(nameWord => accentPrefixMatch(queryClusters[i], nameWord))
+      const matchesTextField = textFields.some(field => field.includes(word))
+      const matchesPhone = /^\d{3,}$/.test(word) && phoneDigits.includes(word)
+      return matchesName || matchesTextField || matchesPhone
     })
-    .sort((a, b) => a.full_name.localeCompare(b.full_name, 'vi'))
+    if (!matches) continue
+
+    // Hạng: 0 = tên riêng đúng y dấu, 1 = đúng tên riêng, 2 = khớp đầu tên riêng, 3 = tên đệm / trường phụ.
+    const givenIsExact = queryClusters.some(q => q.length === givenName.length
+      && q.every((c, i) => c.base === givenName[i].base && c.marks === givenName[i].marks))
+    const rank = givenIsExact ? 0
+      : matchesTail || queryClusters.some(q => accentPrefixMatch(q, givenName, true)) ? 1
+      : queryClusters.some(q => accentPrefixMatch(q, givenName)) ? 2
+      : 3
+    ranked.push({ student, rank })
+  }
+
+  return ranked
+    .sort((a, b) => a.rank - b.rank || a.student.full_name.localeCompare(b.student.full_name, 'vi'))
     .slice(0, manualSearchLimit(classId))
+    .map(entry => entry.student)
 }
 
 /**

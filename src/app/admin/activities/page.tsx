@@ -2975,16 +2975,7 @@ export default function ActivitiesPage() {
                                   </div>
                                   <span className="text-sm font-medium text-[#00a86b]">Đã bổ sung</span>
                                 </div>
-                              ) : (
-                                <button
-                                  onClick={() => markCompensatoryAttendance(student.id)}
-                                  disabled={saving === student.id || !!currentDateHoliday}
-                                  className="h-[34px] px-4 bg-[rgba(250,134,94,0.15)] rounded-full flex items-center gap-2 hover:bg-[rgba(250,134,94,0.25)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  <Plus className="w-4 h-4 text-brand" strokeWidth={2.5} />
-                                  <span className="text-sm font-medium text-brand">Bổ sung</span>
-                                </button>
-                              )}
+                              ) : null}
                             </div>
 
                             {/* Timestamp & By Column */}
