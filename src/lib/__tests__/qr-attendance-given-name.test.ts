@@ -14,16 +14,15 @@ const yenChi = mk('yen-chi', 'Nguyễn Thị Yên Chi')
 const anYen = mk('an-yen', 'Phạm An Yên')
 
 describe('filterManualStudents — ưu tiên tên riêng', () => {
-  it('em có tên riêng khớp đứng trước em chỉ khớp tên đệm', () => {
+  it('gõ 1 từ: chỉ ra em có tên riêng khớp, bỏ em chỉ khớp tên đệm', () => {
     const out = ids(filterManualStudents([yenNhi, vuYen, hoangYen], 'yen'))
-    expect(out).toEqual(['hoang-yen', 'vu-yen', 'yen-nhi'])
+    expect(out).toEqual(['hoang-yen', 'vu-yen'])
   })
 
   it('tên riêng đúng không bị cắt mất khi có > 20 em khớp tên đệm', () => {
     const middle = Array.from({ length: 25 }, (_, i) => mk(`m${i}`, `Anh Văn Yến Nhi${i}`))
     const out = ids(filterManualStudents([...middle, vuYen, hoangYen], 'yến'))
-    expect(out.slice(0, 2)).toEqual(['hoang-yen', 'vu-yen'])
-    expect(out).toHaveLength(20)
+    expect(out).toEqual(['hoang-yen', 'vu-yen'])
   })
 
   it('khớp đúng tên riêng xếp trước khớp đầu tên riêng', () => {
@@ -63,5 +62,40 @@ describe('filterManualStudents — gõ có dấu thì khớp đúng dấu', () =
     const haiYen = mk('hai-yen', 'Lưu Nguyễn Hải Yến')
     const haiYen2 = mk('hai-yen2', 'Lê Hải Yên')
     expect(ids(filterManualStudents([haiYen, haiYen2], 'hải yến'))).toEqual(['hai-yen'])
+  })
+})
+
+// Lỗi 26/09/2026: gõ 1 tên vẫn lẫn em khớp tên đệm / tên thánh / tên lớp
+// ("nghĩa" ra cả lớp Nghĩa 1A, "tâm" ra cả lớp Khai Tâm).
+describe('filterManualStudents — gõ 1 từ: có em khớp tên riêng thì chỉ hiện các em đó', () => {
+  type R = S & { saint_name?: string; className?: string; student_code?: string }
+  const r = (id: string, full_name: string, extra: Partial<R> = {}): R => ({ id, full_name, class_id: 'c1', ...extra })
+
+  it('"tâm" không ra em lớp Khai Tâm / tên đệm Tâm', () => {
+    const tam = r('tam', 'Nguyễn Minh Tâm')
+    const khaiTam = r('kt', 'Lê Văn Bình', { className: 'Khai Tâm A' })
+    const middle = r('mid', 'Trần Tâm Như')
+    expect(ids(filterManualStudents([khaiTam, middle, tam], 'tâm'))).toEqual(['tam'])
+  })
+
+  it('"an" không ra em tên thánh Gioan / Anna', () => {
+    const an = r('an', 'Phạm Bình An')
+    const gioan = r('gioan', 'Lê Văn Bình', { saint_name: 'Gioan' })
+    const anna = r('anna', 'Lê Thị Hoa', { saint_name: 'Anna' })
+    expect(ids(filterManualStudents([gioan, anna, an], 'an'))).toEqual(['an'])
+  })
+
+  it('không em nào khớp tên riêng thì vẫn tìm theo lớp / tên đệm / mã', () => {
+    const a = r('a', 'Lê Văn Bình', { className: 'Hiệp Sĩ 1' })
+    const b = r('b', 'Trần Ngọc Như', { student_code: 'TN-123' })
+    expect(ids(filterManualStudents([a, b], 'hiệp'))).toEqual(['a'])
+    expect(ids(filterManualStudents([a, b], 'ngọc'))).toEqual(['b'])
+    expect(ids(filterManualStudents([a, b], 'tn-123'))).toEqual(['b'])
+  })
+
+  it('gõ nhiều từ vẫn tìm theo lớp như cũ ("nghĩa 1a" ra cả lớp)', () => {
+    const nghia = r('nghia', 'Lê Văn Nghĩa', { className: 'Nghĩa 1A' })
+    const other = r('other', 'Lê Văn Bình', { className: 'Nghĩa 1A' })
+    expect(ids(filterManualStudents([other, nghia], 'nghĩa 1a'))).toEqual(['nghia', 'other'])
   })
 })

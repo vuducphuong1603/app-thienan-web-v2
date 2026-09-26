@@ -54,7 +54,7 @@ describe('filterManualStudents — khoảng trắng & hoa thường', () => {
     expect(ids(filterManualStudents(all, '\thuyen\ntram\t'))).toEqual(['huyen-tram'])
   })
   it('viết hoa toàn bộ: tên, tên thánh, mã, lớp', () => {
-    expect(ids(filterManualStudents(all, 'QUYNH'))).toEqual(['no-class', 'quynh-anh'])
+    expect(ids(filterManualStudents(all, 'QUYNH'))).toEqual(['no-class'])
     expect(ids(filterManualStudents(all, 'MARIA'))).toEqual(['quynh-anh'])
     expect(ids(filterManualStudents(all, 'qa001'))).toEqual(['quynh-anh'])
     expect(ids(filterManualStudents(all, 'ẤU 1A'))).toEqual(['duc', 'toan'])
@@ -87,7 +87,7 @@ describe('filterManualStudents — classId', () => {
   })
   it('em class_id null bị loại khi có classId nhưng vẫn tìm được khi không lọc lớp', () => {
     expect(filterManualStudents(all, 'quynh', 'c1')).not.toContain(noClass)
-    expect(ids(filterManualStudents(all, 'quynh'))).toEqual(['no-class', 'quynh-anh'])
+    expect(ids(filterManualStudents(all, 'quynh'))).toEqual(['no-class'])
   })
   it('không classId + chuỗi rỗng/khoảng trắng → rỗng dù có dữ liệu', () => {
     expect(filterManualStudents(all, '')).toEqual([])

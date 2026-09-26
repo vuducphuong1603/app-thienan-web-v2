@@ -206,6 +206,7 @@ function accentPrefixMatch(query: LetterCluster[], word: LetterCluster[], whole 
  * text phụ, hoặc một đoạn số điện thoại phụ huynh có ít nhất 3 chữ số.
  * Kết quả ưu tiên em có TÊN RIÊNG (từ cuối) khớp đúng, rồi khớp đầu tên riêng,
  * rồi mới tới em chỉ khớp tên đệm / trường phụ — để giới hạn số dòng không cắt mất em cần tìm.
+ * Gõ 1 từ mà có em khớp tên riêng thì chỉ trả về các em đó.
  */
 export function filterManualStudents<T extends SearchableStudent>(
   students: readonly T[],
@@ -256,7 +257,12 @@ export function filterManualStudents<T extends SearchableStudent>(
     ranked.push({ student, rank })
   }
 
+  // Gõ 1 từ mà có em khớp tên riêng → chỉ hiện các em đó, bỏ em chỉ khớp tên đệm / tên thánh / lớp
+  // ("tâm" không kéo theo cả lớp Khai Tâm). Không em nào khớp tên riêng mới tìm rộng ra.
+  const givenOnly = words.length === 1 && ranked.some(entry => entry.rank < 3)
+
   return ranked
+    .filter(entry => !givenOnly || entry.rank < 3)
     .sort((a, b) => a.rank - b.rank || a.student.full_name.localeCompare(b.student.full_name, 'vi'))
     .slice(0, manualSearchLimit(classId))
     .map(entry => entry.student)
