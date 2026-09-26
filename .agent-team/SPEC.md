@@ -1,44 +1,64 @@
-# SPEC — Tìm thiếu nhi nhất quán giữa Danh bạ và Quét QR
+# SPEC — Báo cáo tổng hợp cho Cha: "Nghỉ" = số em vắng trọn kỳ + cảnh báo vắng 2 tháng liên tiếp
 
 ## 1. Mission
-Người dùng phản hồi "trang Danh bạ tìm thấy thiếu nhi nhưng ô tìm thủ công trong Quét QR điểm danh thì không".
-Nguyên nhân đã xác định (orchestrator đã đối chiếu DB thật, 1328 em ACTIVE):
-- Quét QR tìm bằng `ilike` trên DB (có dấu), `.limit(50)` TRƯỚC khi lọc client "chỉ khớp tên cuối" → tên phổ biến
-  (Anh: 161 dòng ilike, 83 em tên cuối Anh) bị mất; gõ không dấu ("phuong") ra 0 kết quả; tên kép ("Quỳnh" → "Quỳnh Anh") không ra.
-- Danh bạ mặc định "Tất cả trạng thái" nên hiện cả 132 em INACTIVE (vẫn gắn lớp đang hoạt động) → người dùng tưởng đang học.
-Deliverable: (A) tìm thủ công trong Quét QR lọc phía client trên danh sách em ACTIVE tải một lần, bỏ dấu, quy tắc khớp nới hơn;
-(B) Danh bạ mặc định lọc "Đang học". Dữ liệu DB (1 em tên NFD) orchestrator tự sửa, KHÔNG thuộc phạm vi đội.
+Mục "Báo cáo tổng hợp điểm danh" (báo cáo gửi Cha, `reportStyle` priest) trong `src/app/admin/activities/page.tsx`
+(`generatePriestReport`, `handlePriestExportImage`, `handlePriestExportExcel`, khối xem trước "Priest Report Result Section")
+và `src/components/PriestReportTemplate.tsx`.
+
+Yêu cầu nguyên văn của người dùng: "chỗ Nghỉ thì hiển thị con số thiếu nhi đã nghỉ kiểu không đi buổi nào trong tháng đó,
+nếu vẫn được điểm danh 1 lần thì không tính. Tới tháng sau (liên tiếp) mà vẫn không đi thì hiện cảnh báo: tên, lớp và số
+điện thoại phụ huynh. Tháng 1 không đi, tháng 2 đi, tháng 3 không đi → KHÔNG cảnh báo; chỉ cảnh báo khi 2 tháng liên tiếp.
+Đây là mục xuất báo cáo cho Cha — coi chừng đụng nhầm code qua mục khác." Cảnh báo phải IN CHUNG vào ảnh + Excel xuất ra.
 
 ## 2. Tech stack (cố định)
-Next.js 15 app router, React, TypeScript, Tailwind, Supabase JS client, Vitest (`src/lib/__tests__/*.test.ts`). Không thêm dependency, không migration DB.
+Next.js 15 app router, React, TypeScript, Tailwind, Supabase JS, Vitest (`src/lib/__tests__/*.test.ts`).
+Không thêm dependency, không migration DB, không ghi vào DB.
 
 ## 3. Yêu cầu
-### A. `src/lib/qr-attendance.ts` + `src/components/QRScanAttendanceModal.tsx`
-A1. Thêm hàm thuần `filterManualStudents(students, text, classId?)` (tên có thể khác nhưng phải export + test) làm toàn bộ việc lọc phía client:
-   - dùng `normalizeSearchText` (src/lib/search.ts) cho cả từ khoá và dữ liệu → gõ không dấu / có dấu / NFD đều khớp.
-   - mỗi từ khoá phải khớp ít nhất một trong: (a) đầu của bất kỳ từ nào trong họ tên TRỪ từ đầu tiên (họ) — "quynh" khớp "Trần Ngọc Quỳnh Anh", "tran" KHÔNG khớp; (b) cả cụm từ khoá là đoạn cuối của họ tên ("huyen tram"); (c) tên thánh, mã, tên lớp chứa từ khoá; (d) SĐT phụ huynh chứa chuỗi số (≥3 số).
-   - có classId → chỉ em thuộc lớp đó; từ khoá rỗng + có classId → cả lớp.
-   - kết quả sắp theo full_name (localeCompare 'vi'), giới hạn `manualSearchLimit(classId)` (giữ hàm cũ: 200 có lớp / 20 không lớp).
-   Giữ `matchesStudentSearch`, `studentSearchOrFilter` cũ nếu còn test dùng, hoặc cập nhật test tương ứng — không được để test cũ đỏ vì bỏ hàm.
-A2. Modal: khi mở (isOpen) tải MỘT lần toàn bộ em ACTIVE bằng `fetchAllRows` (đã có trong src/lib/queries.ts, Supabase trả tối đa 1000 dòng/request) với cột `id, full_name, saint_name, student_code, class_id, parent_phone, classes(name)`, cache trong state/ref của modal; `runSearch` không gọi DB tìm kiếm nữa, chỉ gọi hàm A1 (giữ debounce hiện tại, giữ phần query `attendance_records` để đánh dấu đã điểm danh). Trong lúc chưa tải xong hiển thị trạng thái "Đang tải danh sách…" thay vì "Không tìm thấy". Giữ nguyên các hành vi khác của modal (lịch sử, toast, nút X/check vừa sửa ở commit 3e99d9d).
-A3. Bỏ phần tìm `classes` bằng ilike trong runSearch (tên lớp đã có trong dữ liệu cache).
-### B. `src/app/admin/management/students/page.tsx`
-B1. `filterStatus` mặc định `'ACTIVE'` thay vì `'all'`. Người dùng vẫn chọn "Tất cả trạng thái" / "Nghỉ học" như cũ. Không đổi gì khác.
+1. **Logic thuần mới** `src/lib/priest-report.ts` (TDD, test ở `src/lib/__tests__/priest-report.test.ts`):
+   - `monthRange(year, monthIndex0)` → `{ from, to }` chuỗi `YYYY-MM-DD` theo ngày ĐỊA PHƯƠNG (không dùng `toISOString`,
+     vốn lệch 1 ngày ở UTC+7: hiện tháng 9 ra `2026-08-31..2026-09-29` — lỗi có sẵn, sửa luôn cho chế độ tháng).
+   - `previousMonth(year, monthIndex0)` → `{ year, monthIndex0 }` (tháng 1 → tháng 12 năm trước).
+   - Hàm đếm theo lớp số em ACTIVE KHÔNG có bản ghi `present` nào trong kỳ (input: danh sách em + tập student_id có mặt).
+   - Hàm tạo danh sách cảnh báo: em vắng trọn kỳ hiện tại VÀ vắng trọn tháng liền trước → `{ studentId, saintName, fullName,
+     className, parentPhones: string[] }` (bỏ SĐT rỗng/trùng; `parent_phone`, `parent_phone_2`), sắp theo thứ tự lớp
+     (display_order của lớp) rồi tên.
+2. **"Có đi" = có ÍT NHẤT 1 bản ghi `status='present'`** của em đó trong kỳ, bất kỳ buổi nào thuộc loại điểm danh đang chọn
+   (`all` = thu5/cn/cn_le; `thu5`; `cn` = cn hoặc cn_le). Chủ nhật: chỉ đi giáo lý HOẶC chỉ đi lễ cũng tính là có đi (dùng bản ghi
+   thô, KHÔNG dùng `mergeSundayRecords` cho phần này). Xác định theo `student_id` (không lọc theo `class_id`, em chuyển lớp vẫn đúng).
+3. **Cột "Nghỉ"** (bảng xem trước, ảnh, Excel, dòng cộng ngành, tổng cộng) = số em vắng trọn kỳ theo #2. Áp dụng mọi chế độ
+   (tuần/tháng/năm) để nghĩa của cột thống nhất. Thẻ thống kê "Tổng lượt nghỉ" đổi nhãn thành "Số em nghỉ cả kỳ" (hoặc
+   tương đương rõ nghĩa). Cột "Đi" và "Tỉ lệ (%)" GIỮ NGUYÊN cách tính hiện tại (lượt có mặt / tổng lượt, có mergeSundayRecords).
+   Thêm 1 dòng chú thích nhỏ dưới bảng trong ảnh: "Nghỉ: số em không đi buổi nào trong kỳ báo cáo".
+4. **Cảnh báo 2 tháng liên tiếp** — chỉ ở chế độ **Tháng**: tính thêm tập có mặt của tháng liền trước (cùng loại điểm danh).
+   Chỉ cảnh báo khi cả hai tháng đều có ≥ 1 ngày điểm danh hợp lệ (không phải tháng toàn nghỉ lễ). Hiển thị mục
+   "⚠ CẢNH BÁO: vắng 2 tháng liên tiếp (tháng M-1 và M)" gồm bảng STT | Tên thánh + Họ tên | Lớp | SĐT phụ huynh:
+   - trong `PriestReportTemplate` (dưới bảng chính, nên nằm trong ảnh xuất), màu cảnh báo đỏ nhạt, hợp tông hiện có;
+   - trong khối xem trước trên web;
+   - trong Excel: sheet thứ 2 "Canh bao" (không đổi tên sheet 1).
+   Không có em nào → ẩn mục (ảnh) / hiện dòng "Không có em nào vắng 2 tháng liên tiếp" trên web.
+5. **Truy vấn** trong `generatePriestReport`: dữ liệu `attendance_records` có thể > 1000 dòng → dùng `fetchAllRows`
+   (export sẵn trong `src/lib/queries.ts`) với khoá sắp xếp duy nhất (`.order('id')`) cho mọi truy vấn điểm danh của báo cáo.
+   Danh sách em ACTIVE (`id, saint_name, full_name, class_id, parent_phone, parent_phone_2`) lấy 1 lần bằng `fetchAllRows`
+   thay cho vòng lặp đếm từng lớp; sĩ số lớp = đếm từ danh sách đó (kết quả phải giống cũ).
+6. **Phạm vi file** (ngoài danh sách này = vi phạm): `src/lib/priest-report.ts` (mới), `src/lib/__tests__/priest-report.test.ts`
+   (mới), `src/components/PriestReportTemplate.tsx`, `src/app/admin/activities/page.tsx` — trong page.tsx CHỈ được sửa
+   `generatePriestReport`, `handlePriestExportExcel`, khối JSX xem trước báo cáo Cha (Priest Report Result Section) và import.
+   Không đụng báo cáo phụ huynh / sổ điểm / tab điểm danh / `mergeSundayRecords` / `fetchAllRows`.
+7. Chạy `gitnexus impact` trước khi sửa symbol có sẵn (theo CLAUDE.md dự án).
 
-## 4. Commands (chạy từ project root, nguyên văn)
-- `npm test` — Vitest toàn bộ (phải 0 fail)
-- `npx tsc --noEmit -p .` — 0 lỗi
-- `npx eslint src/lib/qr-attendance.ts src/components/QRScanAttendanceModal.tsx src/app/admin/management/students/page.tsx src/lib/__tests__/qr-attendance.test.ts` — 0 error (warning có sẵn ở QRScanAttendanceModal dòng ~146 react-hooks/exhaustive-deps được phép)
-- KHÔNG chạy `npm run test:live` (chạm DB prod).
+## 4. Commands
+- `npm test` (vitest run — toàn bộ, không chạm DB)
+- `npx tsc --noEmit -p .`
+- `npx eslint src/lib/priest-report.ts src/lib/__tests__/priest-report.test.ts src/components/PriestReportTemplate.tsx src/app/admin/activities/page.tsx`
+- KHÔNG chạy `npm run test:live`, KHÔNG `git push`, KHÔNG commit (orchestrator commit).
 
 ## 5. Definition of Done
 | # | Kiểm tra | Kỳ vọng |
 |---|---|---|
-| 1 | `npm test` | tất cả pass, ≥ 8 test mới cho hàm A1 (không dấu, NFD, tên kép, họ không khớp, cụm cuối, tên thánh/mã/lớp, SĐT, classId, limit) |
-| 2 | `npx tsc --noEmit -p .` | 0 lỗi |
-| 3 | eslint 3 file trên | 0 error |
-| 4 | `grep -n "ilike" src/components/QRScanAttendanceModal.tsx` | không còn dòng nào |
-| 5 | `grep -n "useState<FilterStatus>('ACTIVE')" src/app/admin/management/students/page.tsx` | 1 dòng |
-| 6 | Review lead: modal chỉ gọi DB đọc thieu_nhi 1 lần mỗi lần mở; không gọi lại mỗi lần gõ | đạt |
-| 7 | `git status` chỉ chứa 4 file: qr-attendance.ts, test của nó, QRScanAttendanceModal.tsx, students/page.tsx | đạt |
-Không commit — orchestrator commit sau khi tự kiểm chứng.
+| 1 | `npm test` | tất cả xanh, tổng ≥ 228 + 12 test mới |
+| 2 | test mới phủ | monthRange (tháng 9/2026 = 2026-09-01..2026-09-30, tháng 2 năm nhuận, tháng 12), previousMonth (tháng 1→12 năm trước), đi 1 buổi → không tính nghỉ, chỉ đi lễ CN → không tính nghỉ, vắng T1+T2 → cảnh báo, vắng T1 đi T2 → không, đi T1 vắng T2 → không, SĐT rỗng/trùng bị bỏ, sắp xếp theo lớp rồi tên |
+| 3 | `npx tsc --noEmit -p .` | 0 lỗi |
+| 4 | eslint lệnh trên | 0 error |
+| 5 | `git diff --stat` | chỉ 4 file trong #6; diff page.tsx chỉ nằm trong các vùng cho phép |
+| 6 | Review orchestrator | cột Nghỉ/cộng ngành/tổng = số em; cảnh báo có tên + lớp + SĐT phụ huynh, có trong ảnh (template) và Excel sheet 2; chỉ ở chế độ Tháng |

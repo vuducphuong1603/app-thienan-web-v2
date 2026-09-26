@@ -1,4 +1,5 @@
 import { forwardRef, Fragment } from 'react'
+import type { PriestAbsentWarning } from '@/lib/priest-report'
 
 export interface PriestReportClassData {
   classId: string
@@ -31,6 +32,11 @@ export interface PriestReportData {
   fromDate: string
   toDate: string
   timeLabel: string
+  absentWarning?: {
+    prevLabel: string
+    currentLabel: string
+    students: PriestAbsentWarning[]
+  } | null
 }
 
 interface PriestReportTemplateProps {
@@ -153,6 +159,40 @@ const PriestReportTemplate = forwardRef<HTMLDivElement, PriestReportTemplateProp
           </tr>
         </tbody>
       </table>
+
+      <p className="text-xs text-gray-500 mt-2">
+        Nghỉ: số em không đi buổi nào trong kỳ báo cáo
+      </p>
+
+      {data.absentWarning && data.absentWarning.students.length > 0 && (
+        <section className="mt-4 border border-[#f5c6cb] bg-[#fff5f5] p-3">
+          <h3 className="text-[#c41e3a] font-bold text-sm mb-2">
+            ⚠ CẢNH BÁO: vắng 2 tháng liên tiếp ({data.absentWarning.prevLabel} và {data.absentWarning.currentLabel})
+          </h3>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-[#f8d7da] text-[#721c24]">
+                <th className="border border-gray-400 px-2 py-2 text-center w-[50px]">STT</th>
+                <th className="border border-gray-400 px-2 py-2 text-left">Tên thánh + Họ tên</th>
+                <th className="border border-gray-400 px-2 py-2 text-left">Lớp</th>
+                <th className="border border-gray-400 px-2 py-2 text-left">SĐT phụ huynh</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.absentWarning.students.map((student, index) => (
+                <tr key={student.studentId} className="bg-white">
+                  <td className="border border-gray-400 px-2 py-2 text-center">{index + 1}</td>
+                  <td className="border border-gray-400 px-2 py-2">
+                    {student.saintName} {student.fullName}
+                  </td>
+                  <td className="border border-gray-400 px-2 py-2">{student.className}</td>
+                  <td className="border border-gray-400 px-2 py-2">{student.parentPhones.join(' / ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {/* Footer */}
       <p className="text-center text-xs text-gray-500 mt-4">

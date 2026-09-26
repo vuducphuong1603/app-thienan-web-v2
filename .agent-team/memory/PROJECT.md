@@ -20,6 +20,8 @@ Next.js 15 app router, React, TypeScript, Tailwind, Supabase JS (prod DB, RLS), 
 - `src/lib/search.ts` `normalizeSearchText` — accent-insensitive search (many callers, don't change casually).
 - `src/components/QRScanAttendanceModal.tsx` — QR + manual attendance; manual search = client-side `filterManualStudents` on an
   ACTIVE-students cache loaded once per open.
+- `src/lib/priest-report.ts` — priest (Cha) report logic: local monthRange, fully-absent counts, 2-month absence warnings;
+  page.tsx generatePriestReport uses it. "Nghỉ" in that report = number of students with 0 present in the period.
 - `src/app/admin/management/students/page.tsx` — Danh bạ (defaults to status ACTIVE).
 
 ## Conventions
@@ -30,4 +32,5 @@ Next.js 15 app router, React, TypeScript, Tailwind, Supabase JS (prod DB, RLS), 
 
 ## Current state & evolution
 - 2026-09-15: manual QR search is consistent with Danh bạ (client filter, accent-insensitive, no 50-row cut).
+- 2026-09-26: priest report Nghỉ = students absent whole period + consecutive-2-month warning (month mode).
 - Known debt: RLS on thieu_nhi still open to authenticated users (GLV/PĐT limits are UI-only); mobile app search not aligned.

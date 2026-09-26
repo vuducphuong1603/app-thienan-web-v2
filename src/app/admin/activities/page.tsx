@@ -6,9 +6,19 @@ import { mergeSundayRecords, isSundayDate, countSundayReport, DayType, SundaySes
 import { sortByGivenName, compareByGivenName } from '@/lib/student-sort'
 import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear, Holiday } from '@/lib/supabase'
-import { useActiveClasses, useSchoolYears, countWeekdays } from '@/lib/queries'
+import { useActiveClasses, useSchoolYears, countWeekdays, fetchAllRows } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
 import { scopedBranches } from '@/lib/branch-scope'
+import {
+  buildAbsentWarnings,
+  countAttendanceDays,
+  countFullyAbsentByClass,
+  monthRange,
+  monthOverlapsSchoolYear,
+  presentStudentIds,
+  previousMonth,
+  type PriestStudent,
+} from '@/lib/priest-report'
 
 import { Check, X, List, FileText, Loader2, Plus, Calendar, CalendarDays, Bell, ShieldAlert, History, ChevronDown, ScanLine, BookOpen, Church, IdCard } from 'lucide-react'
 import Link from 'next/link'
@@ -2036,6 +2046,7 @@ export default function ActivitiesPage() {
       let fromDate: string
       let toDate: string
       let timeLabel: string
+      let reportSY = schoolYear
 
       if (priestTimeFilterMode === 'week') {
         if (!priestWeekStart || !priestWeekEnd) {
@@ -2047,11 +2058,11 @@ export default function ActivitiesPage() {
         toDate = priestWeekEnd
         timeLabel = `Tuần: ${formatDisplayDate(fromDate)} - ${formatDisplayDate(toDate)}`
       } else if (priestTimeFilterMode === 'month') {
-        const firstDay = new Date(priestYear, priestMonth, 1)
-        const lastDay = new Date(priestYear, priestMonth + 1, 0)
-        fromDate = firstDay.toISOString().split('T')[0]
-        toDate = lastDay.toISOString().split('T')[0]
+        const range = monthRange(priestYear, priestMonth)
+        fromDate = range.from
+        toDate = range.to
         timeLabel = `Tháng ${priestMonth + 1}/${priestYear}`
+        reportSY = schoolYears.find(sy => monthOverlapsSchoolYear({ from: fromDate, to: toDate }, sy)) ?? schoolYear
       } else {
         // year mode - use school year dates
         const selectedSY = schoolYears.find(sy => sy.id === priestSchoolYearId)
@@ -2076,15 +2087,33 @@ export default function ActivitiesPage() {
         throw classError || new Error('No classes found')
       }
 
-      // 3. Count students per class
-      const classStudentCounts = new Map<string, number>()
-      for (const cls of allClasses) {
-        const { count } = await supabase
+      // 3. Fetch all active students once; this avoids the Supabase 1000-row limit and N+1 counts.
+      const students = await fetchAllRows<PriestStudent>(
+        (from, to) => supabase
           .from('thieu_nhi')
-          .select('*', { count: 'exact', head: true })
-          .eq('class_id', cls.id)
+          .select('id, saint_name, full_name, class_id, parent_phone, parent_phone_2')
           .eq('status', 'ACTIVE')
-        classStudentCounts.set(cls.id, count || 0)
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+
+      const classStudentCounts = new Map<string, number>()
+      students.forEach(student => {
+        if (student.class_id) {
+          classStudentCounts.set(student.class_id, (classStudentCounts.get(student.class_id) || 0) + 1)
+        }
+      })
+
+      const classIds = allClasses.map(c => c.id)
+      const activeClassIds = new Set(classIds)
+
+      type PriestAttendanceRow = {
+        id: string
+        class_id: string
+        status: string
+        day_type: string
+        student_id: string
+        attendance_date: string
       }
 
       // 4. Count attendance dates (thu5/cn) in the range, excluding holidays
@@ -2110,58 +2139,91 @@ export default function ActivitiesPage() {
         }
       }
 
-      // Count valid attendance days in range
-      const countAttendanceDays = () => {
-        let count = 0
-        const current = new Date(fromDate)
-        const end = new Date(toDate)
-        while (current <= end) {
-          const dateStr = current.toISOString().split('T')[0]
-          const dayIndex = current.getDay()
-          const isThu5 = dayIndex === 4
-          const isCN = dayIndex === 0
+      const attendanceDayCount = countAttendanceDays(fromDate, toDate, priestAttendanceType, holidayDates)
 
-          if (!holidayDates.has(dateStr)) {
-            if (priestAttendanceType === 'all' && (isThu5 || isCN)) count++
-            else if (priestAttendanceType === 'thu5' && isThu5) count++
-            else if (priestAttendanceType === 'cn' && isCN) count++
+      const fetchPriestAttendance = (rangeFrom: string, rangeTo: string) => fetchAllRows<PriestAttendanceRow>(
+        (from, to) => {
+          let attendanceQuery = supabase
+            .from('attendance_records')
+            .select('id, class_id, status, day_type, student_id, attendance_date')
+            .gte('attendance_date', rangeFrom)
+            .lte('attendance_date', rangeTo)
+            .eq('status', 'present')
+            .order('id', { ascending: true })
+
+          if (priestAttendanceType === 'cn') {
+            attendanceQuery = attendanceQuery.in('day_type', ['cn', 'cn_le'])
+          } else if (priestAttendanceType !== 'all') {
+            attendanceQuery = attendanceQuery.eq('day_type', priestAttendanceType)
           }
-          current.setDate(current.getDate() + 1)
+
+          return attendanceQuery.range(from, to)
         }
-        return count
-      }
-      const attendanceDayCount = countAttendanceDays()
+      )
 
-      // 5. Fetch attendance records for all classes in date range
-      const classIds = allClasses.map(c => c.id)
-      let attendanceQuery = supabase
-        .from('attendance_records')
-        .select('class_id, status, day_type, student_id, attendance_date')
-        .in('class_id', classIds)
-        .gte('attendance_date', fromDate)
-        .lte('attendance_date', toDate)
-        .eq('status', 'present')
-
-      if (priestAttendanceType === 'cn') {
-        attendanceQuery = attendanceQuery.in('day_type', ['cn', 'cn_le'])
-      } else if (priestAttendanceType !== 'all') {
-        attendanceQuery = attendanceQuery.eq('day_type', priestAttendanceType)
-      }
-
-      const { data: rawPriestRecords } = await attendanceQuery
+      // 5. Fetch raw attendance for the date range. Filtering by active class happens after merge.
+      const rawPriestRecords = await fetchPriestAttendance(fromDate, toDate)
+      const currentPresentIds = presentStudentIds(rawPriestRecords, priestAttendanceType)
       // Chủ nhật: chỉ tính có mặt khi đủ cả giáo lý lẫn đi lễ
-      const attendanceRecords = rawPriestRecords
-        ? mergeSundayRecords(rawPriestRecords).filter(r => r.status === 'present')
-        : rawPriestRecords
+      const attendanceRecords = mergeSundayRecords(rawPriestRecords)
+        .filter(record => record.status === 'present' && activeClassIds.has(record.class_id))
 
       // 6. Count present per class
       const classPresentCounts = new Map<string, number>()
-      attendanceRecords?.forEach(record => {
+      attendanceRecords.forEach(record => {
         const current = classPresentCounts.get(record.class_id) || 0
         classPresentCounts.set(record.class_id, current + 1)
       })
 
+      let absentWarning: PriestReportData['absentWarning'] = null
+      if (priestTimeFilterMode === 'month') {
+        const previous = previousMonth(priestYear, priestMonth)
+        const previousRange = monthRange(previous.year, previous.monthIndex0)
+        const previousHolidayDates = new Set<string>()
+        const { data: previousHolidays } = await supabase
+          .from('holidays')
+          .select('holiday_date, day_type')
+          .gte('holiday_date', previousRange.from)
+          .lte('holiday_date', previousRange.to)
+
+        if (previousHolidays) {
+          previousHolidays.forEach(h => {
+            if (priestAttendanceType === 'all' || h.day_type === 'both' || h.day_type === priestAttendanceType) {
+              previousHolidayDates.add(h.holiday_date)
+            }
+          })
+        }
+
+        const previousAttendanceDayCount = countAttendanceDays(
+          previousRange.from,
+          previousRange.to,
+          priestAttendanceType,
+          previousHolidayDates
+        )
+        const previousRecords = await fetchPriestAttendance(previousRange.from, previousRange.to)
+        const previousPresentIds = presentStudentIds(previousRecords, priestAttendanceType)
+
+        if (
+          monthOverlapsSchoolYear(previousRange, reportSY) &&
+          attendanceDayCount > 0 &&
+          previousAttendanceDayCount > 0 &&
+          previousPresentIds.size > 0
+        ) {
+          absentWarning = {
+            prevLabel: `Tháng ${previous.monthIndex0 + 1}/${previous.year}`,
+            currentLabel: timeLabel,
+            students: buildAbsentWarnings(
+              students.filter(student => student.class_id !== null && activeClassIds.has(student.class_id)),
+              allClasses,
+              currentPresentIds,
+              previousPresentIds
+            ),
+          }
+        }
+      }
+
       // 7. Group by branch
+      const absentByClass = countFullyAbsentByClass(students, currentPresentIds)
       const branchesData: PriestReportBranchData[] = []
       let grandTotalStudents = 0
       let grandTotalSlots = 0
@@ -2176,7 +2238,7 @@ export default function ActivitiesPage() {
           const studentCount = classStudentCounts.get(cls.id) || 0
           const totalSlots = studentCount * attendanceDayCount
           const presentCount = classPresentCounts.get(cls.id) || 0
-          const absentCount = totalSlots - presentCount
+          const absentCount = absentByClass.get(cls.id) ?? 0
           const rate = totalSlots > 0 ? (presentCount / totalSlots) * 100 : 0
 
           return {
@@ -2186,7 +2248,7 @@ export default function ActivitiesPage() {
             studentCount,
             totalSlots,
             presentCount,
-            absentCount: Math.max(0, absentCount),
+            absentCount,
             rate,
           }
         })
@@ -2194,7 +2256,7 @@ export default function ActivitiesPage() {
         const branchTotalStudents = classesData.reduce((sum, c) => sum + c.studentCount, 0)
         const branchTotalSlots = classesData.reduce((sum, c) => sum + c.totalSlots, 0)
         const branchTotalPresent = classesData.reduce((sum, c) => sum + c.presentCount, 0)
-        const branchTotalAbsent = classesData.reduce((sum, c) => sum + Math.max(0, c.absentCount), 0)
+        const branchTotalAbsent = classesData.reduce((sum, c) => sum + c.absentCount, 0)
         const branchRate = branchTotalSlots > 0 ? (branchTotalPresent / branchTotalSlots) * 100 : 0
 
         branchesData.push({
@@ -2225,6 +2287,7 @@ export default function ActivitiesPage() {
         fromDate,
         toDate,
         timeLabel,
+        absentWarning,
       }
 
       setPriestReportData(reportData)
@@ -2315,6 +2378,24 @@ export default function ActivitiesPage() {
       const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
       ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }]
       XLSX.utils.book_append_sheet(wb, ws, 'Tong hop')
+
+      if (priestReportData.absentWarning) {
+        const warning = priestReportData.absentWarning
+        const warningTitle = `CẢNH BÁO: vắng 2 tháng liên tiếp (${warning.prevLabel} và ${warning.currentLabel})`
+        const warningHeader = ['STT', 'Tên thánh', 'Họ tên', 'Lớp', 'SĐT phụ huynh']
+        const warningRows: (string | number)[][] = warning.students.length > 0
+          ? warning.students.map((student, index) => [
+            index + 1,
+            student.saintName,
+            student.fullName,
+            student.className,
+            student.parentPhones.join(' / '),
+          ])
+          : [['Không có em nào vắng 2 tháng liên tiếp']]
+        const warningWs = XLSX.utils.aoa_to_sheet([[warningTitle], warningHeader, ...warningRows])
+        warningWs['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 25 }]
+        XLSX.utils.book_append_sheet(wb, warningWs, 'Canh bao')
+      }
 
       const fileName = `bao_cao_tong_hop_${today}.xlsx`
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
@@ -4520,10 +4601,10 @@ export default function ActivitiesPage() {
                       <span className="text-[40px] font-bold text-black dark:text-white leading-none">{priestReportData.grandTotalPresent}</span>
                     </div>
 
-                    {/* Tổng lượt nghỉ */}
+                    {/* Số em nghỉ cả kỳ */}
                     <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80 dark:text-white/80">Tổng lượt nghỉ</span>
+                        <span className="text-sm text-black/80 dark:text-white/80">Số em nghỉ cả kỳ</span>
                         <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         </div>
@@ -4606,6 +4687,57 @@ export default function ActivitiesPage() {
                       </tbody>
                     </table>
                   </div>
+
+                  <p className="mt-2 text-xs text-[#666d80]">
+                    Nghỉ: số em không đi buổi nào trong kỳ báo cáo
+                  </p>
+
+                  {priestTimeFilterMode === 'month' && priestReportData.absentWarning && (
+                    <section className="mt-5 rounded-2xl border border-[#f5c6cb] bg-[#fff5f5] p-4">
+                      <h3 className="mb-3 text-sm font-bold text-[#c41e3a]">
+                        ⚠ CẢNH BÁO: vắng 2 tháng liên tiếp ({priestReportData.absentWarning.prevLabel} và {priestReportData.absentWarning.currentLabel})
+                      </h3>
+                      {priestReportData.absentWarning.students.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-[#f5c6cb] bg-[#f8d7da] text-[#721c24]">
+                                <th className="px-2 py-2 text-left font-medium w-[50px]">STT</th>
+                                <th className="px-2 py-2 text-left font-medium">Tên thánh + Họ tên</th>
+                                <th className="px-2 py-2 text-left font-medium">Lớp</th>
+                                <th className="px-2 py-2 text-left font-medium">SĐT phụ huynh</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {priestReportData.absentWarning.students.map((student, index) => (
+                                <tr key={student.studentId} className="border-b border-[#f5c6cb] bg-white/70">
+                                  <td className="px-2 py-2 text-[#666d80]">{index + 1}</td>
+                                  <td className="px-2 py-2 text-black">
+                                    {student.saintName} {student.fullName}
+                                  </td>
+                                  <td className="px-2 py-2 text-black">{student.className}</td>
+                                  <td className="px-2 py-2 text-black">
+                                    {student.parentPhones.length > 0
+                                      ? student.parentPhones.map((phone, phoneIndex) => (
+                                        <React.Fragment key={phone}>
+                                          {phoneIndex > 0 && ' / '}
+                                          <a className="text-[#c41e3a] underline" href={`tel:${phone}`}>
+                                            {phone}
+                                          </a>
+                                        </React.Fragment>
+                                      ))
+                                      : '-'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-[#721c24]">Không có em nào vắng 2 tháng liên tiếp</p>
+                      )}
+                    </section>
+                  )}
                 </div>
               )}
             </>
