@@ -1,6 +1,7 @@
 'use client'
 
 import { CLASS_TEACHER_ROLES } from '@/lib/class-teachers'
+import { filterActiveNamedTeachers } from '@/lib/teacher-scope'
 import { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft, ChevronDown, Search, UserMinus } from 'lucide-react'
 import { supabase, Class, Branch } from '@/lib/supabase'
@@ -53,18 +54,20 @@ export default function EditClassForm({ classData, onBack, onSuccess }: EditClas
     try {
       const { data: allTeachers, error } = await supabase
         .from('users')
-        .select('id, full_name, saint_name, role, class_id, class_name')
+        .select('id, full_name, saint_name, role, status, class_id, class_name')
         .in('role', [...CLASS_TEACHER_ROLES])
+        .eq('status', 'ACTIVE')
 
       if (error) {
         console.error('Error fetching teachers:', error)
         return
       }
 
-      const assigned = (allTeachers || []).filter(
+      const namedActiveTeachers = filterActiveNamedTeachers(allTeachers || [])
+      const assigned = namedActiveTeachers.filter(
         (t) => t.class_id === classData.id || t.class_name === classData.name
       )
-      const available = (allTeachers || []).filter(
+      const available = namedActiveTeachers.filter(
         (t) => !t.class_id && !t.class_name
       )
 

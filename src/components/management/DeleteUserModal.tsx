@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LogOut } from 'lucide-react'
 
 interface DeleteUserModalProps {
@@ -12,14 +12,21 @@ interface DeleteUserModalProps {
 
 export default function DeleteUserModal({ isOpen, onClose, onConfirm }: DeleteUserModalProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) setErrorMessage(null)
+  }, [isOpen])
 
   const handleDelete = async () => {
     setIsDeleting(true)
+    setErrorMessage(null)
     try {
       await onConfirm()
       onClose()
     } catch (error) {
       console.error('Error deleting user:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể xóa tài khoản')
     } finally {
       setIsDeleting(false)
     }
@@ -44,6 +51,11 @@ export default function DeleteUserModal({ isOpen, onClose, onConfirm }: DeleteUs
           <p className="text-sm text-primary-3 text-center mb-6">
             Bạn chắc chắn muốn xóa tài khoản này?
           </p>
+          {errorMessage && (
+            <p className="w-full mb-4 text-sm text-red-600 text-center" role="alert">
+              {errorMessage}
+            </p>
+          )}
 
           {/* Buttons */}
           <div className="w-full flex items-center gap-3">

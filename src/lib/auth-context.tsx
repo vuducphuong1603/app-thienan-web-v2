@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo, ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase, UserProfile, UserRole, resetAuthDead } from './supabase'
+import { loginIdentifierToEmail } from './login-identifier'
 import { getBranchScope, isManagerRole, type BranchScope } from './branch-scope'
 import { useRouter, usePathname } from 'next/navigation'
 import {
@@ -40,21 +41,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // Routes that don't require authentication
 const publicRoutes = ['/login', '/register', '/forgot-password']
-
-// Convert phone number to email format used in Supabase Auth
-function phoneToEmail(phone: string): string {
-  // Remove whitespace and normalize
-  let normalized = phone.trim().replace(/\s/g, '')
-  // Remove +84 prefix and add leading 0
-  if (normalized.startsWith('+84')) {
-    normalized = '0' + normalized.slice(3)
-  }
-  // Remove 84 prefix (without +)
-  if (normalized.startsWith('84') && normalized.length === 11) {
-    normalized = '0' + normalized.slice(2)
-  }
-  return `${normalized}@thienan.app`
-}
 
 // Fetch user profile from public.users table
 async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
@@ -293,11 +279,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true)
 
-      // Normalize identifier
-      const normalizedIdentifier = identifier.trim().replace(/\s/g, '')
-
-      // Convert phone/identifier to email format for Supabase Auth
-      const email = phoneToEmail(normalizedIdentifier)
+      // Convert phone/identifier to the Supabase Auth email format. Existing
+      // @thienan.local accounts pass through unchanged.
+      const email = loginIdentifierToEmail(identifier)
 
       // Sign in via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({

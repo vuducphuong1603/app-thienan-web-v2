@@ -14,6 +14,7 @@ import AddUserForm from '@/components/management/AddUserForm'
 import EditUserForm from '@/components/management/EditUserForm'
 import { useUsers, useClassesByBranch, useInvalidateQueries } from '@/lib/queries'
 import { normalizeSearchText } from '@/lib/search'
+import { getEdgeFunctionErrorMessage } from '@/lib/edge-function-error'
 
 interface User extends UserProfile {
   class_name?: string
@@ -124,14 +125,16 @@ export default function UsersPage() {
   const handleDeleteUser = async () => {
     if (!userToDelete) return
 
-    const { error } = await supabase
-      .from('users')
-      .delete()
-      .eq('id', userToDelete.id)
+    const { data, error } = await supabase.functions.invoke('delete-user', {
+      body: { userId: userToDelete.id },
+    })
 
     if (error) {
       console.error('Error deleting user:', error)
-      throw error
+      throw new Error(await getEdgeFunctionErrorMessage(error))
+    }
+    if (data?.error) {
+      throw new Error(data.error)
     }
 
     // Refresh the users list
@@ -147,14 +150,16 @@ export default function UsersPage() {
   const handleResetPassword = async () => {
     if (!userToResetPassword) return
 
-    const { error } = await supabase
-      .from('users')
-      .update({ password: '123456' })
-      .eq('id', userToResetPassword.id)
+    const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+      body: { userId: userToResetPassword.id, password: '123456' },
+    })
 
     if (error) {
       console.error('Error resetting password:', error)
-      throw error
+      throw new Error(await getEdgeFunctionErrorMessage(error))
+    }
+    if (data?.error) {
+      throw new Error(data.error)
     }
   }
 

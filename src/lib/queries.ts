@@ -4,7 +4,8 @@ import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRu
 import { CLASS_TEACHER_ROLES } from './class-teachers'
 import type { DirectoryClass, DirectoryUser } from './teacher-directory'
 import { sortByGivenName } from './student-sort'
-import { effectiveSessionDays, tbHK, tbNam } from './score-summary'
+import { effectiveSessionDays } from './score-summary'
+import { calculateStudentScoreDetails, countPresentAttendance } from './student-score-summary'
 import { useAuth } from './auth-context'
 import { invalidateStudentData, invalidateUserData } from './cache-invalidation'
 import {
@@ -581,36 +582,50 @@ export function useStudentsWithDetails() {
       console.log('[useStudentsWithDetails] queryFn START')
       const t0 = Date.now()
 
-      // Fetch everything in parallel - no waterfall
-      const [schoolYearRes, classesRes, studentsData, allHolidaysRes] = await Promise.all([
-        supabase.from('school_years').select('id, start_date, end_date').eq('is_current', true).single()
-          .then(r => { console.log('[query] school_years done:', Date.now() - t0, 'ms', r.error?.message || 'OK'); return r }),
+      // Attendance records need the current school-year date range, so load the
+      // year first and then fetch the remaining data in parallel.
+      const schoolYearRes = await supabase.from('school_years').select('id, start_date, end_date').eq('is_current', true).single()
+        .then(r => { console.log('[query] school_years done:', Date.now() - t0, 'ms', r.error?.message || 'OK'); return r })
+
+      if (schoolYearRes.error) throw schoolYearRes.error
+      const schoolYear = schoolYearRes.data
+
+      const [classesRes, studentsData, allHolidaysRes, attendanceData] = await Promise.all([
         supabase.from('classes').select('id, name, branch, display_order, status, created_at, updated_at').eq('status', 'ACTIVE').order('display_order', { ascending: true })
           .then(r => { console.log('[query] classes done:', Date.now() - t0, 'ms', r.error?.message || 'OK'); return r }),
         // Supabase chỉ trả tối đa 1000 dòng mỗi request nên phải lấy hết theo trang,
         // nếu không danh sách và ô tìm kiếm sẽ bỏ sót thiếu nhi khi vượt 1000 em.
         // Kèm .order('id') làm khoá phụ để phân trang ổn định khi trùng full_name.
         fetchAllRows<ThieuNhiProfile>(
-          (from, to) => supabase.from('thieu_nhi').select('id, full_name, saint_name, student_code, date_of_birth, gender, phone, address, parent_name, parent_phone, parent_name_2, parent_phone_2, class_id, status, avatar_url, notes, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn, created_at, updated_at')
+          (from, to) => supabase.from('thieu_nhi').select('id, full_name, saint_name, student_code, date_of_birth, gender, phone, address, parent_name, parent_phone, parent_name_2, parent_phone_2, class_id, status, avatar_url, notes, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, created_at, updated_at')
             .order('full_name', { ascending: true }).order('id', { ascending: true }).range(from, to)
         ).then(rows => { console.log('[query] thieu_nhi done:', Date.now() - t0, 'ms', 'rows:', rows.length); return rows }),
         supabase.from('holidays').select('day_type, school_year_id')
           .then(r => { console.log('[query] holidays done:', Date.now() - t0, 'ms', r.error?.message || 'OK'); return r }),
+        fetchAllRows<Pick<AttendanceRecord, 'id' | 'student_id' | 'day_type'>>(
+          (from, to) => supabase
+            .from('attendance_records')
+            .select('id, student_id, day_type')
+            .eq('status', 'present')
+            .gte('attendance_date', schoolYear.start_date)
+            .lte('attendance_date', schoolYear.end_date)
+            .order('id', { ascending: true })
+            .range(from, to),
+        ),
       ])
 
       console.log('[useStudentsWithDetails] All queries done:', Date.now() - t0, 'ms')
 
-      if (schoolYearRes.error) throw schoolYearRes.error
       if (classesRes.error) throw classesRes.error
       if (allHolidaysRes.error) throw allHolidaysRes.error
 
-      const schoolYear = schoolYearRes.data
       const classesData = classesRes.data || []
       // Chỉ lấy ngày nghỉ của năm học hiện tại, tránh trừ nhầm ngày nghỉ năm cũ
       const holidays = ((allHolidaysRes.data || []) as Pick<Holiday, 'day_type' | 'school_year_id'>[])
         .filter(h => !schoolYear || h.school_year_id === schoolYear.id)
 
       const { thu5: effectiveThu5Days, cn: effectiveCnDays } = effectiveSessionDays(schoolYear, holidays)
+      const attendanceCounts = countPresentAttendance(attendanceData)
 
       // Build class lookup map for O(1) access instead of O(n) find per student
       const classMap = new Map(classesData.map(c => [c.id, c]))
@@ -621,30 +636,27 @@ export function useStudentsWithDetails() {
         const birthDate = student.date_of_birth ? new Date(student.date_of_birth) : null
         const age = birthDate ? Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : undefined
 
-        const score_45_hk1 = student.score_45_hk1
-        const score_exam_hk1 = student.score_exam_hk1
-        const score_45_hk2 = student.score_45_hk2
-        const score_exam_hk2 = student.score_exam_hk2
-        const attendance_thu5 = student.attendance_thu5 || 0
-        const attendance_cn = student.attendance_cn || 0
-
-        const avg_catechism = tbNam(
-          tbHK(score_45_hk1, score_exam_hk1),
-          tbHK(score_45_hk2, score_exam_hk2),
+        const scoreDetails = calculateStudentScoreDetails(
+          {
+            score_45_hk1: student.score_45_hk1,
+            score_exam_hk1: student.score_exam_hk1,
+            score_45_hk2: student.score_45_hk2,
+            score_exam_hk2: student.score_exam_hk2,
+          },
+          attendanceCounts.get(student.id),
+          { thu5: effectiveThu5Days, cn: effectiveCnDays },
         )
-        const score_thu5 = (attendance_thu5 * 0.4) * (10 / effectiveThu5Days)
-        const score_cn = (attendance_cn * 0.6) * (10 / effectiveCnDays)
-        const avg_attendance = score_thu5 + score_cn
-        const total_avg = avg_catechism === null ? null : avg_catechism * 0.6 + avg_attendance * 0.4
 
         return {
           ...student,
           class_name: studentClass?.name || undefined,
           class_branch: studentClass?.branch || undefined,
           age,
-          score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2,
-          avg_catechism, attendance_thu5, attendance_cn,
-          score_thu5, score_cn, avg_attendance, total_avg,
+          score_45_hk1: student.score_45_hk1,
+          score_exam_hk1: student.score_exam_hk1,
+          score_45_hk2: student.score_45_hk2,
+          score_exam_hk2: student.score_exam_hk2,
+          ...scoreDetails,
         }
       })
 
@@ -772,18 +784,27 @@ export function useClassDetail(classId: string) {
       const lastCN = getRecentDay('cn')
       const recentDates = [lastThu5, lastCN].filter(Boolean) as string[]
 
-      const [teachersRes, students, schoolYearRes, attendanceRes] = await Promise.all([
+      const schoolYearRes = await supabase
+        .from('school_years')
+        .select('id, start_date, end_date')
+        .eq('is_current', true)
+        .maybeSingle()
+
+      if (schoolYearRes.error) throw schoolYearRes.error
+      const schoolYear = schoolYearRes.data
+
+      const [teachersRes, students, attendanceData, attendanceRes] = await Promise.all([
         supabase
           .from('users')
           .select('id, full_name, saint_name, phone, email, avatar_url, status, class_id, class_name')
           .in('role', [...CLASS_TEACHER_ROLES]),
         // Supabase trả tối đa 1000 dòng mỗi request nên phải lấy hết theo trang
-        fetchAllRows<Omit<ClassStudentDetail, 'avgCatechism' | 'avgAttendance' | 'totalAvg'>>(
+        fetchAllRows<Omit<ClassStudentDetail, 'attendance_thu5' | 'attendance_cn' | 'avgCatechism' | 'avgAttendance' | 'totalAvg'>>(
           (from, to) =>
             supabase
               .from('thieu_nhi')
               .select(
-                'id, student_code, full_name, saint_name, date_of_birth, parent_name, parent_phone, status, avatar_url, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn'
+                'id, student_code, full_name, saint_name, date_of_birth, parent_name, parent_phone, status, avatar_url, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2'
               )
               .eq('class_id', classId)
               // Chỉ lấy em đang học: sau mỗi năm học, em cũ của lớp bị chuyển
@@ -793,7 +814,20 @@ export function useClassDetail(classId: string) {
               .order('id', { ascending: true })
               .range(from, to)
         ),
-        supabase.from('school_years').select('id, start_date, end_date').eq('is_current', true).maybeSingle(),
+        schoolYear
+          ? fetchAllRows<Pick<AttendanceRecord, 'id' | 'student_id' | 'day_type'>>(
+              (from, to) =>
+                supabase
+                  .from('attendance_records')
+                  .select('id, student_id, day_type')
+                  .eq('class_id', classId)
+                  .eq('status', 'present')
+                  .gte('attendance_date', schoolYear.start_date)
+                  .lte('attendance_date', schoolYear.end_date)
+                  .order('id', { ascending: true })
+                  .range(from, to)
+            )
+          : Promise.resolve([] as Pick<AttendanceRecord, 'id' | 'student_id' | 'day_type'>[]),
         supabase
           .from('attendance_records')
           .select('student_id, day_type')
@@ -819,7 +853,6 @@ export function useClassDetail(classId: string) {
         .sort((a, b) => a.full_name.localeCompare(b.full_name, 'vi'))
 
       // Số buổi học thực tế (trừ ngày lễ) để quy đổi điểm danh ra thang 10
-      const schoolYear = schoolYearRes.data
       let holidays: { day_type: string }[] = []
       if (schoolYear) {
         const { data: holidaysData } = await supabase
@@ -829,21 +862,27 @@ export function useClassDetail(classId: string) {
         holidays = (holidaysData || []) as { day_type: string }[]
       }
       const { thu5: effectiveThu5Days, cn: effectiveCnDays } = effectiveSessionDays(schoolYear, holidays)
+      const attendanceCounts = countPresentAttendance(attendanceData)
 
       const scoredStudents: ClassStudentDetail[] = students
         .map((s) => {
-          const avgCatechism = tbNam(
-            tbHK(s.score_45_hk1, s.score_exam_hk1),
-            tbHK(s.score_45_hk2, s.score_exam_hk2),
+          const scoreDetails = calculateStudentScoreDetails(
+            {
+              score_45_hk1: s.score_45_hk1,
+              score_exam_hk1: s.score_exam_hk1,
+              score_45_hk2: s.score_45_hk2,
+              score_exam_hk2: s.score_exam_hk2,
+            },
+            attendanceCounts.get(s.id),
+            { thu5: effectiveThu5Days, cn: effectiveCnDays },
           )
-          const avgAttendance =
-            (s.attendance_thu5 || 0) * 0.4 * (10 / effectiveThu5Days) +
-            (s.attendance_cn || 0) * 0.6 * (10 / effectiveCnDays)
           return {
             ...s,
-            avgCatechism,
-            avgAttendance,
-            totalAvg: avgCatechism === null ? null : avgCatechism * 0.6 + avgAttendance * 0.4,
+            attendance_thu5: scoreDetails.attendance_thu5,
+            attendance_cn: scoreDetails.attendance_cn,
+            avgCatechism: scoreDetails.avg_catechism,
+            avgAttendance: scoreDetails.avg_attendance,
+            totalAvg: scoreDetails.total_avg,
           }
         })
       // Xếp theo tên gọi (chữ cuối) giống trang Quản lý thiếu nhi

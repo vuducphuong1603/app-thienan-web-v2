@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LogOut } from 'lucide-react'
 
 interface ResetPasswordModalProps {
@@ -12,14 +12,21 @@ interface ResetPasswordModalProps {
 
 export default function ResetPasswordModal({ isOpen, onClose, onConfirm }: ResetPasswordModalProps) {
   const [isResetting, setIsResetting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) setErrorMessage(null)
+  }, [isOpen])
 
   const handleReset = async () => {
     setIsResetting(true)
+    setErrorMessage(null)
     try {
       await onConfirm()
       onClose()
     } catch (error) {
       console.error('Error resetting password:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể reset mật khẩu')
     } finally {
       setIsResetting(false)
     }
@@ -44,6 +51,11 @@ export default function ResetPasswordModal({ isOpen, onClose, onConfirm }: Reset
           <p className="text-sm text-primary-3 text-center mb-6">
             Bạn chắc chắn muốn reset mật khẩu của người dùng về 123456?
           </p>
+          {errorMessage && (
+            <p className="w-full mb-4 text-sm text-red-600 text-center" role="alert">
+              {errorMessage}
+            </p>
+          )}
 
           {/* Buttons */}
           <div className="w-full flex items-center gap-3">
