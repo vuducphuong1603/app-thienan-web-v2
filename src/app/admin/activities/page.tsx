@@ -10,7 +10,7 @@ import { useActiveClasses, useSchoolYears, fetchAllRows } from '@/lib/queries'
 import { countReportCells, reportCellStatus, reportTotalAttendance, REPORT_CELL_SYMBOL, type ReportCellStatus } from '@/lib/report-cell'
 import { attendanceScores, effectiveSessionDays, fmtScore, round2, scoreSummary } from '@/lib/score-summary'
 import { useAuth } from '@/lib/auth-context'
-import { scopedBranches } from '@/lib/branch-scope'
+import { filterByBranch, scopedBranches } from '@/lib/branch-scope'
 import {
   buildAbsentWarnings,
   countAttendanceDays,
@@ -472,6 +472,7 @@ export default function ActivitiesPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState<string | null>(null) // studentId being saved
   const { data: classes = [] } = useActiveClasses()
+  const reportClasses = filterByBranch(classes, scope)
   const [students, setStudents] = useState<StudentWithAttendance[]>([])
   const { data: schoolYearsData = [] } = useSchoolYears()
   const schoolYears = schoolYearsData
@@ -1555,14 +1556,14 @@ export default function ActivitiesPage() {
 
   // Get report class name
   const getReportClassName = (classId: string) => {
-    const cls = classes.find((c) => c.id === classId)
+    const cls = reportClasses.find((c) => c.id === classId)
     return cls?.name || ''
   }
 
   // Get classes filtered by branch for report
   const getClassesByBranch = (branch: string) => {
-    if (!branch) return classes
-    return classes.filter(c => c.branch === branch)
+    if (!branch) return reportClasses
+    return reportClasses.filter(c => c.branch === branch)
   }
 
   // Close all report dropdowns
@@ -2119,6 +2120,7 @@ export default function ActivitiesPage() {
       if (classError || !allClasses) {
         throw classError || new Error('No classes found')
       }
+      const scopedClasses = filterByBranch(allClasses as Class[], scope)
 
       // 3. Fetch all active students once; this avoids the Supabase 1000-row limit and N+1 counts.
       const students = await fetchAllRows<PriestStudent>(
@@ -2137,7 +2139,7 @@ export default function ActivitiesPage() {
         }
       })
 
-      const classIds = allClasses.map(c => c.id)
+      const classIds = scopedClasses.map(c => c.id)
       const activeClassIds = new Set(classIds)
 
       type PriestAttendanceRow = {
@@ -2247,7 +2249,7 @@ export default function ActivitiesPage() {
             currentLabel: timeLabel,
             students: buildAbsentWarnings(
               students.filter(student => student.class_id !== null && activeClassIds.has(student.class_id)),
-              allClasses,
+              scopedClasses,
               currentPresentIds,
               previousPresentIds
             ),
@@ -2263,8 +2265,8 @@ export default function ActivitiesPage() {
       let grandTotalPresent = 0
       let grandTotalAbsent = 0
 
-      for (const branchName of BRANCHES) {
-        const branchClasses = allClasses.filter(c => c.branch === branchName)
+      for (const branchName of reportBranches) {
+        const branchClasses = scopedClasses.filter(c => c.branch === branchName)
         if (branchClasses.length === 0) continue
 
         const classesData: PriestReportClassData[] = branchClasses.map(cls => {

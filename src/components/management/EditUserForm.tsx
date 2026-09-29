@@ -20,8 +20,6 @@ interface EditUserFormProps {
 interface FormData {
   username: string
   role: UserRole
-  password: string
-  confirmPassword: string
   saint_name: string
   full_name: string
   birthday: string
@@ -41,8 +39,6 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
 
     username: user.username || '',
     role: user.role,
-    password: '',
-    confirmPassword: '',
     saint_name: user.saint_name || '',
     full_name: user.full_name || '',
     birthday: '',
@@ -131,9 +127,6 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
     const newErrors: Partial<FormData> = {}
 
     if (!formData.username.trim()) newErrors.username = 'Vui lòng nhập tên đăng nhập'
-    if (formData.password && formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp'
-    }
     if (!formData.saint_name.trim()) newErrors.saint_name = 'Vui lòng nhập tên thánh'
     if (!formData.full_name.trim()) newErrors.full_name = 'Vui lòng nhập họ và tên'
     if (!formData.phone.trim()) newErrors.phone = 'Vui lòng nhập số điện thoại'
@@ -178,11 +171,6 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
         class_id: formData.class_id || null,
         class_name: formData.class_name || null,
         updated_at: new Date().toISOString(),
-      }
-
-      // Only update password if provided
-      if (formData.password) {
-        updateData.password = formData.password
       }
 
       const { error } = await supabase
@@ -356,39 +344,6 @@ export default function EditUserForm({ user, onBack, onSuccess }: EditUserFormPr
                 </div>
               </div>
             </div>
-
-            {/* Password & Confirm Password */}
-            <div className="flex gap-3">
-              <div className="flex-1 flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-primary-3">
-                  Mật khẩu <span className="text-black/40">(để trống nếu không đổi)</span>
-                </label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => handleInputChange('password', e.target.value)}
-                  placeholder="Nhập mật khẩu mới"
-                  className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.password ? 'ring-2 ring-red-500' : ''}`}
-                />
-                {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
-              </div>
-              <div className="flex-1 flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-primary-3">
-                  Xác nhận mật khẩu
-                </label>
-                <input
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                  placeholder="Nhập lại mật khẩu"
-                  className={`h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/10 rounded-xl text-sm text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-gray-500 border-none focus:outline-none focus:ring-2 focus:ring-brand/30 ${errors.confirmPassword ? 'ring-2 ring-red-500' : ''}`}
-                />
-                {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword}</p>}
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="h-px bg-[#E5E1DC] dark:bg-white/10 my-2" />
 
             {/* Saint Name & Full Name */}
             <div className="flex gap-3">

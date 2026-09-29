@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 import { supabase, UserRole, ROLE_LABELS, Class } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { filterByBranch, inScope } from '@/lib/branch-scope'
+import { getEdgeFunctionErrorMessage } from '@/lib/edge-function-error'
 
 interface ImportUsersModalProps {
   isOpen: boolean
@@ -283,36 +284,46 @@ export default function ImportUsersModal({ isOpen, onClose, onSuccess }: ImportU
           continue
         }
 
-        // Insert new user (phone can be null, email auto-generated from username)
-        const autoEmail = `${user.username.toLowerCase()}@thienan.local`
+        if (!user.phone.trim()) {
+          failed++
+          errors.push(`${user.username}: Thiếu số điện thoại để tạo tài khoản đăng nhập`)
+          continue
+        }
 
         // Lookup class UUID by matching class name
         const classUuid = findClassId(user.class_name)
 
-        const { error } = await supabase.from('users').insert({
-          username: user.username,
-          email: autoEmail,
-          full_name: user.full_name,
-          saint_name: user.saint_name || null,
-          phone: user.phone || null,
-          address: user.address || null,
-          role: user.role,
-          branch: user.branch,
-          class_id: classUuid, // Now stores actual UUID instead of class_code
-          class_name: user.class_name || null,
-          status: 'ACTIVE',
-          password: '123456' // Default password
+        const { data, error } = await supabase.functions.invoke('admin-create-user', {
+          body: {
+            phone: user.phone,
+            username: user.username,
+            password: '123456',
+            full_name: user.full_name,
+            saint_name: user.saint_name || null,
+            role: user.role,
+            branch: user.branch || null,
+            class_id: classUuid,
+            class_name: user.class_name || null,
+            address: user.address || null,
+            status: 'ACTIVE',
+          },
         })
 
         if (error) {
           failed++
-          errors.push(`${user.username}: ${error.message}`)
+          errors.push(`${user.username}: ${await getEdgeFunctionErrorMessage(error)}`)
+        } else if (data?.error) {
+          failed++
+          errors.push(`${user.username}: ${data.error}`)
+        } else if (!data?.id) {
+          failed++
+          errors.push(`${user.username}: Không nhận được mã tài khoản`)
         } else {
           success++
         }
-      } catch {
+      } catch (error) {
         failed++
-        errors.push(`${user.username}: Lỗi không xác định`)
+        errors.push(`${user.username}: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`)
       }
     }
 

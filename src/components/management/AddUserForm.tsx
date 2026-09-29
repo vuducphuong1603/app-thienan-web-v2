@@ -9,6 +9,7 @@ import AvatarCropModal from '@/components/ui/AvatarCropModal'
 import { validateAvatarFile } from '@/lib/student-avatar'
 import { useAuth } from '@/lib/auth-context'
 import { scopedBranches, assignableRoles } from '@/lib/branch-scope'
+import { getEdgeFunctionErrorMessage } from '@/lib/edge-function-error'
 
 interface AddUserFormProps {
   onBack: () => void
@@ -147,9 +148,39 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
 
     setIsSubmitting(true)
     try {
-      let avatarUrl = null
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          phone: formData.phone,
+          username: formData.username,
+          password: formData.password,
+          full_name: formData.full_name,
+          saint_name: formData.saint_name || null,
+          role: formData.role,
+          branch: formData.branch || null,
+          class_id: formData.class_id || null,
+          class_name: formData.class_name || null,
+          address: formData.address || null,
+          status: 'ACTIVE',
+        },
+      })
 
-      // Upload avatar if selected
+      if (error) {
+        alert(`Lỗi tạo người dùng: ${await getEdgeFunctionErrorMessage(error)}`)
+        return
+      }
+
+      if (data?.error) {
+        alert(`Lỗi tạo người dùng: ${data.error}`)
+        return
+      }
+
+      if (!data?.id) {
+        alert('Lỗi tạo người dùng: Không nhận được mã tài khoản')
+        return
+      }
+
+      // Preserve the optional avatar upload after Auth/profile creation. The
+      // edge function owns the account transaction; this is only a profile URL.
       if (avatarFile) {
         const fileExt = avatarFile.name.split('.').pop()
         const fileName = `${Date.now()}.${fileExt}`
@@ -161,33 +192,15 @@ export default function AddUserForm({ onBack, onSuccess }: AddUserFormProps) {
           const { data: { publicUrl } } = supabase.storage
             .from('avatars')
             .getPublicUrl(fileName)
-          avatarUrl = publicUrl
+          const { error: avatarProfileError } = await supabase
+            .from('users')
+            .update({ avatar_url: publicUrl })
+            .eq('id', data.id)
+
+          if (avatarProfileError) {
+            console.warn('User created but avatar could not be saved:', avatarProfileError)
+          }
         }
-      }
-
-      // Create user with UUID
-      const userId = crypto.randomUUID()
-      const { error } = await supabase.from('users').insert({
-        id: userId,
-        username: formData.username,
-        email: formData.username + '@thienan.local',
-        password: formData.password,
-        role: formData.role,
-        saint_name: formData.saint_name,
-        full_name: formData.full_name,
-        phone: formData.phone,
-        address: formData.address || null,
-        avatar_url: avatarUrl,
-        branch: formData.branch || null,
-        class_id: formData.class_id || null,
-        class_name: formData.class_name || null,
-        status: 'ACTIVE',
-      })
-
-      if (error) {
-        console.error('Error creating user:', error)
-        alert(`Lỗi tạo người dùng: ${error.message}`)
-        return
       }
 
       onSuccess()
