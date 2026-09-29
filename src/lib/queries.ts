@@ -4,6 +4,7 @@ import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRu
 import { CLASS_TEACHER_ROLES } from './class-teachers'
 import type { DirectoryClass, DirectoryUser } from './teacher-directory'
 import { sortByGivenName } from './student-sort'
+import { effectiveSessionDays, tbHK, tbNam } from './score-summary'
 import { useAuth } from './auth-context'
 import { invalidateStudentData, invalidateUserData } from './cache-invalidation'
 import {
@@ -301,8 +302,6 @@ export function useGLVPerStudentStats(classId: string | undefined, enabled = tru
         .from('school_years').select('id, start_date, end_date').eq('is_current', true).single()
 
       const schoolYearId = schoolYear?.id
-      const totalThu5 = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 4) : 40
-      const totalCn = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 0) : 40
 
       // Get holidays, students, and all attendance records in parallel
       const [holidaysRes, studentsRes, attendanceRes] = await Promise.all([
@@ -323,10 +322,7 @@ export function useGLVPerStudentStats(classId: string | undefined, enabled = tru
       if (attendanceRes.error) throw attendanceRes.error
 
       const holidays = (holidaysRes.data || []) as Holiday[]
-      const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
-      const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
-      const effectiveThu5Days = Math.max(1, totalThu5 - thu5Holidays)
-      const effectiveCnDays = Math.max(1, totalCn - cnHolidays)
+      const { thu5: effectiveThu5Days, cn: effectiveCnDays } = effectiveSessionDays(schoolYear, holidays)
 
       const students = sortByGivenName(studentsRes.data || [])
       const records = attendanceRes.data || []
@@ -614,15 +610,7 @@ export function useStudentsWithDetails() {
       const holidays = ((allHolidaysRes.data || []) as Pick<Holiday, 'day_type' | 'school_year_id'>[])
         .filter(h => !schoolYear || h.school_year_id === schoolYear.id)
 
-      // Count actual Thursdays (4) and Sundays (0) in school year
-      const totalThu5 = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 4) : 40
-      const totalCn = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 0) : 40
-
-      // Calculate effective days (actual day count minus holidays)
-      const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
-      const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
-      const effectiveThu5Days = Math.max(1, totalThu5 - thu5Holidays)
-      const effectiveCnDays = Math.max(1, totalCn - cnHolidays)
+      const { thu5: effectiveThu5Days, cn: effectiveCnDays } = effectiveSessionDays(schoolYear, holidays)
 
       // Build class lookup map for O(1) access instead of O(n) find per student
       const classMap = new Map(classesData.map(c => [c.id, c]))
@@ -633,18 +621,21 @@ export function useStudentsWithDetails() {
         const birthDate = student.date_of_birth ? new Date(student.date_of_birth) : null
         const age = birthDate ? Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : undefined
 
-        const score_45_hk1 = student.score_45_hk1 || 0
-        const score_exam_hk1 = student.score_exam_hk1 || 0
-        const score_45_hk2 = student.score_45_hk2 || 0
-        const score_exam_hk2 = student.score_exam_hk2 || 0
+        const score_45_hk1 = student.score_45_hk1
+        const score_exam_hk1 = student.score_exam_hk1
+        const score_45_hk2 = student.score_45_hk2
+        const score_exam_hk2 = student.score_exam_hk2
         const attendance_thu5 = student.attendance_thu5 || 0
         const attendance_cn = student.attendance_cn || 0
 
-        const avg_catechism = (score_45_hk1 + score_45_hk2 + score_exam_hk1 * 2 + score_exam_hk2 * 2) / 6
+        const avg_catechism = tbNam(
+          tbHK(score_45_hk1, score_exam_hk1),
+          tbHK(score_45_hk2, score_exam_hk2),
+        )
         const score_thu5 = (attendance_thu5 * 0.4) * (10 / effectiveThu5Days)
         const score_cn = (attendance_cn * 0.6) * (10 / effectiveCnDays)
         const avg_attendance = score_thu5 + score_cn
-        const total_avg = avg_catechism * 0.6 + avg_attendance * 0.4
+        const total_avg = avg_catechism === null ? null : avg_catechism * 0.6 + avg_attendance * 0.4
 
         return {
           ...student,
@@ -746,9 +737,9 @@ export interface ClassStudentDetail {
   score_exam_hk2: number | null
   attendance_thu5: number | null
   attendance_cn: number | null
-  avgCatechism: number
+  avgCatechism: number | null
   avgAttendance: number
-  totalAvg: number
+  totalAvg: number | null
 }
 
 export interface ClassTeacherDetail {
@@ -828,31 +819,23 @@ export function useClassDetail(classId: string) {
         .sort((a, b) => a.full_name.localeCompare(b.full_name, 'vi'))
 
       // Số buổi học thực tế (trừ ngày lễ) để quy đổi điểm danh ra thang 10
-      let effectiveThu5Days = 40
-      let effectiveCnDays = 40
       const schoolYear = schoolYearRes.data
+      let holidays: { day_type: string }[] = []
       if (schoolYear) {
-        const totalThu5 = countWeekdays(schoolYear.start_date, schoolYear.end_date, 4)
-        const totalCn = countWeekdays(schoolYear.start_date, schoolYear.end_date, 0)
         const { data: holidaysData } = await supabase
           .from('holidays')
           .select('day_type')
           .eq('school_year_id', schoolYear.id)
-        const holidays = (holidaysData || []) as { day_type: string }[]
-        const thu5Holidays = holidays.filter((h) => h.day_type === 'thu5' || h.day_type === 'both').length
-        const cnHolidays = holidays.filter((h) => h.day_type === 'cn' || h.day_type === 'both').length
-        effectiveThu5Days = Math.max(1, totalThu5 - thu5Holidays)
-        effectiveCnDays = Math.max(1, totalCn - cnHolidays)
+        holidays = (holidaysData || []) as { day_type: string }[]
       }
+      const { thu5: effectiveThu5Days, cn: effectiveCnDays } = effectiveSessionDays(schoolYear, holidays)
 
       const scoredStudents: ClassStudentDetail[] = students
         .map((s) => {
-          const avgCatechism =
-            ((s.score_45_hk1 || 0) +
-              (s.score_45_hk2 || 0) +
-              (s.score_exam_hk1 || 0) * 2 +
-              (s.score_exam_hk2 || 0) * 2) /
-            6
+          const avgCatechism = tbNam(
+            tbHK(s.score_45_hk1, s.score_exam_hk1),
+            tbHK(s.score_45_hk2, s.score_exam_hk2),
+          )
           const avgAttendance =
             (s.attendance_thu5 || 0) * 0.4 * (10 / effectiveThu5Days) +
             (s.attendance_cn || 0) * 0.6 * (10 / effectiveCnDays)
@@ -860,7 +843,7 @@ export function useClassDetail(classId: string) {
             ...s,
             avgCatechism,
             avgAttendance,
-            totalAvg: avgCatechism * 0.6 + avgAttendance * 0.4,
+            totalAvg: avgCatechism === null ? null : avgCatechism * 0.6 + avgAttendance * 0.4,
           }
         })
       // Xếp theo tên gọi (chữ cuối) giống trang Quản lý thiếu nhi
@@ -872,10 +855,13 @@ export function useClassDetail(classId: string) {
       const presentCn = attendanceRows.filter((r) => r.day_type === 'cn').length
       const denominator = activeStudents.length
 
+      const studentsWithTotalAverage = activeStudents.filter(
+        (s): s is ClassStudentDetail & { totalAvg: number } => s.totalAvg !== null,
+      )
       const classAvg =
-        activeStudents.length > 0
-          ? activeStudents.reduce((sum, s) => sum + s.totalAvg, 0) / activeStudents.length
-          : 0
+        studentsWithTotalAverage.length > 0
+          ? studentsWithTotalAverage.reduce((sum, s) => sum + s.totalAvg, 0) / studentsWithTotalAverage.length
+          : null
 
       return {
         classInfo,

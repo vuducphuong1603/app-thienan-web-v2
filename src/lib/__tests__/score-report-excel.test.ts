@@ -3,6 +3,8 @@ import {
   buildScoreColumns,
   colLetter,
   buildRowFormulas,
+  buildScoreReportWorkbook,
+  buildAttendanceWorkbook,
   listAttendanceDates,
   splitFullName,
   attendanceScores,
@@ -12,22 +14,22 @@ import {
 const noneSelected: ScoreColumnSelection = {
   diLeT5: false, hocGL: false, diLeCN: false, diemTB: false,
   score45HK1: false, scoreExamHK1: false, score45HK2: false, scoreExamHK2: false,
-  diemTong: false, ketQua: false,
+  diemTong: false, xepLoai: false, ketQua: false,
 }
 
 describe('buildScoreColumns', () => {
-  it('shows all score columns (plus Hạng, minus Kết quả) when nothing is selected', () => {
+  it('shows all score columns when nothing is selected', () => {
     const cols = buildScoreColumns(noneSelected)
     const keys = cols.map(c => c.key)
     expect(keys).toEqual([
       'stt', 'saintName', 'hoDem', 'ten',
       'diLeT5', 'hocGL', 'diLeCN', 'diemTB',
       's45HK1', 'examHK1', 's45HK2', 'examHK2',
-      'tbNam', 'hang',
+      'tbNam', 'xepLoai', 'hang', 'ketQua',
     ])
   })
 
-  it('includes Kết quả only when explicitly selected', () => {
+  it('includes Kết quả when explicitly selected alongside other selected columns', () => {
     const cols = buildScoreColumns({ ...noneSelected, ketQua: true })
     expect(cols.map(c => c.key)).toContain('ketQua')
   })
@@ -79,6 +81,7 @@ describe('buildScoreColumns', () => {
     expect(byKey.s45HK1).toBe('giaoly')
     expect(byKey.examHK2).toBe('giaoly')
     expect(byKey.tbNam).toBe('tongket')
+    expect(byKey.xepLoai).toBe('tongket')
     expect(byKey.hang).toBe('tongket')
   })
 })
@@ -93,7 +96,7 @@ describe('colLetter', () => {
 })
 
 describe('buildRowFormulas', () => {
-  it('builds TB and Kết quả formulas from actual column positions', () => {
+  it('keeps only the class-wide Hạng formula; score summaries are computed values', () => {
     const allSelected = Object.fromEntries(
       Object.keys(noneSelected).map(k => [k, true])
     ) as unknown as ScoreColumnSelection
@@ -101,15 +104,13 @@ describe('buildRowFormulas', () => {
     // Data starts at Excel row 10; first student is row 10
     const f = buildRowFormulas(cols, 10, 10, 12)
     // Layout: A stt, B saint, C họ, D tên, E diLeT5, F hocGL, G diLeCN, H diemTB,
-    //         I 45HK1, J thiHK1, K 45HK2, L thiHK2, M tbNam, N hang, O ketQua
-    expect(f.diemTB).toBe('(E10*0.4)+(((F10+G10)/2)*0.6)')
+    //         I 45HK1, J thiHK1, K 45HK2, L thiHK2, M tbNam, N xepLoai, O hang, P ketQua
+    expect(f.diemTB).toBeUndefined()
     expect(f.tbHK1).toBeUndefined()
     expect(f.tbHK2).toBeUndefined()
-    // TB Năm vẫn tính được dù cột TB HKI/HKII bị ẩn: nội suy từ 45' và Thi mỗi kỳ
-    expect(f.tbNam).toBe('((I10+J10*2)/3+(K10+L10*2)/3*2)/3')
-    expect(f.hang).toBe('IF(M10="","",RANK(M10,$M$10:$M$12,0))')
-    expect(f.ketQua).toContain('E10<2.5')
-    expect(f.ketQua).toContain('"Ở Lại"')
+    expect(f.tbNam).toBeUndefined()
+    expect(f.hang).toBe('IF(OR(M10="",M10="-"),"",RANK(M10,$M$10:$M$12,0))')
+    expect(f.ketQua).toBeUndefined()
   })
 
   it('omits formulas whose source columns are hidden', () => {
@@ -206,5 +207,92 @@ describe('buildAttendanceExcelColumns', () => {
       { date: '2026-08-23', session: 'le' },
       { date: '2026-08-30', session: 'single' },
     ])
+  })
+})
+
+describe('buildAttendanceWorkbook', () => {
+  it('writes the unmarked report symbol for a past date with no class record', async () => {
+    const buffer = await buildAttendanceWorkbook({
+      className: 'Khai Tâm A',
+      title: 'ĐIỂM DANH',
+      dates: ['2026-09-03'],
+      formatDate: date => date,
+      holidayNames: new Map(),
+      students: [{ full_name: 'Nguyễn Văn An', attendance: {}, attendance_mass: {} }],
+      classRecordKeys: new Set(),
+      today: '2026-09-29',
+    })
+    const excelModule = await import('exceljs')
+    const ExcelJS = (excelModule as unknown as { default?: typeof excelModule }).default ?? excelModule
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(buffer)
+    const values: unknown[] = []
+    workbook.worksheets[0].eachRow(row => row.eachCell(cell => values.push(cell.value)))
+    expect(values).toContain('-')
+  })
+})
+
+async function workbookValues(buffer: ArrayBuffer): Promise<unknown[]> {
+  const excelModule = await import('exceljs')
+  const ExcelJS = (excelModule as unknown as { default?: typeof excelModule }).default ?? excelModule
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(buffer)
+  const values: unknown[] = []
+  workbook.worksheets[0].eachRow(row => row.eachCell(cell => values.push(cell.value)))
+  return values
+}
+
+const scoreStudent = {
+  saint_name: 'Têrêsa',
+  full_name: 'Nguyễn Văn An',
+  score_di_le_t5: null,
+  score_hoc_gl: null,
+  score_45_hk1: null,
+  score_exam_hk1: null,
+  score_45_hk2: null,
+  score_exam_hk2: null,
+  average_hk1: null,
+  average_hk2: null,
+  average_year: null,
+  diem_t5: 0,
+  diem_gl: 0,
+  diem_le_cn: 0,
+  diem_tb: 0,
+}
+
+describe('buildScoreReportWorkbook', () => {
+  it('writes - for null raw scores and every unavailable summary', async () => {
+    const buffer = await buildScoreReportWorkbook({
+      className: 'Khai Tâm A',
+      schoolYearName: '2026-2027',
+      students: [scoreStudent],
+      selection: noneSelected,
+    })
+    const values = await workbookValues(buffer)
+    expect(values).toContain('-')
+    expect(values).not.toContain(NaN)
+  })
+
+  it('writes Giỏi and Ở lại from score-summary for a low-attendance student', async () => {
+    const buffer = await buildScoreReportWorkbook({
+      className: 'Khai Tâm A',
+      schoolYearName: '2026-2027',
+      students: [{
+        ...scoreStudent,
+        score_45_hk1: 8,
+        score_exam_hk1: 8,
+        score_45_hk2: 8,
+        score_exam_hk2: 8,
+        diem_t5: 2,
+        diem_gl: 10,
+        diem_le_cn: 10,
+        diem_tb: 6.8,
+      }],
+      selection: noneSelected,
+    })
+    const values = await workbookValues(buffer)
+    expect(values).toContain(8)
+    expect(values).toContain('Giỏi')
+    expect(values).toContain('Ở lại')
   })
 })

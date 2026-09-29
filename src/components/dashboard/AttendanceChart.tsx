@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { sundayFullyPresentIds } from '@/lib/sunday-attendance'
 import { supabase } from '@/lib/supabase'
+import { fetchAllRows } from '@/lib/queries'
 
 interface DayData {
   label: string
@@ -75,29 +76,30 @@ export default function AttendanceChart({ classId, branch }: AttendanceChartProp
 
       // Chủ nhật: có mặt = đủ cả học giáo lý ('cn') lẫn đi lễ ('cn_le')
       const buildSundayQuery = (date: string) => {
-        let q = supabase.from('attendance_records').select('student_id, day_type')
-          .eq('attendance_date', date)
-          .in('day_type', ['cn', 'cn_le'])
-          .eq('status', 'present')
-        if (classId) q = q.eq('class_id', classId)
-        else if (branchClassIds) q = q.in('class_id', branchClassIds)
-        return q
+        return fetchAllRows<{ student_id: string; day_type: string }>((from, to) => {
+          let q = supabase.from('attendance_records').select('student_id, day_type')
+            .eq('attendance_date', date)
+            .in('day_type', ['cn', 'cn_le'])
+            .eq('status', 'present')
+            .order('id', { ascending: true })
+          if (classId) q = q.eq('class_id', classId)
+          else if (branchClassIds) q = q.in('class_id', branchClassIds)
+          return q.range(from, to)
+        })
       }
 
-      const [totalRes
-, thu5PresentRes, cnRowsRes] = await Promise.all([
+      const [totalRes, thu5PresentRes, cnRows] = await Promise.all([
         totalStudentsQuery,
         lastThu5 ? buildPresentQuery(lastThu5, 'thu5') : Promise.resolve({ count: 0, error: null }),
-        lastCN ? buildSundayQuery(lastCN) : Promise.resolve({ data: [] as { student_id: string; day_type: string }[], error: null }),
+        lastCN ? buildSundayQuery(lastCN) : Promise.resolve([] as { student_id: string; day_type: string }[]),
       ])
 
       if (totalRes.error) throw totalRes.error
       if (thu5PresentRes.error) throw thu5PresentRes.error
-      if (cnRowsRes.error) throw cnRowsRes.error
 
       const totalStudents = totalRes.count || 0
       const thu5Present = thu5PresentRes.count || 0
-      const cnPresent = sundayFullyPresentIds(cnRowsRes.data || []).size
+      const cnPresent = sundayFullyPresentIds(cnRows).size
 
       return [
         { label: 'Thứ 5', present: thu5Present, absent: totalStudents - thu5Present },

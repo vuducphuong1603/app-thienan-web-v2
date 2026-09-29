@@ -206,7 +206,7 @@ export default function ViewClassPage() {
                 <Award className="w-4 h-4" />
                 <span className="text-xs font-medium">Điểm TB lớp</span>
               </div>
-              <span className="text-2xl font-bold text-brand">{classAvg.toFixed(1)}</span>
+              <span className="text-2xl font-bold text-brand">{classAvg?.toFixed(1) ?? '-'}</span>
               <span className="text-xs text-[#8B8685]">TB Giáo lý × 0.6 + TB Điểm danh × 0.4</span>
             </div>
           </div>
@@ -337,7 +337,7 @@ export default function ViewClassPage() {
                         ĐD: <span className="text-black dark:text-white">{student.attendance_thu5 || 0} / {student.attendance_cn || 0}</span>
                       </span>
                       <span className="text-primary-3">
-                        TB: <span className="font-semibold text-brand">{student.totalAvg.toFixed(1)}</span>
+                        TB: <span className="font-semibold text-brand">{student.totalAvg?.toFixed(1) ?? '-'}</span>
                       </span>
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${
@@ -430,7 +430,7 @@ export default function ViewClassPage() {
                         {student.attendance_thu5 || 0} / {student.attendance_cn || 0}
                       </div>
 
-                      <div className="text-sm font-semibold text-brand text-center">{student.totalAvg.toFixed(1)}</div>
+                      <div className="text-sm font-semibold text-brand text-center">{student.totalAvg?.toFixed(1) ?? '-'}</div>
 
                       <div className="flex justify-center">
                         <span

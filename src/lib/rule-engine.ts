@@ -1,27 +1,7 @@
-import { supabase, AlertRule, RuleCondition, Holiday } from './supabase'
-import { countWeekdays } from './queries'
-
-interface StudentData {
-  id: string
-  full_name: string
-  student_code?: string
-  class_id?: string
-  class_name?: string
-  attendance_thu5: number
-  attendance_cn: number
-  avg_catechism: number
-  total_avg: number
-  score_thu5: number
-  score_cn: number
-}
-
-interface ClassData {
-  id: string
-  name: string
-  branch?: string
-  student_count: number
-  teacher_count: number
-}
+import { supabase, AlertRule, Holiday, ThieuNhiProfile } from './supabase'
+import { countWeekdays, fetchAllRows } from './queries'
+import { activeConditions, evaluateCondition } from './rule-conditions'
+import type { RuleClassData as ClassData, RuleStudentData as StudentData } from './rule-conditions'
 
 interface NewAlert {
   rule_id: string
@@ -38,56 +18,6 @@ interface NewAlert {
   metadata: Record<string, unknown>
 }
 
-function evaluateCondition(
-  condition: RuleCondition,
-  studentData: StudentData,
-  classData?: ClassData,
-  effectiveThu5Days?: number,
-  effectiveCnDays?: number,
-): boolean {
-  if (!condition.enabled || condition.value === undefined) return false
-
-  const threshold = condition.value
-  const effThu5 = effectiveThu5Days || 40
-  const effCn = effectiveCnDays || 40
-
-  switch (condition.key) {
-    case 'attendance_rate_below': {
-      const totalAttendance = studentData.attendance_thu5 + studentData.attendance_cn
-      const maxAttendance = effThu5 + effCn
-      const rate = maxAttendance > 0 ? (totalAttendance / maxAttendance) * 100 : 0
-      return rate < threshold
-    }
-    case 'consecutive_absent':
-      // Simplified: check if CN attendance is significantly lower
-      return studentData.attendance_cn < threshold
-    case 'sunday_lower_thursday': {
-      const diff = studentData.attendance_thu5 - studentData.attendance_cn
-      return diff >= threshold
-    }
-    case 'study_score_below':
-      return studentData.avg_catechism < threshold
-    case 'total_score_below':
-      return studentData.total_avg < threshold
-    case 'score_decline':
-      // Simplified: would need historical data for real decline
-      return false
-    case 'individual_study_low':
-      return studentData.avg_catechism < threshold
-    case 'individual_total_low':
-      return studentData.total_avg < threshold
-    case 'class_size_below':
-      return classData ? classData.student_count < threshold : false
-    case 'teacher_ratio_above':
-      if (!classData || classData.student_count === 0) return false
-      return classData.teacher_count / classData.student_count > threshold
-    case 'missing_data_days':
-      return false
-    default:
-      return false
-  }
-}
-
 export async function runRuleEngine(): Promise<number> {
   // 1. Fetch active rules
   const { data: rules, error: rulesError } = await supabase
@@ -99,10 +29,12 @@ export async function runRuleEngine(): Promise<number> {
   if (!rules || rules.length === 0) return 0
 
   // 2. Fetch student data
-  const [schoolYearRes, classesRes, studentsRes, teachersRes] = await Promise.all([
+  const [schoolYearRes, classesRes, students, teachersRes] = await Promise.all([
     supabase.from('school_years').select('id, start_date, end_date').eq('is_current', true).single(),
     supabase.from('classes').select('*').eq('status', 'ACTIVE'),
-    supabase.from('thieu_nhi').select('*').eq('status', 'ACTIVE'),
+    fetchAllRows<ThieuNhiProfile>(
+      (from, to) => supabase.from('thieu_nhi').select('*').eq('status', 'ACTIVE').order('id', { ascending: true }).range(from, to)
+    ),
     supabase.from('users').select('id, class_id').eq('role', 'giao_ly_vien').eq('status', 'ACTIVE'),
   ])
 
@@ -128,7 +60,6 @@ export async function runRuleEngine(): Promise<number> {
   const effectiveThu5Days = Math.max(1, totalThu5 - thu5Holidays)
   const effectiveCnDays = Math.max(1, totalCn - cnHolidays)
   const classes = classesRes.data || []
-  const students = studentsRes.data || []
   const teachers = teachersRes.data || []
 
   const classMap = new Map(classes.map(c => [c.id, c]))
@@ -157,18 +88,23 @@ export async function runRuleEngine(): Promise<number> {
   // Compute student metrics
   const studentDataList: StudentData[] = students.map(s => {
     const cls = s.class_id ? classMap.get(s.class_id) : undefined
-    const score_45_hk1 = s.score_45_hk1 || 0
-    const score_exam_hk1 = s.score_exam_hk1 || 0
-    const score_45_hk2 = s.score_45_hk2 || 0
-    const score_exam_hk2 = s.score_exam_hk2 || 0
     const attendance_thu5 = s.attendance_thu5 || 0
     const attendance_cn = s.attendance_cn || 0
 
-    const avg_catechism = (score_45_hk1 + score_45_hk2 + score_exam_hk1 * 2 + score_exam_hk2 * 2) / 6
+    const scoreParts = [
+      { value: s.score_45_hk1, weight: 1 },
+      { value: s.score_exam_hk1, weight: 2 },
+      { value: s.score_45_hk2, weight: 1 },
+      { value: s.score_exam_hk2, weight: 2 },
+    ].filter((part): part is { value: number; weight: number } => part.value !== null && part.value !== undefined)
+    const scoreWeight = scoreParts.reduce((sum, part) => sum + part.weight, 0)
+    const avg_catechism = scoreWeight > 0
+      ? scoreParts.reduce((sum, part) => sum + part.value * part.weight, 0) / scoreWeight
+      : null
     const score_thu5 = (attendance_thu5 * 0.4) * (10 / effectiveThu5Days)
     const score_cn = (attendance_cn * 0.6) * (10 / effectiveCnDays)
     const avg_attendance = score_thu5 + score_cn
-    const total_avg = avg_catechism * 0.6 + avg_attendance * 0.4
+    const total_avg = avg_catechism === null ? null : avg_catechism * 0.6 + avg_attendance * 0.4
 
     return {
       id: s.id,
@@ -199,8 +135,7 @@ export async function runRuleEngine(): Promise<number> {
   const newAlerts: NewAlert[] = []
 
   for (const rule of rules as AlertRule[]) {
-    const conditions: RuleCondition[] = Array.isArray(rule.conditions) ? rule.conditions : []
-    const enabledConditions = conditions.filter(c => c.enabled)
+    const enabledConditions = activeConditions(rule)
     if (enabledConditions.length === 0) continue
 
     if (rule.type === 'attendance' || rule.type === 'score') {
@@ -211,7 +146,7 @@ export async function runRuleEngine(): Promise<number> {
         )
         if (!triggered) continue
 
-        const key = `${rule.id}|${student.id}|`
+        const key = `${rule.id}|${student.id}|${student.class_id || ''}`
         if (existingSet.has(key)) continue
 
         const triggeredCondLabels = enabledConditions

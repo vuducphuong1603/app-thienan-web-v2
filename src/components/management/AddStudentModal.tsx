@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, User } from 'lucide-react'
 import { supabase, Class, BRANCHES } from '@/lib/supabase'
 import CustomDatePicker from '@/components/ui/CustomDatePicker'
+import { parseScoreInput } from '@/lib/score-summary'
 
 interface AddStudentModalProps {
   isOpen: boolean
@@ -143,10 +144,14 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
 
   // Calculate year average
   const calculateYearAverage = () => {
-    const s45_hk1 = parseFloat(formData.score_45_hk1) || 0
-    const exam_hk1 = parseFloat(formData.score_exam_hk1) || 0
-    const s45_hk2 = parseFloat(formData.score_45_hk2) || 0
-    const exam_hk2 = parseFloat(formData.score_exam_hk2) || 0
+    const s45_hk1 = parseScoreInput(formData.score_45_hk1)
+    const exam_hk1 = parseScoreInput(formData.score_exam_hk1)
+    const s45_hk2 = parseScoreInput(formData.score_45_hk2)
+    const exam_hk2 = parseScoreInput(formData.score_exam_hk2)
+
+    if (s45_hk1 == null || exam_hk1 == null || s45_hk2 == null || exam_hk2 == null) {
+      return '-'
+    }
 
     // Formula: (45' HK1 + 45' HK2 + Thi HK1x2 + Thi HK2x2) / 6
     const avg = (s45_hk1 + s45_hk2 + exam_hk1 * 2 + exam_hk2 * 2) / 6
@@ -156,6 +161,15 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
   // Handle submit
   const handleSubmit = async () => {
     if (!validateForm()) return
+
+    const score45Hk1 = parseScoreInput(formData.score_45_hk1)
+    const examHk1 = parseScoreInput(formData.score_exam_hk1)
+    const score45Hk2 = parseScoreInput(formData.score_45_hk2)
+    const examHk2 = parseScoreInput(formData.score_exam_hk2)
+    if (score45Hk1 === undefined || examHk1 === undefined || score45Hk2 === undefined || examHk2 === undefined) {
+      alert('Điểm phải từ 0 đến 10')
+      return
+    }
 
     setIsSubmitting(true)
     try {
@@ -170,10 +184,10 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, classes }:
         parent_phone_2: formData.parent_phone_2.trim() || null,
         address: formData.address.trim() || null,
         notes: formData.notes.trim() || null,
-        score_45_hk1: parseFloat(formData.score_45_hk1) || 0,
-        score_exam_hk1: parseFloat(formData.score_exam_hk1) || 0,
-        score_45_hk2: parseFloat(formData.score_45_hk2) || 0,
-        score_exam_hk2: parseFloat(formData.score_exam_hk2) || 0,
+        score_45_hk1: score45Hk1,
+        score_exam_hk1: examHk1,
+        score_45_hk2: score45Hk2,
+        score_exam_hk2: examHk2,
         avatar_url: avatarPreview || null,
         status: 'ACTIVE',
       })
