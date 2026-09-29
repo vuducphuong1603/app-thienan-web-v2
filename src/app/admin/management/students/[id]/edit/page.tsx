@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth-context'
 import { isManagerRole, filterByBranch } from '@/lib/branch-scope'
 import { useInvalidateQueries } from '@/lib/queries'
 import { canonicalStudentCode } from '@/lib/qr-attendance'
+import { parseScoreInput } from '@/lib/score-summary'
 import {
   validateAvatarFile,
   uploadStudentAvatar,
@@ -127,10 +128,10 @@ export default function EditStudentPage() {
           parent_phone_2: studentData.parent_phone_2 || '',
           address: studentData.address || '',
           notes: studentData.notes || '',
-          score_45_hk1: studentData.score_45_hk1?.toString() || '',
-          score_exam_hk1: studentData.score_exam_hk1?.toString() || '',
-          score_45_hk2: studentData.score_45_hk2?.toString() || '',
-          score_exam_hk2: studentData.score_exam_hk2?.toString() || '',
+          score_45_hk1: studentData.score_45_hk1?.toString() ?? '',
+          score_exam_hk1: studentData.score_exam_hk1?.toString() ?? '',
+          score_45_hk2: studentData.score_45_hk2?.toString() ?? '',
+          score_exam_hk2: studentData.score_exam_hk2?.toString() ?? '',
           avatar_url: studentData.avatar_url || '',
         })
 
@@ -227,10 +228,14 @@ export default function EditStudentPage() {
 
   // Calculate year average
   const calculateYearAverage = () => {
-    const s45_hk1 = parseFloat(formData.score_45_hk1) || 0
-    const exam_hk1 = parseFloat(formData.score_exam_hk1) || 0
-    const s45_hk2 = parseFloat(formData.score_45_hk2) || 0
-    const exam_hk2 = parseFloat(formData.score_exam_hk2) || 0
+    const s45_hk1 = parseScoreInput(formData.score_45_hk1)
+    const exam_hk1 = parseScoreInput(formData.score_exam_hk1)
+    const s45_hk2 = parseScoreInput(formData.score_45_hk2)
+    const exam_hk2 = parseScoreInput(formData.score_exam_hk2)
+
+    if (s45_hk1 == null || exam_hk1 == null || s45_hk2 == null || exam_hk2 == null) {
+      return '-'
+    }
 
     const avg = (s45_hk1 + s45_hk2 + exam_hk1 * 2 + exam_hk2 * 2) / 6
     return avg.toFixed(1)
@@ -239,6 +244,15 @@ export default function EditStudentPage() {
   // Handle submit
   const handleSubmit = async () => {
     if (!validateForm()) return
+
+    const score45Hk1 = parseScoreInput(formData.score_45_hk1)
+    const examHk1 = parseScoreInput(formData.score_exam_hk1)
+    const score45Hk2 = parseScoreInput(formData.score_45_hk2)
+    const examHk2 = parseScoreInput(formData.score_exam_hk2)
+    if (score45Hk1 === undefined || examHk1 === undefined || score45Hk2 === undefined || examHk2 === undefined) {
+      alert('Điểm phải từ 0 đến 10')
+      return
+    }
 
     setIsSubmitting(true)
     try {
@@ -266,10 +280,10 @@ export default function EditStudentPage() {
         parent_phone_2: formData.parent_phone_2.trim() || null,
         address: formData.address.trim() || null,
         notes: formData.notes.trim() || null,
-        score_45_hk1: parseFloat(formData.score_45_hk1) || 0,
-        score_exam_hk1: parseFloat(formData.score_exam_hk1) || 0,
-        score_45_hk2: parseFloat(formData.score_45_hk2) || 0,
-        score_exam_hk2: parseFloat(formData.score_exam_hk2) || 0,
+        score_45_hk1: score45Hk1,
+        score_exam_hk1: examHk1,
+        score_45_hk2: score45Hk2,
+        score_exam_hk2: examHk2,
         updated_at: new Date().toISOString(),
       }
       const adminOnly = canEditAdminFields

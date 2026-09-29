@@ -1,6 +1,10 @@
 import { forwardRef, Fragment } from 'react'
 import { isSundayDate } from '@/lib/sunday-attendance'
 import { getScoreReportTitle } from '@/lib/score-report-excel'
+import { REPORT_CELL_SYMBOL, reportCellStatus } from '@/lib/report-cell'
+import { fmtScore, scoreSummary } from '@/lib/score-summary'
+
+const reportRecordKey = (date: string, dayType: string) => `${date}:${dayType}`
 
 interface AttendanceReportStudent {
   id: string
@@ -40,6 +44,8 @@ interface AttendanceReportProps {
   className: string
   fromDate: string
   toDate: string
+  classRecordKeys: ReadonlySet<string>
+  today: string
   /** Loại buổi đang xuất: thu5 | cn | all — quyết định tiêu đề */
   attendanceType?: 'all' | 'thu5' | 'cn'
 }
@@ -60,6 +66,7 @@ interface ScoreColumns {
   score45HK2: boolean
   scoreExamHK2: boolean
   diemTong: boolean
+  xepLoai: boolean
   ketQua: boolean
 }
 
@@ -148,7 +155,21 @@ const ReportExportTemplate = forwardRef<HTMLDivElement, ReportExportTemplateProp
 
       {/* Table */}
       {props.type === 'attendance' ? (
-        <AttendanceTable students={props.students} dates={props.dates} holidayMap={props.holidayMap} />
+        <>
+          <AttendanceTable
+            students={props.students}
+            dates={props.dates}
+            holidayMap={props.holidayMap}
+            classRecordKeys={props.classRecordKeys}
+            today={props.today}
+          />
+          <div className="flex flex-wrap items-center justify-center gap-4 mt-3 text-xs text-gray-500" aria-label="Ký hiệu điểm danh">
+            <span><strong className="text-black">{REPORT_CELL_SYMBOL.present}</strong> Có mặt</span>
+            <span>Ô trống: Vắng mặt</span>
+            <span><strong className="text-gray-500">{REPORT_CELL_SYMBOL.unmarked}</strong> Chưa điểm danh</span>
+            <span>Nghỉ: Nghỉ lễ</span>
+          </div>
+        </>
       ) : (
         <ScoreTable students={props.students} scoreColumns={props.scoreColumns} />
       )}
@@ -167,27 +188,41 @@ const ReportExportTemplate = forwardRef<HTMLDivElement, ReportExportTemplateProp
 ReportExportTemplate.displayName = 'ReportExportTemplate'
 
 // Attendance Table Component
-function AttendanceTable({ students, dates, holidayMap }: { students: AttendanceReportStudent[], dates: string[], holidayMap?: Map<string, { name: string; day_type: string }> }) {
+function AttendanceTable({ students, dates, holidayMap, classRecordKeys, today }: {
+  students: AttendanceReportStudent[]
+  dates: string[]
+  holidayMap?: Map<string, { name: string; day_type: string }>
+  classRecordKeys: ReadonlySet<string>
+  today: string
+}) {
   // Chủ nhật (không nghỉ lễ) tách 2 cột con: GL (học giáo lý) | Lễ (đi lễ)
   const isSplit = (date: string) => isSundayDate(date) && !holidayMap?.has(date)
   const hasSplit = dates.some(isSplit)
   // Không dùng rowSpan: html-to-image render rowSpan lệch → hàng 2 dùng ô trống (bỏ viền trên) để nối liền ô hàng 1
   const topCls = 'border border-gray-400 border-b-0 px-2 py-2 text-center'
   const bottomCls = 'border border-gray-400 border-t-0 px-1 py-1 text-center'
-  const renderCell = (status: 'present' | 'absent' | null | undefined, key: string) => (
-    <td key={key} className="border border-gray-400 px-2 py-2 text-center align-middle">
-      {/* Giống file Excel: có mặt = X đen, vắng/chưa điểm danh = để trống */}
-      {status === 'present' ? (
-        // Vẽ X bằng 2 thanh xoay: html2canvas đặt chữ cỡ lớn lệch baseline và cắt SVG trong ô rộng
-        <div className="relative mx-auto" style={{ width: 16, height: 16 }} aria-label="X">
-          <div className="absolute bg-black rounded-full" style={{ left: -1, top: 6.5, width: 18, height: 3, transform: 'rotate(45deg)' }} />
-          <div className="absolute bg-black rounded-full" style={{ left: -1, top: 6.5, width: 18, height: 3, transform: 'rotate(-45deg)' }} />
-        </div>
-      ) : (
-        ''
-      )}
-    </td>
-  )
+  const renderCell = (
+    record: 'present' | 'absent' | null | undefined,
+    date: string,
+    dayType: string,
+    key: string,
+  ) => {
+    const status = reportCellStatus({
+      record,
+      date,
+      today,
+      isHoliday: false,
+      classHasAnyRecord: classRecordKeys.has(reportRecordKey(date, dayType)),
+    })
+    const symbol = status === 'holiday' ? '' : REPORT_CELL_SYMBOL[status]
+    return (
+      <td key={key} className="border border-gray-400 px-2 py-2 text-center align-middle">
+        {symbol && (
+          <span className={status === 'present' ? 'text-black font-semibold' : 'text-gray-500'}>{symbol}</span>
+        )}
+      </td>
+    )
+  }
   return (
     <table className="w-full border-collapse text-sm">
       <thead>
@@ -254,11 +289,11 @@ function AttendanceTable({ students, dates, holidayMap }: { students: Attendance
                 }
                 if (isSplit(date)) {
                   return [
-                    renderCell(student.attendance[date], `${date}-gl`),
-                    renderCell(student.attendance_mass?.[date], `${date}-le`),
+                    renderCell(student.attendance[date], date, 'cn', `${date}-gl`),
+                    renderCell(student.attendance_mass?.[date], date, 'cn_le', `${date}-le`),
                   ]
                 }
-                return renderCell(student.attendance[date], date)
+                return renderCell(student.attendance[date], date, 'thu5', date)
               })}
             </tr>
           )
@@ -282,36 +317,8 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
   const show45HK2 = showAll || scoreColumns?.score45HK2
   const showExamHK2 = showAll || scoreColumns?.scoreExamHK2
   const showDiemTong = showAll || scoreColumns?.diemTong
-  const showKetQua = scoreColumns?.ketQua ?? false
-
-  const getKetQua = (s: ScoreReportStudent) => {
-    const scoreThu5 = s.score_di_le_t5
-    const scoreCn = s.score_hoc_gl
-    const s45hk1 = s.score_45_hk1
-    const s45hk2 = s.score_45_hk2
-    const examHk1 = s.score_exam_hk1
-    const examHk2 = s.score_exam_hk2
-
-    const avgCatechism = (s45hk1 !== null && s45hk2 !== null && examHk1 !== null && examHk2 !== null)
-      ? (s45hk1 + s45hk2 + examHk1 * 2 + examHk2 * 2) / 6
-      : null
-    const avgAttendance = (scoreThu5 !== null && scoreCn !== null)
-      ? scoreThu5 + scoreCn
-      : null
-    const totalAvg = (avgCatechism !== null && avgAttendance !== null)
-      ? avgCatechism * 0.6 + avgAttendance * 0.4
-      : null
-
-    if (
-      (scoreThu5 !== null && scoreThu5 < 2.5) ||
-      (scoreCn !== null && scoreCn < 2.5) ||
-      (avgCatechism !== null && avgCatechism < 2.5) ||
-      (totalAvg !== null && totalAvg < 5)
-    ) {
-      return 'Ở lại'
-    }
-    return 'Đạt'
-  }
+  const showXepLoai = showAll || scoreColumns?.xepLoai
+  const showKetQua = showAll || scoreColumns?.ketQua
 
   return (
     <table className="w-full border-collapse text-sm">
@@ -329,6 +336,7 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
           {show45HK2 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">45p<br/>HK2</th>}
           {showExamHK2 && <th className="border border-gray-400 px-1 py-2 text-center w-[50px]">Thi<br/>HK2</th>}
           {showDiemTong && <th className="border border-gray-400 px-1 py-2 text-center w-[55px] bg-[#ffecb3]">TB<br/>Năm</th>}
+          {showXepLoai && <th className="border border-gray-400 px-1 py-2 text-center w-[70px]">Xếp<br/>loại</th>}
           {showKetQua && <th className="border border-gray-400 px-1 py-2 text-center w-[60px] bg-[#e3f2fd]">Kết<br/>quả</th>}
         </tr>
       </thead>
@@ -337,6 +345,14 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
           const nameParts = student.full_name.split(' ')
           const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
           const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
+          const summary = scoreSummary({
+            score_45_hk1: student.score_45_hk1,
+            score_exam_hk1: student.score_exam_hk1,
+            score_45_hk2: student.score_45_hk2,
+            score_exam_hk2: student.score_exam_hk2,
+            t5: student.diem_t5,
+            cn: student.diem_gl,
+          })
 
           return (
             <tr key={student.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
@@ -346,53 +362,58 @@ function ScoreTable({ students, scoreColumns }: { students: ScoreReportStudent[]
               <td className="border border-gray-400 px-1 py-2 text-center font-medium">{givenName}</td>
               {showDiLeT5 && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
-                  {student.diem_t5 !== null ? student.diem_t5 : '-'}
+                  {fmtScore(student.diem_t5)}
                 </td>
               )}
               {showHocGL && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
-                  {student.diem_gl !== null ? student.diem_gl : '-'}
+                  {fmtScore(student.diem_gl)}
                 </td>
               )}
               {showDiLeCN && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
-                  {student.diem_le_cn !== null ? student.diem_le_cn : '-'}
+                  {fmtScore(student.diem_le_cn)}
                 </td>
               )}
               {showDiemTB && (
                 <td className="border border-gray-400 px-1 py-2 text-center font-semibold bg-[#e8f5e9]">
-                  {student.diem_tb !== null ? student.diem_tb : '-'}
+                  {fmtScore(student.diem_tb)}
                 </td>
               )}
               {show45HK1 && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
-                  {student.score_45_hk1 !== null ? student.score_45_hk1 : '-'}
+                  {fmtScore(student.score_45_hk1)}
                 </td>
               )}
               {showExamHK1 && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
-                  {student.score_exam_hk1 !== null ? student.score_exam_hk1 : '-'}
+                  {fmtScore(student.score_exam_hk1)}
                 </td>
               )}
               {show45HK2 && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
-                  {student.score_45_hk2 !== null ? student.score_45_hk2 : '-'}
+                  {fmtScore(student.score_45_hk2)}
                 </td>
               )}
               {showExamHK2 && (
                 <td className="border border-gray-400 px-1 py-2 text-center">
-                  {student.score_exam_hk2 !== null ? student.score_exam_hk2 : '-'}
+                  {fmtScore(student.score_exam_hk2)}
                 </td>
               )}
               {showDiemTong && (
                 <td className="border border-gray-400 px-1 py-2 text-center font-bold bg-[#ffecb3]">
-                  {student.average_year !== null ? student.average_year : '-'}
+                  {fmtScore(summary.tbNam)}
+                </td>
+              )}
+              {showXepLoai && (
+                <td className="border border-gray-400 px-1 py-2 text-center font-semibold">
+                  {summary.xepLoai}
                 </td>
               )}
               {showKetQua && (() => {
-                const kq = getKetQua(student)
+                const kq = summary.ketQua
                 return (
-                  <td className={`border border-gray-400 px-1 py-2 text-center font-semibold ${kq === 'Đạt' ? 'text-green-600' : 'text-red-600'} bg-[#e3f2fd]`}>
+                  <td className={`border border-gray-400 px-1 py-2 text-center font-semibold ${kq === 'Đạt' ? 'text-green-600' : kq === 'Ở lại' ? 'text-red-600' : 'text-gray-500'} bg-[#e3f2fd]`}>
                     {kq}
                   </td>
                 )

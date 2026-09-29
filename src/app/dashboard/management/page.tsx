@@ -7,6 +7,7 @@ import { Search } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { useStudentsWithDetails, useInvalidateQueries } from '@/lib/queries'
 import { normalizeSearchText } from '@/lib/search'
+import { fmtScore, parseScoreInput } from '@/lib/score-summary'
 
 interface StudentWithDetails extends ThieuNhiProfile {
   class_name?: string
@@ -18,13 +19,13 @@ interface StudentWithDetails extends ThieuNhiProfile {
   score_exam_hk1?: number
   score_45_hk2?: number
   score_exam_hk2?: number
-  avg_catechism?: number
+  avg_catechism?: number | null
   attendance_thu5?: number
   attendance_cn?: number
   score_thu5?: number
   score_cn?: number
   avg_attendance?: number
-  total_avg?: number
+  total_avg?: number | null
 }
 
 interface EditingScores {
@@ -88,10 +89,10 @@ export default function GLVManagementPage() {
     setEditingStudentId(student.id)
     setShowScores(true)
     setEditingScores({
-      score_45_hk1: (student.score_45_hk1 || 0).toString(),
-      score_exam_hk1: (student.score_exam_hk1 || 0).toString(),
-      score_45_hk2: (student.score_45_hk2 || 0).toString(),
-      score_exam_hk2: (student.score_exam_hk2 || 0).toString(),
+      score_45_hk1: student.score_45_hk1?.toString() ?? '',
+      score_exam_hk1: student.score_exam_hk1?.toString() ?? '',
+      score_45_hk2: student.score_45_hk2?.toString() ?? '',
+      score_exam_hk2: student.score_exam_hk2?.toString() ?? '',
     })
   }
 
@@ -110,15 +111,24 @@ export default function GLVManagementPage() {
   const saveScores = async () => {
     if (!editingStudentId) return
 
+    const score45Hk1 = parseScoreInput(editingScores.score_45_hk1)
+    const examHk1 = parseScoreInput(editingScores.score_exam_hk1)
+    const score45Hk2 = parseScoreInput(editingScores.score_45_hk2)
+    const examHk2 = parseScoreInput(editingScores.score_exam_hk2)
+    if (score45Hk1 === undefined || examHk1 === undefined || score45Hk2 === undefined || examHk2 === undefined) {
+      alert('Điểm phải từ 0 đến 10')
+      return
+    }
+
     setIsSaving(true)
     try {
       const { error } = await supabase
         .from('thieu_nhi')
         .update({
-          score_45_hk1: parseFloat(editingScores.score_45_hk1) || 0,
-          score_exam_hk1: parseFloat(editingScores.score_exam_hk1) || 0,
-          score_45_hk2: parseFloat(editingScores.score_45_hk2) || 0,
-          score_exam_hk2: parseFloat(editingScores.score_exam_hk2) || 0,
+          score_45_hk1: score45Hk1,
+          score_exam_hk1: examHk1,
+          score_45_hk2: score45Hk2,
+          score_exam_hk2: examHk2,
         })
         .eq('id', editingStudentId)
 
@@ -412,7 +422,7 @@ export default function GLVManagementPage() {
                             className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
                           />
                         ) : (
-                          <span className="text-sm text-[#8a8c90]">{student.score_45_hk1?.toFixed(1) || '0.0'}</span>
+                          <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_45_hk1)}</span>
                         )}
                       </td>
 
@@ -426,7 +436,7 @@ export default function GLVManagementPage() {
                             className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
                           />
                         ) : (
-                          <span className="text-sm text-[#8a8c90]">{student.score_exam_hk1?.toFixed(1) || '0.0'}</span>
+                          <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_exam_hk1)}</span>
                         )}
                       </td>
 
@@ -440,7 +450,7 @@ export default function GLVManagementPage() {
                             className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
                           />
                         ) : (
-                          <span className="text-sm text-[#8a8c90]">{student.score_45_hk2?.toFixed(1) || '0.0'}</span>
+                          <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_45_hk2)}</span>
                         )}
                       </td>
 
@@ -454,33 +464,33 @@ export default function GLVManagementPage() {
                             className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
                           />
                         ) : (
-                          <span className="text-sm text-[#8a8c90]">{student.score_exam_hk2?.toFixed(1) || '0.0'}</span>
+                          <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_exam_hk2)}</span>
                         )}
                       </td>
 
                       {/* TB Giáo Lý */}
                       <td className={`${scoreCellCls} px-1 py-3 text-center bg-[#F6F6F6]`} style={{ borderRight: '0.5px solid #E5E1DC' }}>
-                        <span className="text-sm font-medium text-[#6e62e5]">{student.avg_catechism?.toFixed(1) || '0.0'}</span>
+                        <span className="text-sm font-medium text-[#6e62e5]">{fmtScore(student.avg_catechism)}</span>
                       </td>
 
                       {/* Điểm danh T5 */}
                       <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
-                        <span className="text-sm text-[#8B8685]">{student.score_thu5?.toFixed(1) || '0.0'}</span>
+                        <span className="text-sm text-[#8B8685]">{fmtScore(student.score_thu5)}</span>
                       </td>
 
                       {/* Điểm danh CN */}
                       <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
-                        <span className="text-sm text-[#8B8685]">{student.score_cn?.toFixed(1) || '0.0'}</span>
+                        <span className="text-sm text-[#8B8685]">{fmtScore(student.score_cn)}</span>
                       </td>
 
                       {/* TB Điểm danh */}
                       <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
-                        <span className="text-sm text-[#8B8685]">{student.avg_attendance?.toFixed(1) || '0.0'}</span>
+                        <span className="text-sm text-[#8B8685]">{fmtScore(student.avg_attendance)}</span>
                       </td>
 
                       {/* Tổng TB */}
                       <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
-                        <span className="text-sm font-semibold text-[#E178FF]">{student.total_avg?.toFixed(1) || '0.0'}</span>
+                        <span className="text-sm font-semibold text-[#E178FF]">{fmtScore(student.total_avg)}</span>
                       </td>
 
                       {/* Actions - Edit scores + Edit info (no add/delete) */}

@@ -6,7 +6,9 @@ import { mergeSundayRecords, isSundayDate, countSundayReport, DayType, SundaySes
 import { sortByGivenName, compareByGivenName } from '@/lib/student-sort'
 import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear, Holiday } from '@/lib/supabase'
-import { useActiveClasses, useSchoolYears, countWeekdays, fetchAllRows } from '@/lib/queries'
+import { useActiveClasses, useSchoolYears, fetchAllRows } from '@/lib/queries'
+import { countReportCells, reportCellStatus, reportTotalAttendance, REPORT_CELL_SYMBOL, type ReportCellStatus } from '@/lib/report-cell'
+import { attendanceScores, effectiveSessionDays, fmtScore, round2, scoreSummary } from '@/lib/score-summary'
 import { useAuth } from '@/lib/auth-context'
 import { scopedBranches } from '@/lib/branch-scope'
 import {
@@ -33,6 +35,12 @@ import type { PriestReportData, PriestReportBranchData, PriestReportClassData } 
 import html2canvas from 'html2canvas'
 
 const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const reportRecordKey = (date: string, dayType: string) => `${date}:${dayType}`
+const nullableScore = (value: number | null | undefined): number | null => {
+  if (value == null) return null
+  const score = Number(value)
+  return Number.isFinite(score) ? score : null
+}
 
 // Report related interfaces
 interface ReportStudent {
@@ -69,6 +77,15 @@ interface ReportStudentScore {
   diem_le_cn: number | null
   diem_tb: number | null
 }
+
+const getReportScoreSummary = (student: ReportStudentScore) => scoreSummary({
+  score_45_hk1: student.score_45_hk1,
+  score_exam_hk1: student.score_exam_hk1,
+  score_45_hk2: student.score_45_hk2,
+  score_exam_hk2: student.score_exam_hk2,
+  t5: student.diem_t5,
+  cn: student.diem_gl,
+})
 
 type TimeFilterMode = 'week' | 'dateRange' | 'month'
 type ReportType = 'attendance' | 'score'
@@ -498,6 +515,7 @@ export default function ActivitiesPage() {
     presentThu5: 0,
     presentCn: 0,
     partialCn: 0,
+    absent: 0,
     notChecked: 0,
     totalAttendance: 0,
   })
@@ -505,9 +523,9 @@ export default function ActivitiesPage() {
   const [reportScoreStudents, setReportScoreStudents] = useState<ReportStudentScore[]>([])
   const [reportScoreStats, setReportScoreStats] = useState({
     totalStudents: 0,
-    averageHK1: 0,
-    averageHK2: 0,
-    averageYear: 0,
+    averageHK1: null as number | null,
+    averageHK2: null as number | null,
+    averageYear: null as number | null,
     excellentCount: 0,  // >= 8.0
     goodCount: 0,       // >= 6.5
     averageCount: 0,    // >= 5.0
@@ -517,6 +535,8 @@ export default function ActivitiesPage() {
   const [exportSuccessMessage, setExportSuccessMessage] = useState('')
   // Holiday map for report (date string -> holiday info)
   const [reportHolidayMap, setReportHolidayMap] = useState<Map<string, { name: string; day_type: string }>>(new Map())
+  // Attendance records present anywhere in the selected class/date/session.
+  const [reportClassRecordKeys, setReportClassRecordKeys] = useState<Set<string>>(new Set())
   // Số Chủ nhật (không nghỉ lễ) trong báo cáo — mỗi ngày tách 2 cột con GL / Lễ
   const reportSundayCount = reportDates.filter(d => isSundayDate(d) && !reportHolidayMap.has(d)).length
   // Current attendance date holiday warning
@@ -563,6 +583,7 @@ export default function ActivitiesPage() {
     score45HK2: false,
     scoreExamHK2: false,
     diemTong: false,
+    xepLoai: false,
     ketQua: false,
   })
 
@@ -1606,7 +1627,7 @@ export default function ActivitiesPage() {
         const [studentsResult, holidaysResult, attendanceResult] = await Promise.all([
           supabase
             .from('thieu_nhi')
-            .select('id, student_code, full_name, saint_name, avatar_url, score_di_le_t5, score_hoc_gl, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2, attendance_thu5, attendance_cn')
+            .select('id, student_code, full_name, saint_name, avatar_url, score_45_hk1, score_exam_hk1, score_45_hk2, score_exam_hk2')
             .eq('class_id', reportClassId)
             .eq('status', 'ACTIVE')
             .order('full_name', { ascending: true }),
@@ -1615,26 +1636,27 @@ export default function ActivitiesPage() {
             : Promise.resolve({ data: [] as Pick<Holiday, 'day_type'>[], error: null }),
           // Số buổi có mặt từng loại (thu5 / cn / cn_le) trong năm học để tính điểm điểm danh thang 10
           schoolYear
-            ? supabase
-                .from('attendance_records')
-                .select('student_id, day_type')
-                .eq('class_id', reportClassId)
-                .eq('status', 'present')
-                .gte('attendance_date', schoolYear.start_date)
-                .lte('attendance_date', schoolYear.end_date)
-            : Promise.resolve({ data: [] as { student_id: string; day_type: string }[], error: null }),
+            ? fetchAllRows<Pick<AttendanceRecord, 'id' | 'student_id' | 'day_type'>>(
+                (from, to) => supabase
+                  .from('attendance_records')
+                  .select('id, student_id, day_type')
+                  .eq('class_id', reportClassId)
+                  .eq('status', 'present')
+                  .gte('attendance_date', schoolYear.start_date)
+                  .lte('attendance_date', schoolYear.end_date)
+                  .order('id', { ascending: true })
+                  .range(from, to)
+              )
+            : Promise.resolve([] as { student_id: string; day_type: string }[]),
         ])
-        if (attendanceResult.error) throw attendanceResult.error
         const presentCounts = new Map<string, { thu5: number; cn: number; cnLe: number }>()
-        for (const r of (attendanceResult.data || []) as { student_id: string; day_type: string }[]) {
+        for (const r of (attendanceResult || []) as { student_id: string; day_type: string }[]) {
           const c = presentCounts.get(r.student_id) || { thu5: 0, cn: 0, cnLe: 0 }
           if (r.day_type === 'thu5') c.thu5++
           else if (r.day_type === 'cn') c.cn++
           else if (r.day_type === 'cn_le') c.cnLe++
           presentCounts.set(r.student_id, c)
         }
-        const { attendanceScores } = await import('@/lib/score-report-excel')
-
         // Xếp theo tên gọi đúng bảng chữ cái tiếng Việt
         const studentsData = studentsResult.data && sortByGivenName(studentsResult.data)
         const studentsError = studentsResult.error
@@ -1643,45 +1665,29 @@ export default function ActivitiesPage() {
           throw studentsError
         }
 
-        // Effective session counts = weekday occurrences in school year minus holidays
-        const totalThu5 = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 4) : 40
-        const totalCn = schoolYear ? countWeekdays(schoolYear.start_date, schoolYear.end_date, 0) : 40
         const yearHolidays = (holidaysResult.data || []) as Pick<Holiday, 'day_type'>[]
-        const effectiveThu5Days = Math.max(1, totalThu5 - yearHolidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length)
-        const effectiveCnDays = Math.max(1, totalCn - yearHolidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length)
+        const effectiveDays = effectiveSessionDays(schoolYear, yearHolidays)
 
         // Calculate averages for each student
         const reportScoreData: ReportStudentScore[] = (studentsData || []).map(student => {
-          const scoreDiLeT5 = student.score_di_le_t5 !== null ? Number(student.score_di_le_t5) : null
-          const scoreHocGL = student.score_hoc_gl !== null ? Number(student.score_hoc_gl) : null
-          const score45HK1 = student.score_45_hk1 !== null ? Number(student.score_45_hk1) : null
-          const scoreExamHK1 = student.score_exam_hk1 !== null ? Number(student.score_exam_hk1) : null
-          const score45HK2 = student.score_45_hk2 !== null ? Number(student.score_45_hk2) : null
-          const scoreExamHK2 = student.score_exam_hk2 !== null ? Number(student.score_exam_hk2) : null
+          const score45HK1 = nullableScore(student.score_45_hk1)
+          const scoreExamHK1 = nullableScore(student.score_exam_hk1)
+          const score45HK2 = nullableScore(student.score_45_hk2)
+          const scoreExamHK2 = nullableScore(student.score_exam_hk2)
 
           // Điểm điểm danh thang 10 theo công thức file mẫu sổ điểm
           const attScores = attendanceScores(
             presentCounts.get(student.id) || { thu5: 0, cn: 0, cnLe: 0 },
-            { thu5: effectiveThu5Days, cn: effectiveCnDays },
+            effectiveDays,
           )
-
-          // Calculate average HK1 (45 min counts 1, exam counts 2)
-          let averageHK1: number | null = null
-          if (score45HK1 !== null && scoreExamHK1 !== null) {
-            averageHK1 = Math.round(((score45HK1 + scoreExamHK1 * 2) / 3) * 100) / 100
-          }
-
-          // Calculate average HK2 (45 min counts 1, exam counts 2)
-          let averageHK2: number | null = null
-          if (score45HK2 !== null && scoreExamHK2 !== null) {
-            averageHK2 = Math.round(((score45HK2 + scoreExamHK2 * 2) / 3) * 100) / 100
-          }
-
-          // Calculate average year (HK1 counts 1, HK2 counts 2)
-          let averageYear: number | null = null
-          if (averageHK1 !== null && averageHK2 !== null) {
-            averageYear = Math.round(((averageHK1 + averageHK2 * 2) / 3) * 100) / 100
-          }
+          const summary = scoreSummary({
+            score_45_hk1: score45HK1,
+            score_exam_hk1: scoreExamHK1,
+            score_45_hk2: score45HK2,
+            score_exam_hk2: scoreExamHK2,
+            t5: attScores.diem_t5,
+            cn: attScores.diem_gl,
+          })
 
           return {
             id: student.id,
@@ -1689,15 +1695,16 @@ export default function ActivitiesPage() {
             full_name: student.full_name,
             saint_name: student.saint_name,
             avatar_url: student.avatar_url,
-            score_di_le_t5: scoreDiLeT5,
-            score_hoc_gl: scoreHocGL,
+            // T5/CN report scores always come from attendance_records, not stored score columns.
+            score_di_le_t5: attScores.diem_t5,
+            score_hoc_gl: attScores.diem_gl,
             score_45_hk1: score45HK1,
             score_exam_hk1: scoreExamHK1,
             score_45_hk2: score45HK2,
             score_exam_hk2: scoreExamHK2,
-            average_hk1: averageHK1,
-            average_hk2: averageHK2,
-            average_year: averageYear,
+            average_hk1: summary.tbHK1,
+            average_hk2: summary.tbHK2,
+            average_year: summary.tbNam,
             diem_t5: attScores.diem_t5,
             diem_gl: attScores.diem_gl,
             diem_le_cn: attScores.diem_le_cn,
@@ -1718,35 +1725,30 @@ export default function ActivitiesPage() {
         let belowAverageCount = 0
 
         reportScoreData.forEach(student => {
-          if (student.average_hk1 !== null) {
-            sumHK1 += student.average_hk1
+          const summary = getReportScoreSummary(student)
+          if (summary.tbHK1 !== null) {
+            sumHK1 += summary.tbHK1
             countHK1++
           }
-          if (student.average_hk2 !== null) {
-            sumHK2 += student.average_hk2
+          if (summary.tbHK2 !== null) {
+            sumHK2 += summary.tbHK2
             countHK2++
           }
-          if (student.average_year !== null) {
-            sumYear += student.average_year
+          if (summary.tbNam !== null) {
+            sumYear += summary.tbNam
             countYear++
-            // Classify by year average
-            if (student.average_year >= 8.0) {
-              excellentCount++
-            } else if (student.average_year >= 6.5) {
-              goodCount++
-            } else if (student.average_year >= 5.0) {
-              averageCount++
-            } else {
-              belowAverageCount++
-            }
+            if (summary.xepLoai === 'Giỏi') excellentCount++
+            else if (summary.xepLoai === 'Khá') goodCount++
+            else if (summary.xepLoai === 'Trung bình') averageCount++
+            else if (summary.xepLoai === 'Yếu') belowAverageCount++
           }
         })
 
         setReportScoreStats({
           totalStudents,
-          averageHK1: countHK1 > 0 ? Math.round((sumHK1 / countHK1) * 100) / 100 : 0,
-          averageHK2: countHK2 > 0 ? Math.round((sumHK2 / countHK2) * 100) / 100 : 0,
-          averageYear: countYear > 0 ? Math.round((sumYear / countYear) * 100) / 100 : 0,
+          averageHK1: countHK1 > 0 ? round2(sumHK1 / countHK1) : null,
+          averageHK2: countHK2 > 0 ? round2(sumHK2 / countHK2) : null,
+          averageYear: countYear > 0 ? round2(sumYear / countYear) : null,
           excellentCount,
           goodCount,
           averageCount,
@@ -1808,29 +1810,37 @@ export default function ActivitiesPage() {
         setReportHolidayMap(holidayMap)
 
         // Build query for attendance records
-        let query = supabase
-          .from('attendance_records')
-          .select('*')
-          .eq('class_id', reportClassId)
-          .gte('attendance_date', fromDate)
-          .lte('attendance_date', toDate)
+        let attendanceData: Pick<AttendanceRecord, 'id' | 'student_id' | 'attendance_date' | 'day_type' | 'status'>[]
+        try {
+          attendanceData = await fetchAllRows<Pick<AttendanceRecord, 'id' | 'student_id' | 'attendance_date' | 'day_type' | 'status'>>(
+            (from, to) => {
+              let query = supabase
+                .from('attendance_records')
+                .select('id, student_id, attendance_date, day_type, status')
+                .eq('class_id', reportClassId)
+                .gte('attendance_date', fromDate)
+                .lte('attendance_date', toDate)
+                .order('id', { ascending: true })
 
-        // Filter by attendance type if not 'all'
-        if (reportAttendanceType === 'cn') {
-          query = query.in('day_type', ['cn', 'cn_le'])
-        } else if (reportAttendanceType !== 'all') {
-          query = query.eq('day_type', reportAttendanceType)
-        }
+              // Filter by attendance type if not 'all'
+              if (reportAttendanceType === 'cn') {
+                query = query.in('day_type', ['cn', 'cn_le'])
+              } else if (reportAttendanceType !== 'all') {
+                query = query.eq('day_type', reportAttendanceType)
+              }
 
-        const { data: attendanceData, error: attendanceError } = await query
-
-        if (attendanceError) {
-          console.warn('Attendance fetch error:', attendanceError)
+              return query.range(from, to)
+            },
+          )
+        } catch (attendanceError) {
+          console.error('Attendance fetch error:', attendanceError)
+          showNotification('error', 'Không thể tải dữ liệu điểm danh')
+          return
         }
 
         // Get unique dates from attendance records + holiday dates
         const uniqueDates = new Set<string>()
-        attendanceData?.forEach(record => {
+        attendanceData.forEach(record => {
           uniqueDates.add(record.attendance_date)
         })
         // Add holiday dates so they appear in the report even without attendance
@@ -1846,7 +1856,9 @@ export default function ActivitiesPage() {
         // Chủ nhật tách 2 buổi: 'cn' (giáo lý) vào attendanceMap, 'cn_le' (đi lễ) vào massMap
         const attendanceMap = new Map<string, Map<string, 'present' | 'absent'>>()
         const massMap = new Map<string, Map<string, 'present' | 'absent'>>()
-        attendanceData?.forEach(record => {
+        const classRecordKeys = new Set<string>()
+        attendanceData.forEach(record => {
+          classRecordKeys.add(reportRecordKey(record.attendance_date, record.day_type))
           const target = record.day_type === 'cn_le' ? massMap : attendanceMap
           if (!target.has(record.student_id)) {
             target.set(record.student_id, new Map())
@@ -1868,41 +1880,60 @@ export default function ActivitiesPage() {
             attendance_mass: studentMass,
           }
         })
+        setReportClassRecordKeys(classRecordKeys)
 
         setReportStudents(reportStudentsData)
 
         // Calculate stats
-        let presentThu5 = 0
-        let presentCn = 0
-        let notChecked = 0
-        let totalAttendance = 0
+        const reportToday = toLocalDateStr(todayForAttendance())
+        const reportCellsByStudent = reportStudentsData.map(student => {
+          const cells: Array<{ status: ReportCellStatus; dayType: string }> = []
+          sortedDates.forEach(date => {
+            const addCell = (record: string | null | undefined, dayType: string) => {
+              cells.push({
+                status: reportCellStatus({
+                  record,
+                  date,
+                  today: reportToday,
+                  isHoliday: holidayMap.has(date),
+                  classHasAnyRecord: classRecordKeys.has(reportRecordKey(date, dayType)),
+                }),
+                dayType,
+              })
+            }
 
-        attendanceData?.forEach(record => {
-          if (record.status === 'present' && record.day_type === 'thu5') {
-            totalAttendance++
-            presentThu5++
-          }
+            if (holidayMap.has(date)) {
+              addCell(undefined, isSundayDate(date) ? 'cn' : 'thu5')
+            } else if (isSundayDate(date)) {
+              addCell(student.attendance[date], 'cn')
+              addCell(student.attendance_mass?.[date], 'cn_le')
+            } else {
+              addCell(student.attendance[date], 'thu5')
+            }
+          })
+          return cells
         })
+        const reportCellCounts = countReportCells(
+          reportCellsByStudent.flatMap(cells => cells.map(cell => cell.status)),
+        )
+        const presentThu5 = reportCellsByStudent.reduce(
+          (total, cells) => total + cells.filter(cell => cell.dayType === 'thu5' && cell.status === 'present').length,
+          0,
+        )
+        const notChecked = reportCellsByStudent.filter(cells =>
+          countReportCells(cells.map(cell => cell.status)).unmarked > 0,
+        ).length
         // Chủ nhật: "có mặt" = đủ cả giáo lý lẫn đi lễ; thêm số lượt chỉ 1 buổi
         const sundayCounts = countSundayReport(reportStudentsData, sortedDates.filter(isSundayDate))
-        presentCn = sundayCounts.full
+        const presentCn = sundayCounts.full
         const partialCn = sundayCounts.partial
-        totalAttendance += sundayCounts.full + sundayCounts.partial
-
-        // Count not checked: each student counts as +1 if they have at least one null date
-        reportStudentsData.forEach(student => {
-          const hasNullDate = sortedDates.some(date =>
-            student.attendance[date] === null || (isSundayDate(date) && student.attendance_mass?.[date] === null)
-          )
-          if (hasNullDate) {
-            notChecked++
-          }
-        })
+        const totalAttendance = reportTotalAttendance(presentThu5, presentCn, partialCn)
 
         setReportStats({
           presentThu5,
           presentCn,
           partialCn,
+          absent: reportCellCounts.absent,
           notChecked,
           totalAttendance,
         })
@@ -2011,6 +2042,8 @@ export default function ActivitiesPage() {
           },
           holidayNames,
           students: reportStudents,
+          classRecordKeys: reportClassRecordKeys,
+          today: toLocalDateStr(todayForAttendance()),
           logoBase64,
           badgeBase64,
         })
@@ -3900,7 +3933,16 @@ export default function ActivitiesPage() {
                       onChange={(e) => setScoreColumns(prev => ({ ...prev, diemTong: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
-                    <span className="text-sm text-black dark:text-white">Điểm Tổng</span>
+                    <span className="text-sm text-black dark:text-white">TB Năm</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scoreColumns.xepLoai}
+                      onChange={(e) => setScoreColumns(prev => ({ ...prev, xepLoai: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                    />
+                    <span className="text-sm text-black dark:text-white">Xếp loại</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -4056,7 +4098,7 @@ export default function ActivitiesPage() {
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-white leading-none">{reportScoreStats.averageHK1}</span>
+                        <span className="text-[40px] font-bold text-white leading-none">{fmtScore(reportScoreStats.averageHK1)}</span>
                       </div>
                     </div>
 
@@ -4071,7 +4113,7 @@ export default function ActivitiesPage() {
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportScoreStats.averageHK2}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{fmtScore(reportScoreStats.averageHK2)}</span>
                       </div>
                     </div>
 
@@ -4086,7 +4128,7 @@ export default function ActivitiesPage() {
                         </div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{reportScoreStats.averageYear}</span>
+                        <span className="text-[40px] font-bold text-black dark:text-white leading-none">{fmtScore(reportScoreStats.averageYear)}</span>
                       </div>
                     </div>
 
@@ -4185,27 +4227,38 @@ export default function ActivitiesPage() {
                                     </td>
                                   )
                                 }
-                                const renderCell = (status: 'present' | 'absent' | null | undefined, key: string, extraClass = '') => (
-                                  <td key={key} className={`text-center border-l border-[#8A8C90] ${extraClass} ${status === 'present' ? 'bg-[#F5D5D5]' : ''}`}>
-                                    {status === 'present' ? (
-                                      <span className="text-[#8A8C90] text-[16px]">×</span>
-                                    ) : status === 'absent' ? (
-                                      <div className="w-[24px] h-[24px] rounded-full bg-[#22C55E] flex items-center justify-center mx-auto">
-                                        <Check className="w-4 h-4 text-white" />
-                                      </div>
-                                    ) : (
-                                      <span className="text-[#666d80]">-</span>
-                                    )}
-                                  </td>
-                                )
+                                const renderCell = (
+                                  record: 'present' | 'absent' | null | undefined,
+                                  dayType: string,
+                                  key: string,
+                                  extraClass = '',
+                                ) => {
+                                  const status = reportCellStatus({
+                                    record,
+                                    date,
+                                    today: toLocalDateStr(todayForAttendance()),
+                                    isHoliday: false,
+                                    classHasAnyRecord: reportClassRecordKeys.has(reportRecordKey(date, dayType)),
+                                  })
+                                  const symbol = status === 'holiday' ? '' : REPORT_CELL_SYMBOL[status]
+                                  return (
+                                    <td key={key} className={`text-center border-l border-[#8A8C90] ${extraClass}`}>
+                                      {symbol && (
+                                        <span className={status === 'present' ? 'text-black dark:text-white font-semibold' : 'text-[#666d80]'}>
+                                          {symbol}
+                                        </span>
+                                      )}
+                                    </td>
+                                  )
+                                }
                                 if (isSundayDate(date)) {
                                   // Chủ nhật: 2 cột con — giáo lý | đi lễ
                                   return [
-                                    renderCell(student.attendance[date], `${date}-gl`),
-                                    renderCell(student.attendance_mass?.[date], `${date}-le`, 'border-[#8A8C90]/40'),
+                                    renderCell(student.attendance[date], 'cn', `${date}-gl`),
+                                    renderCell(student.attendance_mass?.[date], 'cn_le', `${date}-le`, 'border-[#8A8C90]/40'),
                                   ]
                                 }
-                                return renderCell(student.attendance[date], date)
+                                return renderCell(student.attendance[date], 'thu5', date)
                               })}
                             </tr>
                             )
@@ -4213,6 +4266,12 @@ export default function ActivitiesPage() {
                         )}
                       </tbody>
                     </table>
+                  <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-[#666d80]" aria-label="Ký hiệu điểm danh">
+                    <span><strong className="text-black">{REPORT_CELL_SYMBOL.present}</strong> Có mặt</span>
+                    <span>Ô trống: Vắng mặt</span>
+                    <span><strong>{REPORT_CELL_SYMBOL.unmarked}</strong> Chưa điểm danh</span>
+                    <span>Nghỉ: Nghỉ lễ</span>
+                  </div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -4231,39 +4290,11 @@ export default function ActivitiesPage() {
                       const show45HK2 = showAll || scoreColumns.score45HK2
                       const showExamHK2 = showAll || scoreColumns.scoreExamHK2
                       const showDiemTong = showAll || scoreColumns.diemTong
-                      const showKetQua = scoreColumns.ketQua
-
-                      const getKetQua = (s: ReportStudentScore) => {
-                        const scoreThu5 = s.score_di_le_t5
-                        const scoreCn = s.score_hoc_gl
-                        const s45hk1 = s.score_45_hk1
-                        const s45hk2 = s.score_45_hk2
-                        const examHk1 = s.score_exam_hk1
-                        const examHk2 = s.score_exam_hk2
-
-                        const avgCatechism = (s45hk1 !== null && s45hk2 !== null && examHk1 !== null && examHk2 !== null)
-                          ? (s45hk1 + s45hk2 + examHk1 * 2 + examHk2 * 2) / 6
-                          : null
-                        const avgAttendance = (scoreThu5 !== null && scoreCn !== null)
-                          ? scoreThu5 + scoreCn
-                          : null
-                        const totalAvg = (avgCatechism !== null && avgAttendance !== null)
-                          ? avgCatechism * 0.6 + avgAttendance * 0.4
-                          : null
-
-                        if (
-                          (scoreThu5 !== null && scoreThu5 < 2.5) ||
-                          (scoreCn !== null && scoreCn < 2.5) ||
-                          (avgCatechism !== null && avgCatechism < 2.5) ||
-                          (totalAvg !== null && totalAvg < 5)
-                        ) {
-                          return 'Ở lại'
-                        }
-                        return 'Đạt'
-                      }
+                      const showXepLoai = showAll || scoreColumns.xepLoai
+                      const showKetQua = showAll || scoreColumns.ketQua
 
                       // Count visible columns for colSpan
-                      const visibleScoreCols = [showDiLeT5, showHocGL, showDiLeCN, showDiemTB, show45HK1, showExamHK1, show45HK2, showExamHK2, showDiemTong, showKetQua].filter(Boolean).length
+                      const visibleScoreCols = [showDiLeT5, showHocGL, showDiLeCN, showDiemTB, show45HK1, showExamHK1, show45HK2, showExamHK2, showDiemTong, showXepLoai, showKetQua].filter(Boolean).length
 
                       return (
                         <table className="w-full">
@@ -4282,6 +4313,7 @@ export default function ActivitiesPage() {
                               {showExamHK2 && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">Thi HK2</th>}
                               {(show45HK2 || showExamHK2) && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">TB HK2</th>}
                               {showDiemTong && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[80px]">TB Năm</th>}
+                              {showXepLoai && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[100px]">Xếp loại</th>}
                               {showKetQua && <th className="text-center px-2 text-[14px] font-medium text-[#666d80] w-[100px]">Kết quả</th>}
                             </tr>
                           </thead>
@@ -4294,25 +4326,27 @@ export default function ActivitiesPage() {
                               </tr>
                             ) : (
                               reportScoreStudents.map((student, index) => {
+                                const summary = getReportScoreSummary(student)
                                 return (
                                   <tr key={student.id} className="border-b border-[#E5E1DC] h-[52px] hover:bg-gray-50 dark:hover:bg-white/10">
                                     <td className="px-4 text-[14px] text-black dark:text-white">{index + 1}</td>
                                     <td className="px-4 text-[14px] text-black dark:text-white">{student.saint_name || '-'}</td>
                                     <td className="px-4 text-[14px] font-medium text-black dark:text-white">{student.full_name}</td>
-                                    {showDiLeT5 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.diem_t5 !== null ? student.diem_t5 : '-'}</td>}
-                                    {showHocGL && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.diem_gl !== null ? student.diem_gl : '-'}</td>}
-                                    {showDiLeCN && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.diem_le_cn !== null ? student.diem_le_cn : '-'}</td>}
-                                    {showDiemTB && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.diem_tb !== null ? student.diem_tb : '-'}</td>}
-                                    {show45HK1 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_45_hk1 !== null ? student.score_45_hk1 : '-'}</td>}
-                                    {showExamHK1 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_exam_hk1 !== null ? student.score_exam_hk1 : '-'}</td>}
-                                    {show45HK2 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_45_hk2 !== null ? student.score_45_hk2 : '-'}</td>}
-                                    {showExamHK2 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{student.score_exam_hk2 !== null ? student.score_exam_hk2 : '-'}</td>}
-                                    {(show45HK2 || showExamHK2) && <td className="text-center px-2 text-[14px] font-semibold text-brand">{student.average_hk2 !== null ? student.average_hk2 : '-'}</td>}
-                                    {showDiemTong && <td className="text-center px-2 text-[14px] font-bold text-brand">{student.average_year !== null ? student.average_year : '-'}</td>}
+                                    {showDiLeT5 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{fmtScore(student.diem_t5)}</td>}
+                                    {showHocGL && <td className="text-center px-2 text-[14px] text-black dark:text-white">{fmtScore(student.diem_gl)}</td>}
+                                    {showDiLeCN && <td className="text-center px-2 text-[14px] text-black dark:text-white">{fmtScore(student.diem_le_cn)}</td>}
+                                    {showDiemTB && <td className="text-center px-2 text-[14px] font-semibold text-brand">{fmtScore(student.diem_tb)}</td>}
+                                    {show45HK1 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{fmtScore(student.score_45_hk1)}</td>}
+                                    {showExamHK1 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{fmtScore(student.score_exam_hk1)}</td>}
+                                    {show45HK2 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{fmtScore(student.score_45_hk2)}</td>}
+                                    {showExamHK2 && <td className="text-center px-2 text-[14px] text-black dark:text-white">{fmtScore(student.score_exam_hk2)}</td>}
+                                    {(show45HK2 || showExamHK2) && <td className="text-center px-2 text-[14px] font-semibold text-brand">{fmtScore(summary.tbHK2)}</td>}
+                                    {showDiemTong && <td className="text-center px-2 text-[14px] font-bold text-brand">{fmtScore(summary.tbNam)}</td>}
+                                    {showXepLoai && <td className="text-center px-2 text-[14px] font-semibold text-black dark:text-white">{summary.xepLoai}</td>}
                                     {showKetQua && (() => {
-                                      const kq = getKetQua(student)
+                                      const kq = summary.ketQua
                                       return (
-                                        <td className={`text-center px-2 text-[14px] font-semibold ${kq === 'Đạt' ? 'text-green-600' : 'text-red-600'}`}>{kq}</td>
+                                        <td className={`text-center px-2 text-[14px] font-semibold ${kq === 'Đạt' ? 'text-green-600' : kq === 'Ở lại' ? 'text-red-600' : 'text-gray-500'}`}>{kq}</td>
                                       )
                                     })()}
                                   </tr>
@@ -4755,6 +4789,8 @@ export default function ActivitiesPage() {
             students={reportStudents}
             dates={reportDates}
             holidayMap={reportHolidayMap}
+            classRecordKeys={reportClassRecordKeys}
+            today={toLocalDateStr(todayForAttendance())}
             attendanceType={reportAttendanceType}
             className={getReportClassName(reportClassId)}
             fromDate={reportTimeFilterMode === 'week' ? reportWeekStart : reportTimeFilterMode === 'month' ? new Date(reportYear, reportMonth, 1).toISOString().split('T')[0] : reportFromDate}

@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { supabase, ROLE_LABELS, UserRole, NotificationTargetType, NotificationPriority } from '@/lib/supabase'
-import { useActiveClasses, useInvalidateQueries } from '@/lib/queries'
+import { fetchAllRows, useActiveClasses, useInvalidateQueries } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
 import { scopedBranches, filterByClassId } from '@/lib/branch-scope'
+import { branchRecipientIds, chunk, NOTIFICATION_BATCH_SIZE } from '@/lib/notification-recipients'
 
 interface CreateNotificationModalProps {
   isOpen: boolean
@@ -130,12 +131,25 @@ export default function CreateNotificationModal({ isOpen, onClose }: CreateNotif
           .eq('status', 'ACTIVE')
         recipientUserIds = (data || []).map(u => u.id)
       } else if (targetType === 'branch') {
-        const { data } = await supabase
-          .from('users')
-          .select('id')
-          .in('branch', selectedValues)
-          .eq('status', 'ACTIVE')
-        recipientUserIds = (data || []).map(u => u.id)
+        const [users, classes] = await Promise.all([
+          fetchAllRows<{ id: string; branch: string | null; class_id: string | null; status: string }>(
+            (from, to) => supabase
+              .from('users')
+              .select('id, branch, class_id, status')
+              .eq('status', 'ACTIVE')
+              .order('id', { ascending: true })
+              .range(from, to)
+          ),
+          fetchAllRows<{ id: string; branch: string | null; status: string }>(
+            (from, to) => supabase
+              .from('classes')
+              .select('id, branch, status')
+              .eq('status', 'ACTIVE')
+              .order('id', { ascending: true })
+              .range(from, to)
+          ),
+        ])
+        recipientUserIds = branchRecipientIds(users, classes, selectedValues)
       } else if (targetType === 'class') {
         const { data } = await supabase
           .from('users')
@@ -167,9 +181,7 @@ export default function CreateNotificationModal({ isOpen, onClose }: CreateNotif
           user_id: userId,
         }))
 
-        // Insert in batches of 500 to avoid payload limits
-        for (let i = 0; i < recipients.length; i += 500) {
-          const batch = recipients.slice(i, i + 500)
+        for (const batch of chunk(recipients, NOTIFICATION_BATCH_SIZE)) {
           const { error: recipientError } = await supabase
             .from('notification_recipients')
             .insert(batch)

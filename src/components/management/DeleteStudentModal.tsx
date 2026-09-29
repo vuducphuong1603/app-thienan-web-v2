@@ -51,11 +51,11 @@ export default function DeleteStudentModal({ isOpen, onClose, onConfirm, student
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-black dark:text-white mb-2">Xóa thiếu nhi?</h2>
+          <h2 className="text-xl font-bold text-black dark:text-white mb-2">Đưa thiếu nhi về ngừng hoạt động?</h2>
 
           {/* Description */}
           <p className="text-sm text-primary-3 text-center mb-4">
-            Bạn chắc chắn muốn xóa thiếu nhi <span className="font-medium text-black dark:text-white">{studentName}</span>?
+            Bạn chắc chắn muốn đưa thiếu nhi <span className="font-medium text-black dark:text-white">{studentName}</span> về trạng thái ngừng hoạt động? Lịch sử điểm danh, điểm số và dữ liệu liên quan sẽ được giữ lại.
           </p>
 
           {/* Error message */}
@@ -85,7 +85,7 @@ export default function DeleteStudentModal({ isOpen, onClose, onConfirm, student
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              {isDeleting ? 'Đang xóa...' : 'Xóa'}
+              {isDeleting ? 'Đang cập nhật...' : 'Xác nhận'}
             </button>
           </div>
         </div>

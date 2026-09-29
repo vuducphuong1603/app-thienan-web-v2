@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ChevronLeft, User } from 'lucide-react'
 import { supabase, Class, Holiday } from '@/lib/supabase'
-import { countWeekdays } from '@/lib/queries'
+import { fetchAllRows } from '@/lib/queries'
+import { attendanceScores, effectiveSessionDays, fmtScore, scoreSummary } from '@/lib/score-summary'
 import { useAuth } from '@/lib/auth-context'
 import { isManagerRole, inScope } from '@/lib/branch-scope'
 
@@ -66,9 +67,8 @@ export default function ViewStudentPage() {
     }
   }, [student, classes, scope, router])
   const [isLoading, setIsLoading] = useState(true)
-  const [effectiveThu5Days, setEffectiveThu5Days] = useState(40)
-
-  const [effectiveCnDays, setEffectiveCnDays] = useState(40)
+  const [effectiveDays, setEffectiveDays] = useState({ thu5: 40, cn: 40 })
+  const [attendanceCounts, setAttendanceCounts] = useState({ thu5: 0, cn: 0, cnLe: 0 })
 
   useEffect(() => {
     const fetchData = async () => {
@@ -81,23 +81,16 @@ export default function ViewStudentPage() {
           .eq('is_current', true)
           .single()
 
+        let holidays: Pick<Holiday, 'day_type'>[] = []
         if (schoolYearData) {
-          // Count actual Thursdays and Sundays
-          const totalThu5 = countWeekdays(schoolYearData.start_date, schoolYearData.end_date, 4)
-          const totalCn = countWeekdays(schoolYearData.start_date, schoolYearData.end_date, 0)
-
           // Fetch holidays
           const { data: holidaysData } = await supabase
             .from('holidays')
-            .select('*')
+            .select('day_type')
             .eq('school_year_id', schoolYearData.id)
-          const holidays = (holidaysData || []) as Holiday[]
-          const thu5Holidays = holidays.filter(h => h.day_type === 'thu5' || h.day_type === 'both').length
-          const cnHolidays = holidays.filter(h => h.day_type === 'cn' || h.day_type === 'both').length
-
-          setEffectiveThu5Days(Math.max(1, totalThu5 - thu5Holidays))
-          setEffectiveCnDays(Math.max(1, totalCn - cnHolidays))
+          holidays = (holidaysData || []) as Pick<Holiday, 'day_type'>[]
         }
+        setEffectiveDays(effectiveSessionDays(schoolYearData, holidays))
 
         // Fetch classes
         const { data: classesData } = await supabase
@@ -122,6 +115,38 @@ export default function ViewStudentPage() {
         }
 
         setStudent(studentData)
+
+        let attendanceRecords: { day_type: string }[] = []
+        try {
+          attendanceRecords = await fetchAllRows<{ day_type: string }>((from, to) => {
+            let query = supabase
+              .from('attendance_records')
+              .select('day_type')
+              .eq('student_id', studentId)
+              .eq('status', 'present')
+              .order('attendance_date', { ascending: true })
+              .range(from, to)
+            if (schoolYearData) {
+              query = query
+                .gte('attendance_date', schoolYearData.start_date)
+                .lte('attendance_date', schoolYearData.end_date)
+            }
+            return query
+          })
+        } catch (attendanceError) {
+          console.error('Error fetching attendance:', attendanceError)
+        }
+
+        const counts = attendanceRecords.reduce(
+          (result, record) => {
+            if (record.day_type === 'thu5') result.thu5 += 1
+            else if (record.day_type === 'cn') result.cn += 1
+            else if (record.day_type === 'cn_le') result.cnLe += 1
+            return result
+          },
+          { thu5: 0, cn: 0, cnLe: 0 },
+        )
+        setAttendanceCounts(counts)
       } catch (err) {
         console.error('Error:', err)
       } finally {
@@ -161,22 +186,16 @@ export default function ViewStudentPage() {
 
   // Calculate averages
   const calculateAverages = () => {
-    if (!student) return { avgCatechism: 0, avgAttendance: 0, totalAvg: 0 }
-
-    const score_45_hk1 = student.score_45_hk1 || 0
-    const score_exam_hk1 = student.score_exam_hk1 || 0
-    const score_45_hk2 = student.score_45_hk2 || 0
-    const score_exam_hk2 = student.score_exam_hk2 || 0
-    const attendance_thu5 = student.attendance_thu5 || 0
-    const attendance_cn = student.attendance_cn || 0
-
-    const avgCatechism = (score_45_hk1 + score_45_hk2 + score_exam_hk1 * 2 + score_exam_hk2 * 2) / 6
-    const score_thu5 = (attendance_thu5 * 0.4) * (10 / effectiveThu5Days)
-    const score_cn = (attendance_cn * 0.6) * (10 / effectiveCnDays)
-    const avgAttendance = score_thu5 + score_cn
-    const totalAvg = avgCatechism * 0.6 + avgAttendance * 0.4
-
-    return { avgCatechism, avgAttendance, totalAvg }
+    const attendance = attendanceScores(attendanceCounts, effectiveDays)
+    const summary = scoreSummary({
+      score_45_hk1: student?.score_45_hk1,
+      score_exam_hk1: student?.score_exam_hk1,
+      score_45_hk2: student?.score_45_hk2,
+      score_exam_hk2: student?.score_exam_hk2,
+      t5: attendance.diem_t5,
+      cn: attendance.diem_gl,
+    })
+    return { attendance, summary }
   }
 
   if (isLoading) {
@@ -208,7 +227,7 @@ export default function ViewStudentPage() {
 
   const classInfo = getClassInfo(student.class_id)
   const age = calculateAge(student.date_of_birth)
-  const { avgCatechism, avgAttendance, totalAvg } = calculateAverages()
+  const { attendance: attendanceSummary, summary } = calculateAverages()
 
   return (
     <div className="bg-[#F6F6F6] dark:bg-white/5 border border-white/60 dark:border-white/10 rounded-2xl min-h-[calc(100vh-140px)]">
@@ -437,13 +456,13 @@ export default function ViewStudentPage() {
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Điểm 45 phút</label>
                     <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
-                      {(student.score_45_hk1 || 0).toFixed(1)}
+                      {fmtScore(student.score_45_hk1)}
                     </div>
                   </div>
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Điểm học kỳ (x2)</label>
                     <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
-                      {(student.score_exam_hk1 || 0).toFixed(1)}
+                      {fmtScore(student.score_exam_hk1)}
                     </div>
                   </div>
                 </div>
@@ -460,13 +479,13 @@ export default function ViewStudentPage() {
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Điểm 45 phút</label>
                     <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
-                      {(student.score_45_hk2 || 0).toFixed(1)}
+                      {fmtScore(student.score_45_hk2)}
                     </div>
                   </div>
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Điểm học kỳ (x2)</label>
                     <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
-                      {(student.score_exam_hk2 || 0).toFixed(1)}
+                      {fmtScore(student.score_exam_hk2)}
                     </div>
                   </div>
                 </div>
@@ -483,13 +502,19 @@ export default function ViewStudentPage() {
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Số buổi thứ 5</label>
                     <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
-                      {student.attendance_thu5 || 0}
+                      {attendanceCounts.thu5}
                     </div>
                   </div>
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-[#666d80] mb-1.5">Số buổi Chúa nhật</label>
                     <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
-                      {student.attendance_cn || 0}
+                      {attendanceCounts.cn}
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-[#666d80] mb-1.5">Số buổi lễ CN</label>
+                    <div className="h-[43px] px-4 bg-[#F6F6F6] dark:bg-white/5 rounded-xl text-sm text-black dark:text-white flex items-center justify-center font-medium">
+                      {attendanceCounts.cnLe}
                     </div>
                   </div>
                 </div>
@@ -502,28 +527,64 @@ export default function ViewStudentPage() {
                 <h3 className="text-base font-semibold text-black dark:text-white">Điểm trung bình</h3>
               </div>
               <div className="p-4">
-                <div className="flex gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-[#6e62e5] mb-1.5">TB Giáo lý</label>
+                    <label className="block text-sm font-medium text-[#6e62e5] mb-1.5">TB HK1</label>
                     <div className="h-[43px] px-4 bg-[#F0EEFF] rounded-xl text-lg text-[#6e62e5] flex items-center justify-center font-bold">
-                      {avgCatechism.toFixed(1)}
+                      {fmtScore(summary.tbHK1)}
                     </div>
                   </div>
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-[#666d80] mb-1.5">TB Điểm danh</label>
-                    <div className="h-[43px] px-4 bg-[#F6F6F6] rounded-xl text-lg text-[#8B8685] flex items-center justify-center font-bold">
-                      {avgAttendance.toFixed(1)}
+                    <label className="block text-sm font-medium text-[#6e62e5] mb-1.5">TB HK2</label>
+                    <div className="h-[43px] px-4 bg-[#F0EEFF] rounded-xl text-lg text-[#6e62e5] flex items-center justify-center font-bold">
+                      {fmtScore(summary.tbHK2)}
                     </div>
                   </div>
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-[#E178FF] mb-1.5">Tổng TB</label>
+                    <label className="block text-sm font-medium text-[#E178FF] mb-1.5">TB năm</label>
                     <div className="h-[43px] px-4 bg-[#FDF0FF] rounded-xl text-lg text-[#E178FF] flex items-center justify-center font-bold">
-                      {totalAvg.toFixed(1)}
+                      {fmtScore(summary.tbNam)}
                     </div>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                  <div>
+                    <label className="block text-xs font-medium text-[#666d80] mb-1.5">Điểm T5</label>
+                    <div className="h-[38px] px-3 bg-[#F6F6F6] rounded-xl text-sm text-[#8B8685] flex items-center justify-center font-bold">
+                      {fmtScore(attendanceSummary.diem_t5)}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#666d80] mb-1.5">Điểm CN</label>
+                    <div className="h-[38px] px-3 bg-[#F6F6F6] rounded-xl text-sm text-[#8B8685] flex items-center justify-center font-bold">
+                      {fmtScore(attendanceSummary.diem_gl)}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#666d80] mb-1.5">Điểm lễ CN</label>
+                    <div className="h-[38px] px-3 bg-[#F6F6F6] rounded-xl text-sm text-[#8B8685] flex items-center justify-center font-bold">
+                      {fmtScore(attendanceSummary.diem_le_cn)}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#666d80] mb-1.5">TB điểm danh</label>
+                    <div className="h-[38px] px-3 bg-[#F6F6F6] rounded-xl text-sm text-[#8B8685] flex items-center justify-center font-bold">
+                      {fmtScore(attendanceSummary.diem_tb)}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                  <div className="h-[43px] px-4 bg-[#F0EEFF] rounded-xl flex items-center justify-between">
+                    <span className="text-sm font-medium text-[#666d80]">Xếp loại</span>
+                    <span className="text-sm font-bold text-[#6e62e5]">{summary.xepLoai}</span>
+                  </div>
+                  <div className="h-[43px] px-4 bg-[#FDF0FF] rounded-xl flex items-center justify-between">
+                    <span className="text-sm font-medium text-[#666d80]">Kết quả</span>
+                    <span className="text-sm font-bold text-[#E178FF]">{summary.ketQua}</span>
+                  </div>
+                </div>
                 <p className="text-xs text-[#666d80] mt-3">
-                  Công thức: TB Giáo lý × 0.6 + TB Điểm danh × 0.4
+                  Điểm T5/CN được tính từ bản ghi điểm danh trong năm học hiện tại.
                 </p>
               </div>
             </div>

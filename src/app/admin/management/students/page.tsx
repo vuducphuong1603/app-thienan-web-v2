@@ -3,11 +3,13 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, ThieuNhiProfile, Class, BRANCHES } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 import { Search, ChevronDown, Plus } from 'lucide-react'
 import ImportStudentsModal from '@/components/management/ImportStudentsModal'
 import DeleteStudentModal from '@/components/management/DeleteStudentModal'
 import { useStudentsWithDetails, useInvalidateQueries } from '@/lib/queries'
 import { normalizeSearchText } from '@/lib/search'
+import { fmtScore, parseScoreInput } from '@/lib/score-summary'
 
 interface StudentWithDetails extends ThieuNhiProfile {
   class_name?: string
@@ -20,13 +22,13 @@ interface StudentWithDetails extends ThieuNhiProfile {
   score_exam_hk1?: number
   score_45_hk2?: number
   score_exam_hk2?: number
-  avg_catechism?: number
+  avg_catechism?: number | null
   attendance_thu5?: number
   attendance_cn?: number
   score_thu5?: number      // Điểm T5 = (attendance_thu5 * 0.4) * (10 / totalThu5Days)
   score_cn?: number        // Điểm CN = (attendance_cn * 0.6) * (10 / totalCnDays)
   avg_attendance?: number  // TB Điểm danh = score_thu5 + score_cn
-  total_avg?: number
+  total_avg?: number | null
 }
 
 interface EditingScores {
@@ -46,6 +48,7 @@ type FilterStatus = 'all' | 'ACTIVE' | 'INACTIVE'
 
 export default function StudentsPage() {
   const router = useRouter()
+  const { isAdmin } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
   const [filterClass, setFilterClass] = useState<FilterClass>('all')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('ACTIVE')
@@ -127,34 +130,57 @@ export default function StudentsPage() {
     return acc
   }, {} as Record<string, Class[]>)
 
-  // Handle delete student
+  // Default delete is a soft delete so attendance and score history remains available.
   const handleDeleteStudent = async () => {
-    console.log('handleDeleteStudent called')
-    console.log('selectedStudent:', selectedStudent)
-
     if (!selectedStudent) {
-      console.log('No student selected, returning')
       return
     }
 
-    console.log('Attempting to delete student with id:', selectedStudent.id)
+    console.log('Attempting to deactivate student with id:', selectedStudent.id)
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('thieu_nhi')
-      .delete()
+      .update({ status: 'INACTIVE' })
       .eq('id', selectedStudent.id)
-      .select()
 
-    console.log('Delete response - data:', data, 'error:', error)
+    console.log('Deactivate response - error:', error)
 
     if (error) {
-      console.error('Error deleting student:', error)
-      alert(`Không thể xóa thiếu nhi: ${error.message}`)
+      console.error('Error deactivating student:', error)
+      alert(`Không thể đưa thiếu nhi về trạng thái ngừng hoạt động: ${error.message}`)
       throw error
     }
 
-    console.log('Delete successful, refreshing data...')
+    console.log('Deactivate successful, refreshing data...')
     // Refresh data in background (don't await — UI updates when refetch completes)
+    fetchData()
+  }
+
+  // Permanent deletion is restricted to admins and intentionally requires two confirmations.
+  const handlePermanentDeleteStudent = async (student: StudentWithDetails) => {
+    if (!isAdmin) return
+
+    const firstConfirmation = window.confirm(
+      `Xoá vĩnh viễn ${student.full_name}? Toàn bộ lịch sử điểm danh và các yêu cầu cấp lại thẻ sẽ bị xoá vĩnh viễn. Thao tác này không thể hoàn tác.`
+    )
+    if (!firstConfirmation) return
+
+    const secondConfirmation = window.confirm(
+      `Xác nhận lần cuối: xoá vĩnh viễn ${student.full_name}. Lịch sử điểm danh và các yêu cầu cấp lại thẻ sẽ bị xoá vĩnh viễn. Tiếp tục?`
+    )
+    if (!secondConfirmation) return
+
+    const { error } = await supabase
+      .from('thieu_nhi')
+      .delete()
+      .eq('id', student.id)
+
+    if (error) {
+      console.error('Error permanently deleting student:', error)
+      alert(`Không thể xoá vĩnh viễn thiếu nhi: ${error.message}`)
+      return
+    }
+
     fetchData()
   }
 
@@ -169,10 +195,10 @@ export default function StudentsPage() {
     setEditingStudentId(student.id)
     setShowScores(true)
     setEditingScores({
-      score_45_hk1: (student.score_45_hk1 || 0).toString(),
-      score_exam_hk1: (student.score_exam_hk1 || 0).toString(),
-      score_45_hk2: (student.score_45_hk2 || 0).toString(),
-      score_exam_hk2: (student.score_exam_hk2 || 0).toString(),
+      score_45_hk1: student.score_45_hk1?.toString() ?? '',
+      score_exam_hk1: student.score_exam_hk1?.toString() ?? '',
+      score_45_hk2: student.score_45_hk2?.toString() ?? '',
+      score_exam_hk2: student.score_exam_hk2?.toString() ?? '',
     })
   }
 
@@ -191,15 +217,24 @@ export default function StudentsPage() {
   const saveScores = async () => {
     if (!editingStudentId) return
 
+    const score45Hk1 = parseScoreInput(editingScores.score_45_hk1)
+    const examHk1 = parseScoreInput(editingScores.score_exam_hk1)
+    const score45Hk2 = parseScoreInput(editingScores.score_45_hk2)
+    const examHk2 = parseScoreInput(editingScores.score_exam_hk2)
+    if (score45Hk1 === undefined || examHk1 === undefined || score45Hk2 === undefined || examHk2 === undefined) {
+      alert('Điểm phải từ 0 đến 10')
+      return
+    }
+
     setIsSaving(true)
     try {
       const { error } = await supabase
         .from('thieu_nhi')
         .update({
-          score_45_hk1: parseFloat(editingScores.score_45_hk1) || 0,
-          score_exam_hk1: parseFloat(editingScores.score_exam_hk1) || 0,
-          score_45_hk2: parseFloat(editingScores.score_45_hk2) || 0,
-          score_exam_hk2: parseFloat(editingScores.score_exam_hk2) || 0,
+          score_45_hk1: score45Hk1,
+          score_exam_hk1: examHk1,
+          score_45_hk2: score45Hk2,
+          score_exam_hk2: examHk2,
         })
         .eq('id', editingStudentId)
 
@@ -602,7 +637,7 @@ export default function StudentsPage() {
                           className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
                         />
                       ) : (
-                        <span className="text-sm text-[#8a8c90]">{student.score_45_hk1?.toFixed(1) || '0.0'}</span>
+                        <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_45_hk1)}</span>
                       )}
                     </td>
 
@@ -616,7 +651,7 @@ export default function StudentsPage() {
                           className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
                         />
                       ) : (
-                        <span className="text-sm text-[#8a8c90]">{student.score_exam_hk1?.toFixed(1) || '0.0'}</span>
+                        <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_exam_hk1)}</span>
                       )}
                     </td>
 
@@ -630,7 +665,7 @@ export default function StudentsPage() {
                           className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
                         />
                       ) : (
-                        <span className="text-sm text-[#8a8c90]">{student.score_45_hk2?.toFixed(1) || '0.0'}</span>
+                        <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_45_hk2)}</span>
                       )}
                     </td>
 
@@ -644,33 +679,33 @@ export default function StudentsPage() {
                           className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
                         />
                       ) : (
-                        <span className="text-sm text-[#8a8c90]">{student.score_exam_hk2?.toFixed(1) || '0.0'}</span>
+                        <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_exam_hk2)}</span>
                       )}
                     </td>
 
                     {/* TB Giáo Lý (calculated, purple) - End of score group */}
                     <td className={`${scoreCellCls} px-1 py-3 text-center bg-[#F6F6F6]`} style={{ borderRight: '0.5px solid #E5E1DC' }}>
-                      <span className="text-sm font-medium text-[#6e62e5]">{student.avg_catechism?.toFixed(1) || '0.0'}</span>
+                      <span className="text-sm font-medium text-[#6e62e5]">{fmtScore(student.avg_catechism)}</span>
                     </td>
 
                     {/* Điểm danh T5 */}
                     <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
-                      <span className="text-sm text-[#8B8685]">{student.score_thu5?.toFixed(1) || '0.0'}</span>
+                      <span className="text-sm text-[#8B8685]">{fmtScore(student.score_thu5)}</span>
                     </td>
 
                     {/* Điểm danh CN */}
                     <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
-                      <span className="text-sm text-[#8B8685]">{student.score_cn?.toFixed(1) || '0.0'}</span>
+                      <span className="text-sm text-[#8B8685]">{fmtScore(student.score_cn)}</span>
                     </td>
 
                     {/* TB Điểm danh (calculated) */}
                     <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
-                      <span className="text-sm text-[#8B8685]">{student.avg_attendance?.toFixed(1) || '0.0'}</span>
+                      <span className="text-sm text-[#8B8685]">{fmtScore(student.avg_attendance)}</span>
                     </td>
 
                     {/* Tổng TB (calculated, pink) */}
                     <td className={`${scoreCellCls} px-1 py-3 text-center ${rowBgClass}`}>
-                      <span className="text-sm font-semibold text-[#E178FF]">{student.total_avg?.toFixed(1) || '0.0'}</span>
+                      <span className="text-sm font-semibold text-[#E178FF]">{fmtScore(student.total_avg)}</span>
                     </td>
 
                     {/* Actions */}
@@ -758,6 +793,16 @@ export default function StudentsPage() {
                                 <path d="M6.66667 5V3.33333C6.66667 2.89131 6.84226 2.46738 7.15482 2.15482C7.46738 1.84226 7.89131 1.66667 8.33333 1.66667H11.6667C12.1087 1.66667 12.5326 1.84226 12.8452 2.15482C13.1577 2.46738 13.3333 2.89131 13.3333 3.33333V5M15.8333 5V16.6667C15.8333 17.1087 15.6577 17.5326 15.3452 17.8452C15.0326 18.1577 14.6087 18.3333 14.1667 18.3333H5.83333C5.39131 18.3333 4.96738 18.1577 4.65482 17.8452C4.34226 17.5326 4.16667 17.1087 4.16667 16.6667V5H15.8333Z" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => void handlePermanentDeleteStudent(student)}
+                                className="h-9 rounded-lg border border-red-300 px-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                                title="Xoá vĩnh viễn"
+                                aria-label={`Xoá vĩnh viễn ${student.full_name}`}
+                              >
+                                Xoá vĩnh viễn
+                              </button>
+                            )}
                           </>
                         )}
                       </div>

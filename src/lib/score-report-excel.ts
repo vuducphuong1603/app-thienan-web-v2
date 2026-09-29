@@ -1,7 +1,9 @@
 // Xuất Excel bảng điểm / điểm danh theo mẫu "FILE MAU SO DIEM TUNG LOP.xlsx"
-// (logo Xứ Đoàn, Times New Roman, header 2 tầng với 3 khối màu, viền lưới, công thức)
+// (logo Xứ Đoàn, Times New Roman, header 2 tầng với 3 khối màu, viền lưới)
 
 import { isSundayDate } from './sunday-attendance'
+import { REPORT_CELL_SYMBOL, reportCellStatus } from './report-cell'
+import { round2, scoreSummary } from './score-summary'
 export interface ScoreColumnSelection {
   diLeT5: boolean
   hocGL: boolean
@@ -12,6 +14,7 @@ export interface ScoreColumnSelection {
   score45HK2: boolean
   scoreExamHK2: boolean
   diemTong: boolean
+  xepLoai: boolean
   ketQua: boolean
 }
 
@@ -52,23 +55,7 @@ export function splitFullName(fullName: string): { hoDem: string; ten: string } 
   return { hoDem: parts.slice(0, -1).join(' '), ten: parts[parts.length - 1] }
 }
 
-const round2 = (n: number) => Math.round(n * 100) / 100
-
-/**
- * Quy đổi số buổi có mặt sang điểm thang 10 theo số buổi hiệu lực trong năm học,
- * và tính Điểm TB điểm danh theo công thức file mẫu: T5*0.4 + ((GL + Lễ CN)/2)*0.6
- */
-export function attendanceScores(
-  counts: { thu5: number; cn: number; cnLe: number },
-  effectiveDays: { thu5: number; cn: number },
-): { diem_t5: number; diem_gl: number; diem_le_cn: number; diem_tb: number } {
-  const scale = (count: number, days: number) => (days > 0 ? round2(Math.min(10, (count * 10) / days)) : 0)
-  const diem_t5 = scale(counts.thu5, effectiveDays.thu5)
-  const diem_gl = scale(counts.cn, effectiveDays.cn)
-  const diem_le_cn = scale(counts.cnLe, effectiveDays.cn)
-  const diem_tb = round2(diem_t5 * 0.4 + ((diem_gl + diem_le_cn) / 2) * 0.6)
-  return { diem_t5, diem_gl, diem_le_cn, diem_tb }
-}
+export { attendanceScores } from './score-summary'
 
 // Bảng màu lấy từ file mẫu
 const COLOR = {
@@ -81,6 +68,7 @@ const COLOR = {
 
 const FONT = 'Times New Roman'
 const FONT_SIZE = 11.5
+const reportRecordKey = (date: string, dayType: string) => `${date}:${dayType}`
 
 export function buildScoreColumns(sel: ScoreColumnSelection): ReportColumn[] {
   const anySelected = Object.values(sel).some(v => v)
@@ -94,23 +82,28 @@ export function buildScoreColumns(sel: ScoreColumnSelection): ReportColumn[] {
     { key: 'hoDem', label: 'Họ', group: 'info', width: 25 },
     { key: 'ten', label: 'Tên', group: 'info', width: 25 },
   ]
-  if (show('diLeT5')) cols.push({ key: 'diLeT5', label: 'Đi Lễ T5', group: 'diemdanh', width: 6.9, numFmt: '0.0' })
-  if (show('hocGL')) cols.push({ key: 'hocGL', label: 'Học GL', group: 'diemdanh', width: 6.9, numFmt: '0.0' })
-  if (show('diLeCN')) cols.push({ key: 'diLeCN', label: 'Đi Lễ CN', group: 'diemdanh', width: 6.9, numFmt: '0.0' })
-  if (show('diemTB')) cols.push({ key: 'diemTB', label: 'Điểm TB', group: 'diemdanh', width: 7.4, numFmt: '0.0' })
-  if (show('score45HK1')) cols.push({ key: 's45HK1', label: "45' HKI", group: 'giaoly', width: 6.9, numFmt: '0.0' })
-  if (show('scoreExamHK1')) cols.push({ key: 'examHK1', label: 'Thi HKI', group: 'giaoly', width: 6.9, numFmt: '0.0' })
+  if (show('diLeT5')) cols.push({ key: 'diLeT5', label: 'Đi Lễ T5', group: 'diemdanh', width: 6.9, numFmt: '0.00' })
+  if (show('hocGL')) cols.push({ key: 'hocGL', label: 'Học GL', group: 'diemdanh', width: 6.9, numFmt: '0.00' })
+  if (show('diLeCN')) cols.push({ key: 'diLeCN', label: 'Đi Lễ CN', group: 'diemdanh', width: 6.9, numFmt: '0.00' })
+  if (show('diemTB')) cols.push({ key: 'diemTB', label: 'Điểm TB', group: 'diemdanh', width: 7.4, numFmt: '0.00' })
+  if (show('score45HK1')) cols.push({ key: 's45HK1', label: "45' HKI", group: 'giaoly', width: 6.9, numFmt: '0.00' })
+  if (show('scoreExamHK1')) cols.push({ key: 'examHK1', label: 'Thi HKI', group: 'giaoly', width: 6.9, numFmt: '0.00' })
   // Cột TB HKI tạm ẩn cho tới khi sơ kết HKI (yêu cầu 2026-08-28). Khi cần hiện lại:
   // if (show('score45HK1') || show('scoreExamHK1')) cols.push({ key: 'tbHK1', label: 'TB HKI', group: 'giaoly', width: 6.9, numFmt: '0.0' })
-  if (show('score45HK2')) cols.push({ key: 's45HK2', label: "45' HKII", group: 'giaoly', width: 6.9, numFmt: '0.0' })
-  if (show('scoreExamHK2')) cols.push({ key: 'examHK2', label: 'Thi HKII', group: 'giaoly', width: 6.9, numFmt: '0.0' })
+  if (show('score45HK2')) cols.push({ key: 's45HK2', label: "45' HKII", group: 'giaoly', width: 6.9, numFmt: '0.00' })
+  if (show('scoreExamHK2')) cols.push({ key: 'examHK2', label: 'Thi HKII', group: 'giaoly', width: 6.9, numFmt: '0.00' })
   // Cột TB HKII ẩn khi xuất báo cáo (yêu cầu 2026-09-03). Khi cần hiện lại:
   // if (show('score45HK2') || show('scoreExamHK2')) cols.push({ key: 'tbHK2', label: 'TB HKII', group: 'giaoly', width: 6.9, numFmt: '0.0' })
   if (show('diemTong')) {
-    cols.push({ key: 'tbNam', label: 'TB Năm', group: 'tongket', width: 7.6, numFmt: '0.0' })
+    cols.push({ key: 'tbNam', label: 'TB Năm', group: 'tongket', width: 7.6, numFmt: '0.00' })
+  }
+  if (show('xepLoai')) {
+    cols.push({ key: 'xepLoai', label: 'Xếp loại', group: 'tongket', width: 10 })
+  }
+  if (show('diemTong')) {
     cols.push({ key: 'hang', label: 'Hạng', group: 'tongket', width: 7.7, numFmt: '0' })
   }
-  if (sel.ketQua) cols.push({ key: 'ketQua', label: 'Kết quả', group: 'tongket', width: 8.4 })
+  if (show('ketQua')) cols.push({ key: 'ketQua', label: 'Kết quả', group: 'tongket', width: 8.4 })
   return cols
 }
 
@@ -145,30 +138,11 @@ export function buildRowFormulas(
   const has = (...keys: string[]) => keys.every(k => pos[k] !== undefined)
 
   const f: RowFormulas = {}
-  // Điểm TB điểm danh theo file mẫu: =(T5*0.4)+(((GL+LễCN)/2)*0.6)
-  if (has('diemTB', 'diLeT5', 'hocGL', 'diLeCN')) {
-    f.diemTB = `(${ref('diLeT5')}*0.4)+(((${ref('hocGL')}+${ref('diLeCN')})/2)*0.6)`
-  }
-  // TB HK = (45' + Thi*2)/3. Nếu cột TB HK bị ẩn nhưng vẫn đủ nguồn thì nội suy biểu thức để dùng cho TB Năm
-  const tbHK1Expr = has('s45HK1', 'examHK1') ? `(${ref('s45HK1')}+${ref('examHK1')}*2)/3` : undefined
-  const tbHK2Expr = has('s45HK2', 'examHK2') ? `(${ref('s45HK2')}+${ref('examHK2')}*2)/3` : undefined
-  if (has('tbHK1') && tbHK1Expr) f.tbHK1 = tbHK1Expr
-  if (has('tbHK2') && tbHK2Expr) f.tbHK2 = tbHK2Expr
-  const tbHK1Ref = has('tbHK1') ? ref('tbHK1') : tbHK1Expr
-  const tbHK2Ref = has('tbHK2') ? ref('tbHK2') : tbHK2Expr
-  if (has('tbNam') && tbHK1Ref && tbHK2Ref) {
-    f.tbNam = `(${tbHK1Ref}+${tbHK2Ref}*2)/3`
-  }
+  // Score averages, classification, and result are written as values from score-summary.ts.
+  // Only ranking remains an Excel formula because it depends on the whole exported class.
   if (has('hang', 'tbNam')) {
     const col = colLetter(pos.tbNam)
-    f.hang = `IF(${ref('tbNam')}="","",RANK(${ref('tbNam')},$${col}$${firstDataRow}:$${col}$${lastDataRow},0))`
-  }
-  if (has('ketQua', 'diLeT5', 'hocGL', 's45HK1', 'examHK1', 's45HK2', 'examHK2')) {
-    const t5 = ref('diLeT5')
-    const cn = ref('hocGL')
-    const avgCat = `(${ref('s45HK1')}+${ref('s45HK2')}+${ref('examHK1')}*2+${ref('examHK2')}*2)/6`
-    const totalAvg = `${avgCat}*0.6+(${t5}+${cn})*0.4`
-    f.ketQua = `IF(OR(${t5}<2.5,${cn}<2.5,${avgCat}<2.5,${totalAvg}<5),"Ở Lại","")`
+    f.hang = `IF(OR(${ref('tbNam')}="",${ref('tbNam')}="-"),"",RANK(${ref('tbNam')},$${col}$${firstDataRow}:$${col}$${lastDataRow},0))`
   }
   return f
 }
@@ -383,38 +357,51 @@ export async function buildScoreReportWorkbook(opts: {
   ws.getRow(tier1Row).height = 18
   ws.getRow(tier2Row).height = 30
 
-  // Dữ liệu
-  const valueOf = (s: ScoreReportStudent, key: string, stt: number): string | number => {
+  // Dữ liệu — null điểm là dấu '-' thay vì ô rỗng/0; các tổng hợp lấy từ score-summary.ts.
+  const excelScore = (score: number | null | undefined): string | number => (
+    score == null ? '-' : round2(score)
+  )
+  const valueOf = (s: ScoreReportStudent, summary: ReturnType<typeof scoreSummary>, key: string, stt: number): string | number => {
     switch (key) {
       case 'stt': return stt
       case 'saintName': return s.saint_name || ''
       case 'hoDem': return splitFullName(s.full_name).hoDem
       case 'ten': return splitFullName(s.full_name).ten
-      case 'diLeT5': return s.diem_t5 ?? ''
-      case 'hocGL': return s.diem_gl ?? ''
-      case 'diLeCN': return s.diem_le_cn ?? ''
-      case 'diemTB': return s.diem_tb ?? ''
-      case 's45HK1': return s.score_45_hk1 ?? ''
-      case 'examHK1': return s.score_exam_hk1 ?? ''
-      case 'tbHK1': return s.average_hk1 ?? ''
-      case 's45HK2': return s.score_45_hk2 ?? ''
-      case 'examHK2': return s.score_exam_hk2 ?? ''
-      case 'tbHK2': return s.average_hk2 ?? ''
-      case 'tbNam': return s.average_year ?? ''
+      case 'diLeT5': return excelScore(s.diem_t5)
+      case 'hocGL': return excelScore(s.diem_gl)
+      case 'diLeCN': return excelScore(s.diem_le_cn)
+      case 'diemTB': return excelScore(s.diem_tb)
+      case 's45HK1': return excelScore(s.score_45_hk1)
+      case 'examHK1': return excelScore(s.score_exam_hk1)
+      case 'tbHK1': return excelScore(summary.tbHK1)
+      case 's45HK2': return excelScore(s.score_45_hk2)
+      case 'examHK2': return excelScore(s.score_exam_hk2)
+      case 'tbHK2': return excelScore(summary.tbHK2)
+      case 'tbNam': return excelScore(summary.tbNam)
+      case 'xepLoai': return summary.xepLoai
+      case 'ketQua': return summary.ketQua
       default: return ''
     }
   }
 
   students.forEach((s, idx) => {
     const rowIdx = firstDataRow + idx
+    const summary = scoreSummary({
+      score_45_hk1: s.score_45_hk1,
+      score_exam_hk1: s.score_exam_hk1,
+      score_45_hk2: s.score_45_hk2,
+      score_exam_hk2: s.score_exam_hk2,
+      t5: s.diem_t5,
+      cn: s.diem_gl,
+    })
     const formulas = buildRowFormulas(cols, rowIdx, firstDataRow, lastDataRow)
     cols.forEach((c, ci) => {
       const cell = ws.getCell(rowIdx, ci + 1)
-      const formula = (formulas as Record<string, string | undefined>)[c.key]
+      const formula = c.key === 'hang' ? formulas.hang : undefined
       if (formula) {
         cell.value = { formula }
       } else {
-        cell.value = valueOf(s, c.key, idx + 1)
+        cell.value = valueOf(s, summary, c.key, idx + 1)
       }
       cell.font = { name: FONT, size: FONT_SIZE }
       cell.alignment = {
@@ -459,11 +446,13 @@ export async function buildAttendanceWorkbook(opts: {
   formatDate: (date: string) => string
   holidayNames: Map<string, string>
   students: AttendanceReportStudent[]
+  classRecordKeys: ReadonlySet<string>
+  today: string
   logoBase64?: string
   badgeBase64?: string
 }): Promise<ArrayBuffer> {
   const ExcelJS = await loadExcelJS()
-  const { className, title, dates, formatDate, holidayNames, students, logoBase64, badgeBase64 } = opts
+  const { className, title, dates, formatDate, holidayNames, students, classRecordKeys, today, logoBase64, badgeBase64 } = opts
 
   const columns = buildAttendanceExcelColumns(dates, holidayNames)
   const hasSplit = columns.some(c => c.session !== 'single')
@@ -486,7 +475,7 @@ export async function buildAttendanceWorkbook(opts: {
     totalCols: Math.min(totalCols, 14),
     logoBase64,
     badgeBase64,
-    extraInfo: `Tổng số buổi: ${dates.length}`,
+    extraInfo: `Tổng số buổi: ${dates.length} | X: Có mặt | Ô trống: Vắng mặt | -: Chưa điểm danh`,
   })
   const subHeaderRow = hasSplit ? headerRow + 1 : headerRow
 
@@ -532,14 +521,22 @@ export async function buildAttendanceWorkbook(opts: {
     const nameParts = s.full_name.split(' ')
     const givenName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : ''
     const familyMiddleName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
-    // Theo file mẫu: có mặt đánh X, còn lại để trống với nền xanh nhạt
+    // Theo file mẫu: có mặt đánh X; vắng để trống; ngày chưa điểm danh đánh '-' màu xám.
     const values: (string | number)[] = [idx + 1, s.saint_name || '', familyMiddleName, givenName]
     columns.forEach(c => {
       if (holidayNames.has(c.date)) {
         values.push('Nghỉ')
       } else {
         const status = c.session === 'le' ? s.attendance_mass?.[c.date] : s.attendance[c.date]
-        values.push(status === 'present' ? 'X' : '')
+        const dayType = c.session === 'le' ? 'cn_le' : c.session === 'gl' ? 'cn' : 'thu5'
+        const cellStatus = reportCellStatus({
+          record: status,
+          date: c.date,
+          today,
+          isHoliday: false,
+          classHasAnyRecord: classRecordKeys.has(reportRecordKey(c.date, dayType)),
+        })
+        values.push(cellStatus === 'holiday' ? '' : REPORT_CELL_SYMBOL[cellStatus])
       }
     })
     values.forEach((v, ci) => {
@@ -551,7 +548,12 @@ export async function buildAttendanceWorkbook(opts: {
         vertical: 'middle',
       }
       cell.border = thinBorder
-      if (ci >= 4 && v !== 'X') cell.fill = fill(COLOR.headerInfo)
+      if (ci >= 4 && v !== REPORT_CELL_SYMBOL.present) {
+        cell.fill = fill(COLOR.headerInfo)
+        if (v === REPORT_CELL_SYMBOL.unmarked) {
+          cell.font = { name: FONT, size: 10, color: { argb: 'FF666D80' } }
+        }
+      }
     })
     ws.getRow(rowIdx).height = 15
   })
