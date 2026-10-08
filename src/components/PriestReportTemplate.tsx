@@ -6,32 +6,28 @@ export interface PriestReportClassData {
   className: string
   branch: string
   studentCount: number
-  totalSlots: number
-  presentCount: number
   absentCount: number
-  rate: number
+  rate: number | null
 }
 
 export interface PriestReportBranchData {
   branch: string
   classes: PriestReportClassData[]
   totalStudents: number
-  totalSlots: number
-  totalPresent: number
   totalAbsent: number
-  rate: number
+  rate: number | null
 }
 
 export interface PriestReportData {
   branches: PriestReportBranchData[]
   grandTotalStudents: number
-  grandTotalSlots: number
-  grandTotalPresent: number
   grandTotalAbsent: number
-  grandRate: number
+  grandRate: number | null
   fromDate: string
   toDate: string
   timeLabel: string
+  thursdayCount: number
+  sundayCount: number
   absentWarning?: {
     prevLabel: string
     currentLabel: string
@@ -100,6 +96,9 @@ const PriestReportTemplate = forwardRef<HTMLDivElement, PriestReportTemplateProp
       <p className="text-center text-base mb-4">
         {data.timeLabel}
       </p>
+      <p className="text-center text-sm mb-4">
+        Trong khoảng thời gian này có {data.thursdayCount} ngày thứ Năm và {data.sundayCount} ngày Chủ nhật
+      </p>
 
       {/* Table */}
       <table className="w-full border-collapse text-sm">
@@ -108,7 +107,6 @@ const PriestReportTemplate = forwardRef<HTMLDivElement, PriestReportTemplateProp
             <th className="border border-gray-400 px-2 py-2 text-center w-[50px]">STT</th>
             <th className="border border-gray-400 px-2 py-2 text-left">Ngành / Lớp</th>
             <th className="border border-gray-400 px-2 py-2 text-center w-[70px]">Sĩ số</th>
-            <th className="border border-gray-400 px-2 py-2 text-center w-[80px]">Đi</th>
             <th className="border border-gray-400 px-2 py-2 text-center w-[80px]">Nghỉ</th>
             <th className="border border-gray-400 px-2 py-2 text-center w-[80px]">Tỉ lệ (%)</th>
           </tr>
@@ -123,10 +121,9 @@ const PriestReportTemplate = forwardRef<HTMLDivElement, PriestReportTemplateProp
                     <td className="border border-gray-400 px-2 py-2 text-center">{globalIndex}</td>
                     <td className="border border-gray-400 px-2 py-2">{cls.className}</td>
                     <td className="border border-gray-400 px-2 py-2 text-center">{cls.studentCount}</td>
-                    <td className="border border-gray-400 px-2 py-2 text-center">{cls.presentCount}</td>
                     <td className="border border-gray-400 px-2 py-2 text-center">{cls.absentCount}</td>
                     <td className="border border-gray-400 px-2 py-2 text-center font-medium">
-                      {cls.totalSlots > 0 ? cls.rate.toFixed(1) : '-'}
+                      {cls.rate !== null ? cls.rate.toFixed(1) : '-'}
                     </td>
                   </tr>
                 )
@@ -137,10 +134,9 @@ const PriestReportTemplate = forwardRef<HTMLDivElement, PriestReportTemplateProp
                   Cộng ngành {branch.branch}
                 </td>
                 <td className="border border-gray-400 px-2 py-2 text-center">{branch.totalStudents}</td>
-                <td className="border border-gray-400 px-2 py-2 text-center">{branch.totalPresent}</td>
                 <td className="border border-gray-400 px-2 py-2 text-center">{branch.totalAbsent}</td>
                 <td className="border border-gray-400 px-2 py-2 text-center">
-                  {branch.totalSlots > 0 ? branch.rate.toFixed(1) : '-'}
+                  {branch.rate !== null ? branch.rate.toFixed(1) : '-'}
                 </td>
               </tr>
             </Fragment>
@@ -151,10 +147,9 @@ const PriestReportTemplate = forwardRef<HTMLDivElement, PriestReportTemplateProp
               TỔNG CỘNG
             </td>
             <td className="border border-gray-400 px-2 py-2 text-center">{data.grandTotalStudents}</td>
-            <td className="border border-gray-400 px-2 py-2 text-center">{data.grandTotalPresent}</td>
             <td className="border border-gray-400 px-2 py-2 text-center">{data.grandTotalAbsent}</td>
             <td className="border border-gray-400 px-2 py-2 text-center">
-              {data.grandTotalSlots > 0 ? data.grandRate.toFixed(1) : '-'}
+              {data.grandRate !== null ? data.grandRate.toFixed(1) : '-'}
             </td>
           </tr>
         </tbody>

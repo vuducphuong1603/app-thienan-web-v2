@@ -37,7 +37,7 @@ export type TimeFilterMode = 'week' | 'dateRange' | 'month'
 export type ReportType = 'attendance' | 'score'
 export type AttendanceTypeFilter = 'all' | 'thu5' | 'cn'
 export type ReportStyleType = 'parent' | 'priest'
-export type PriestTimeFilterMode = 'week' | 'month' | 'year'
+export type PriestTimeFilterMode = 'week' | 'month' | 'year' | 'custom'
 export type TabType = 'attendance' | 'report'
 
 export interface StudentWithAttendance extends ThieuNhiProfile {
