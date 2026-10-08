@@ -2,19 +2,21 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { todayForAttendance } from '@/lib/debug-date'
-import { mergeSundayRecords, isSundayDate, countSundayReport, DayType, SundaySession, SUNDAY_SESSION_SHORT_LABELS, sundayStatus, SUNDAY_STATUS_LABELS } from '@/lib/sunday-attendance'
+import { isSundayDate, countSundayReport, DayType, SundaySession, SUNDAY_SESSION_SHORT_LABELS, sundayStatus, SUNDAY_STATUS_LABELS } from '@/lib/sunday-attendance'
 import { sortByGivenName, compareByGivenName } from '@/lib/student-sort'
 import { recalcAttendanceCount } from '@/lib/attendance-count'
-import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, SchoolYear, Holiday } from '@/lib/supabase'
+import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, Holiday } from '@/lib/supabase'
 import { useActiveClasses, useSchoolYears, fetchAllRows } from '@/lib/queries'
 import { countReportCells, reportCellStatus, reportTotalAttendance, REPORT_CELL_SYMBOL, type ReportCellStatus } from '@/lib/report-cell'
 import { attendanceScores, effectiveSessionDays, fmtScore, round2, scoreSummary } from '@/lib/score-summary'
 import { useAuth } from '@/lib/auth-context'
 import { scopedBranches } from '@/lib/branch-scope'
 import {
+  attendanceRateByStudents,
   buildAbsentWarnings,
   countAttendanceDays,
   countFullyAbsentByClass,
+  countWeekdays,
   monthRange,
   monthOverlapsSchoolYear,
   presentStudentIds,
@@ -91,7 +93,7 @@ type TimeFilterMode = 'week' | 'dateRange' | 'month'
 type ReportType = 'attendance' | 'score'
 type AttendanceTypeFilter = 'all' | 'thu5' | 'cn'
 type ReportStyleType = 'parent' | 'priest'
-type PriestTimeFilterMode = 'week' | 'month' | 'year'
+type PriestTimeFilterMode = 'week' | 'month' | 'year' | 'custom'
 
 interface StudentWithAttendance extends ThieuNhiProfile {
   class_name?: string
@@ -550,6 +552,8 @@ export default function ActivitiesPage() {
   const [priestYear, setPriestYear] = useState<number>(new Date().getFullYear())
   const [priestWeekStart, setPriestWeekStart] = useState<string>('')
   const [priestWeekEnd, setPriestWeekEnd] = useState<string>('')
+  const [priestCustomFromDate, setPriestCustomFromDate] = useState<string>('')
+  const [priestCustomToDate, setPriestCustomToDate] = useState<string>('')
   const [priestSchoolYearId, setPriestSchoolYearId] = useState<string>('')
   const [priestAttendanceType, setPriestAttendanceType] = useState<AttendanceTypeFilter>('all')
   const [priestReportData, setPriestReportData] = useState<PriestReportData | null>(null)
@@ -2096,6 +2100,20 @@ export default function ActivitiesPage() {
         toDate = range.to
         timeLabel = `Tháng ${priestMonth + 1}/${priestYear}`
         reportSY = schoolYears.find(sy => monthOverlapsSchoolYear({ from: fromDate, to: toDate }, sy)) ?? schoolYear
+      } else if (priestTimeFilterMode === 'custom') {
+        if (!priestCustomFromDate || !priestCustomToDate) {
+          showNotification('error', 'Vui lòng chọn ngày bắt đầu và ngày kết thúc')
+          return
+        }
+        if (priestCustomFromDate > priestCustomToDate) {
+          showNotification('error', 'Ngày bắt đầu không được sau ngày kết thúc')
+          return
+        }
+        fromDate = priestCustomFromDate
+        toDate = priestCustomToDate
+        const [fromYear, fromMonth, fromDay] = fromDate.split('-')
+        const [toYear, toMonth, toDay] = toDate.split('-')
+        timeLabel = `Từ ${fromDay}/${fromMonth}/${fromYear} đến ${toDay}/${toMonth}/${toYear}`
       } else {
         // year mode - use school year dates
         const selectedSY = schoolYears.find(sy => sy.id === priestSchoolYearId)
@@ -2149,31 +2167,6 @@ export default function ActivitiesPage() {
         attendance_date: string
       }
 
-      // 4. Count attendance dates (thu5/cn) in the range, excluding holidays
-      const schoolYearForHolidays = priestTimeFilterMode === 'year'
-        ? schoolYears.find(sy => sy.id === priestSchoolYearId)
-        : schoolYear
-
-      const holidayDates = new Set<string>()
-      if (schoolYearForHolidays?.id) {
-        const { data: holidays } = await supabase
-          .from('holidays')
-          .select('holiday_date, day_type')
-          .eq('school_year_id', schoolYearForHolidays.id)
-          .gte('holiday_date', fromDate)
-          .lte('holiday_date', toDate)
-
-        if (holidays) {
-          holidays.forEach(h => {
-            if (priestAttendanceType === 'all' || h.day_type === 'both' || h.day_type === priestAttendanceType) {
-              holidayDates.add(h.holiday_date)
-            }
-          })
-        }
-      }
-
-      const attendanceDayCount = countAttendanceDays(fromDate, toDate, priestAttendanceType, holidayDates)
-
       const fetchPriestAttendance = (rangeFrom: string, rangeTo: string) => fetchAllRows<PriestAttendanceRow>(
         (from, to) => {
           let attendanceQuery = supabase
@@ -2194,22 +2187,31 @@ export default function ActivitiesPage() {
         }
       )
 
-      // 5. Fetch raw attendance for the date range. Filtering by active class happens after merge.
+      // 5. Fetch present records for current attendance and absence calculations.
       const rawPriestRecords = await fetchPriestAttendance(fromDate, toDate)
       const currentPresentIds = presentStudentIds(rawPriestRecords, priestAttendanceType)
-      // Chủ nhật: chỉ tính có mặt khi đủ cả giáo lý lẫn đi lễ
-      const attendanceRecords = mergeSundayRecords(rawPriestRecords)
-        .filter(record => record.status === 'present' && activeClassIds.has(record.class_id))
-
-      // 6. Count present per class
-      const classPresentCounts = new Map<string, number>()
-      attendanceRecords.forEach(record => {
-        const current = classPresentCounts.get(record.class_id) || 0
-        classPresentCounts.set(record.class_id, current + 1)
-      })
 
       let absentWarning: PriestReportData['absentWarning'] = null
       if (priestTimeFilterMode === 'month') {
+        const holidayDates = new Set<string>()
+        if (schoolYear?.id) {
+          const { data: holidays } = await supabase
+            .from('holidays')
+            .select('holiday_date, day_type')
+            .eq('school_year_id', schoolYear.id)
+            .gte('holiday_date', fromDate)
+            .lte('holiday_date', toDate)
+
+          if (holidays) {
+            holidays.forEach(h => {
+              if (priestAttendanceType === 'all' || h.day_type === 'both' || h.day_type === priestAttendanceType) {
+                holidayDates.add(h.holiday_date)
+              }
+            })
+          }
+        }
+
+        const attendanceDayCount = countAttendanceDays(fromDate, toDate, priestAttendanceType, holidayDates)
         const previous = previousMonth(priestYear, priestMonth)
         const previousRange = monthRange(previous.year, previous.monthIndex0)
         const previousHolidayDates = new Set<string>()
@@ -2259,8 +2261,6 @@ export default function ActivitiesPage() {
       const absentByClass = countFullyAbsentByClass(students, currentPresentIds)
       const branchesData: PriestReportBranchData[] = []
       let grandTotalStudents = 0
-      let grandTotalSlots = 0
-      let grandTotalPresent = 0
       let grandTotalAbsent = 0
 
       for (const branchName of BRANCHES) {
@@ -2269,54 +2269,45 @@ export default function ActivitiesPage() {
 
         const classesData: PriestReportClassData[] = branchClasses.map(cls => {
           const studentCount = classStudentCounts.get(cls.id) || 0
-          const totalSlots = studentCount * attendanceDayCount
-          const presentCount = classPresentCounts.get(cls.id) || 0
           const absentCount = absentByClass.get(cls.id) ?? 0
-          const rate = totalSlots > 0 ? (presentCount / totalSlots) * 100 : 0
+          const rate = attendanceRateByStudents(studentCount, absentCount)
 
           return {
             classId: cls.id,
             className: cls.name,
             branch: branchName,
             studentCount,
-            totalSlots,
-            presentCount,
             absentCount,
             rate,
           }
         })
 
         const branchTotalStudents = classesData.reduce((sum, c) => sum + c.studentCount, 0)
-        const branchTotalSlots = classesData.reduce((sum, c) => sum + c.totalSlots, 0)
-        const branchTotalPresent = classesData.reduce((sum, c) => sum + c.presentCount, 0)
         const branchTotalAbsent = classesData.reduce((sum, c) => sum + c.absentCount, 0)
-        const branchRate = branchTotalSlots > 0 ? (branchTotalPresent / branchTotalSlots) * 100 : 0
+        const branchRate = attendanceRateByStudents(branchTotalStudents, branchTotalAbsent)
 
         branchesData.push({
           branch: branchName,
           classes: classesData,
           totalStudents: branchTotalStudents,
-          totalSlots: branchTotalSlots,
-          totalPresent: branchTotalPresent,
           totalAbsent: branchTotalAbsent,
           rate: branchRate,
         })
 
         grandTotalStudents += branchTotalStudents
-        grandTotalSlots += branchTotalSlots
-        grandTotalPresent += branchTotalPresent
         grandTotalAbsent += branchTotalAbsent
       }
 
-      const grandRate = grandTotalSlots > 0 ? (grandTotalPresent / grandTotalSlots) * 100 : 0
+      const grandRate = attendanceRateByStudents(grandTotalStudents, grandTotalAbsent)
+      const weekdayCounts = countWeekdays(fromDate, toDate)
 
       const reportData: PriestReportData = {
         branches: branchesData,
         grandTotalStudents,
-        grandTotalSlots,
-        grandTotalPresent,
         grandTotalAbsent,
         grandRate,
+        thursdayCount: weekdayCounts.thu5,
+        sundayCount: weekdayCounts.cn,
         fromDate,
         toDate,
         timeLabel,
@@ -2370,8 +2361,9 @@ export default function ActivitiesPage() {
       const XLSX = await import('xlsx')
       const wb = XLSX.utils.book_new()
       const today = new Date().toISOString().split('T')[0]
+      const weekdaySentence = `Trong khoảng thời gian này có ${priestReportData.thursdayCount} ngày thứ Năm và ${priestReportData.sundayCount} ngày Chủ nhật`
 
-      const header = ['STT', 'Ngành / Lớp', 'Sĩ số', 'Đi', 'Nghỉ', 'Tỉ lệ (%)']
+      const header = ['STT', 'Ngành / Lớp', 'Sĩ số', 'Nghỉ', 'Tỉ lệ (%)']
       const rows: (string | number)[][] = []
       let globalIndex = 0
 
@@ -2382,9 +2374,8 @@ export default function ActivitiesPage() {
             globalIndex,
             cls.className,
             cls.studentCount,
-            cls.presentCount,
             cls.absentCount,
-            cls.totalSlots > 0 ? Number(cls.rate.toFixed(1)) : 0,
+            cls.rate !== null ? Number(cls.rate.toFixed(1)) : '-',
           ])
         })
         // Branch subtotal
@@ -2392,9 +2383,8 @@ export default function ActivitiesPage() {
           '',
           `Cộng ngành ${branch.branch}`,
           branch.totalStudents,
-          branch.totalPresent,
           branch.totalAbsent,
-          branch.totalSlots > 0 ? Number(branch.rate.toFixed(1)) : 0,
+          branch.rate !== null ? Number(branch.rate.toFixed(1)) : '-',
         ])
       })
 
@@ -2403,13 +2393,18 @@ export default function ActivitiesPage() {
         '',
         'TỔNG CỘNG',
         priestReportData.grandTotalStudents,
-        priestReportData.grandTotalPresent,
         priestReportData.grandTotalAbsent,
-        priestReportData.grandTotalSlots > 0 ? Number(priestReportData.grandRate.toFixed(1)) : 0,
+        priestReportData.grandRate !== null ? Number(priestReportData.grandRate.toFixed(1)) : '-',
       ])
 
-      const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
-      ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }]
+      const ws = XLSX.utils.aoa_to_sheet([
+        [priestReportData.timeLabel],
+        [weekdaySentence],
+        [],
+        header,
+        ...rows,
+      ])
+      ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 8 }, { wch: 8 }, { wch: 10 }]
       XLSX.utils.book_append_sheet(wb, ws, 'Tong hop')
 
       if (priestReportData.absentWarning) {
@@ -4377,24 +4372,30 @@ export default function ActivitiesPage() {
                 <div className="flex-1 bg-white dark:bg-white/10 border border-[#e5e1dc] rounded-2xl overflow-hidden">
                   <div className="flex flex-wrap items-center gap-y-2 py-2 lg:py-0 lg:h-12 px-4">
                     <span className="flex-1 text-base font-semibold text-black dark:text-white">Chọn thời gian</span>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                      <button onClick={() => setPriestTimeFilterMode('month')} className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2" role="radiogroup" aria-label="Chọn thời gian">
+                      <button type="button" role="radio" aria-checked={priestTimeFilterMode === 'month'} onClick={() => setPriestTimeFilterMode('month')} className="flex items-center gap-2">
                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${priestTimeFilterMode === 'month' ? 'border-brand' : 'border-gray-300 dark:border-white/30'}`}>
                           {priestTimeFilterMode === 'month' && <div className="w-2 h-2 rounded-full bg-brand" />}
                         </div>
                         <span className="text-sm font-medium text-black dark:text-white">Tháng</span>
                       </button>
-                      <button onClick={() => setPriestTimeFilterMode('week')} className="flex items-center gap-2">
+                      <button type="button" role="radio" aria-checked={priestTimeFilterMode === 'week'} onClick={() => setPriestTimeFilterMode('week')} className="flex items-center gap-2">
                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${priestTimeFilterMode === 'week' ? 'border-brand' : 'border-gray-300 dark:border-white/30'}`}>
                           {priestTimeFilterMode === 'week' && <div className="w-2 h-2 rounded-full bg-brand" />}
                         </div>
                         <span className="text-sm font-medium text-black dark:text-white">Tuần</span>
                       </button>
-                      <button onClick={() => setPriestTimeFilterMode('year')} className="flex items-center gap-2">
+                      <button type="button" role="radio" aria-checked={priestTimeFilterMode === 'year'} onClick={() => setPriestTimeFilterMode('year')} className="flex items-center gap-2">
                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${priestTimeFilterMode === 'year' ? 'border-brand' : 'border-gray-300 dark:border-white/30'}`}>
                           {priestTimeFilterMode === 'year' && <div className="w-2 h-2 rounded-full bg-brand" />}
                         </div>
                         <span className="text-sm font-medium text-black dark:text-white">Năm học</span>
+                      </button>
+                      <button type="button" role="radio" aria-checked={priestTimeFilterMode === 'custom'} onClick={() => setPriestTimeFilterMode('custom')} className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${priestTimeFilterMode === 'custom' ? 'border-brand' : 'border-gray-300 dark:border-white/30'}`}>
+                          {priestTimeFilterMode === 'custom' && <div className="w-2 h-2 rounded-full bg-brand" />}
+                        </div>
+                        <span className="text-sm font-medium text-black dark:text-white">Tuỳ chọn</span>
                       </button>
                     </div>
                   </div>
@@ -4482,7 +4483,7 @@ export default function ActivitiesPage() {
                       )}
                     </div>
                   </div>
-                ) : (
+                ) : priestTimeFilterMode === 'year' ? (
                   <div className="w-full md:w-[40%]">
                     <label className="block text-sm font-medium text-[#666d80] mb-2">Chọn năm học</label>
                     <div className="relative" data-dropdown>
@@ -4511,6 +4512,27 @@ export default function ActivitiesPage() {
                         </div>
                       )}
                     </div>
+                  </div>
+                ) : (
+                  <div className="flex w-full md:w-[65%] flex-col sm:flex-row gap-3">
+                    <label className="block flex-1">
+                      <span className="block text-sm font-medium text-[#666d80] mb-2">Từ ngày</span>
+                      <input
+                        type="date"
+                        value={priestCustomFromDate}
+                        onChange={event => setPriestCustomFromDate(event.target.value)}
+                        className="w-full h-[52px] px-5 bg-white dark:bg-white/10 text-black dark:text-white rounded-full border border-[#e5e1dc] dark:border-white/10"
+                      />
+                    </label>
+                    <label className="block flex-1">
+                      <span className="block text-sm font-medium text-[#666d80] mb-2">Đến ngày</span>
+                      <input
+                        type="date"
+                        value={priestCustomToDate}
+                        onChange={event => setPriestCustomToDate(event.target.value)}
+                        className="w-full h-[52px] px-5 bg-white dark:bg-white/10 text-black dark:text-white rounded-full border border-[#e5e1dc] dark:border-white/10"
+                      />
+                    </label>
                   </div>
                 )}
 
@@ -4611,8 +4633,12 @@ export default function ActivitiesPage() {
                     </div>
                   </div>
 
+                  <p className="mb-4 text-xs text-[#666d80] dark:text-white/70">
+                    Trong khoảng thời gian này có {priestReportData.thursdayCount} ngày thứ Năm và {priestReportData.sundayCount} ngày Chủ nhật
+                  </p>
+
                   {/* Stats Cards */}
-                  <div className="grid grid-cols-2 xl:flex xl:items-stretch gap-[3px] mb-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:flex xl:items-stretch gap-[3px] mb-6">
                     {/* Tổng sĩ số */}
                     <div className="flex-1 h-[130px] bg-brand rounded-[15px] px-4 py-4 flex flex-col justify-between relative overflow-hidden">
                       <div className="flex items-center justify-between">
@@ -4622,17 +4648,6 @@ export default function ActivitiesPage() {
                         </div>
                       </div>
                       <span className="text-[40px] font-bold text-white leading-none">{priestReportData.grandTotalStudents}</span>
-                    </div>
-
-                    {/* Tổng lượt đi */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80 dark:text-white/80">Tổng lượt đi</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
-                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        </div>
-                      </div>
-                      <span className="text-[40px] font-bold text-black dark:text-white leading-none">{priestReportData.grandTotalPresent}</span>
                     </div>
 
                     {/* Số em nghỉ cả kỳ */}
@@ -4654,7 +4669,9 @@ export default function ActivitiesPage() {
                           <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         </div>
                       </div>
-                      <span className="text-[40px] font-bold text-black dark:text-white leading-none">{priestReportData.grandRate.toFixed(1)}%</span>
+                      <span className="text-[40px] font-bold text-black dark:text-white leading-none">
+                        {priestReportData.grandRate !== null ? `${priestReportData.grandRate.toFixed(1)}%` : '-'}
+                      </span>
                     </div>
                   </div>
 
@@ -4666,7 +4683,6 @@ export default function ActivitiesPage() {
                           <th className="text-left py-3 px-2 text-[#666d80] font-medium w-[50px]">STT</th>
                           <th className="text-left py-3 px-2 text-[#666d80] font-medium">Ngành / Lớp</th>
                           <th className="text-center py-3 px-2 text-[#666d80] font-medium w-[80px]">Sĩ số</th>
-                          <th className="text-center py-3 px-2 text-[#666d80] font-medium w-[80px]">Đi</th>
                           <th className="text-center py-3 px-2 text-[#666d80] font-medium w-[80px]">Nghỉ</th>
                           <th className="text-center py-3 px-2 text-[#666d80] font-medium w-[90px]">Tỉ lệ (%)</th>
                         </tr>
@@ -4683,10 +4699,9 @@ export default function ActivitiesPage() {
                                     <td className="py-3 px-2 text-[14px] text-[#666d80]">{idx}</td>
                                     <td className="py-3 px-2 text-[14px] text-black dark:text-white">{cls.className}</td>
                                     <td className="py-3 px-2 text-[14px] text-center text-black dark:text-white">{cls.studentCount}</td>
-                                    <td className="py-3 px-2 text-[14px] text-center text-green-600 font-medium">{cls.presentCount}</td>
                                     <td className="py-3 px-2 text-[14px] text-center text-red-500 font-medium">{cls.absentCount}</td>
                                     <td className="py-3 px-2 text-[14px] text-center text-black dark:text-white font-medium">
-                                      {cls.totalSlots > 0 ? cls.rate.toFixed(1) : '-'}
+                                      {cls.rate !== null ? cls.rate.toFixed(1) : '-'}
                                     </td>
                                   </tr>
                                 )
@@ -4697,10 +4712,9 @@ export default function ActivitiesPage() {
                                   <span className="text-[14px] font-semibold text-black dark:text-white">Cộng ngành {branch.branch}</span>
                                 </td>
                                 <td className="py-3 px-2 text-[14px] text-center font-semibold text-black dark:text-white">{branch.totalStudents}</td>
-                                <td className="py-3 px-2 text-[14px] text-center font-semibold text-green-600">{branch.totalPresent}</td>
                                 <td className="py-3 px-2 text-[14px] text-center font-semibold text-red-500">{branch.totalAbsent}</td>
                                 <td className="py-3 px-2 text-[14px] text-center font-semibold text-black dark:text-white">
-                                  {branch.totalSlots > 0 ? branch.rate.toFixed(1) : '-'}
+                                  {branch.rate !== null ? branch.rate.toFixed(1) : '-'}
                                 </td>
                               </tr>
                             </React.Fragment>
@@ -4712,10 +4726,9 @@ export default function ActivitiesPage() {
                             <span className="text-[14px] font-bold text-black dark:text-white">TỔNG CỘNG</span>
                           </td>
                           <td className="py-3 px-2 text-[14px] text-center font-bold text-black dark:text-white">{priestReportData.grandTotalStudents}</td>
-                          <td className="py-3 px-2 text-[14px] text-center font-bold text-green-600">{priestReportData.grandTotalPresent}</td>
                           <td className="py-3 px-2 text-[14px] text-center font-bold text-red-500">{priestReportData.grandTotalAbsent}</td>
                           <td className="py-3 px-2 text-[14px] text-center font-bold text-black dark:text-white">
-                            {priestReportData.grandTotalSlots > 0 ? priestReportData.grandRate.toFixed(1) : '-'}
+                            {priestReportData.grandRate !== null ? priestReportData.grandRate.toFixed(1) : '-'}
                           </td>
                         </tr>
                       </tbody>
@@ -4726,7 +4739,7 @@ export default function ActivitiesPage() {
                     Nghỉ: số em không đi buổi nào trong kỳ báo cáo
                   </p>
 
-                  {priestTimeFilterMode === 'month' && priestReportData.absentWarning && (
+                  {priestReportData.absentWarning && (
                     <section className="mt-5 rounded-2xl border border-[#f5c6cb] bg-[#fff5f5] p-4">
                       <h3 className="mb-3 text-sm font-bold text-[#c41e3a]">
                         ⚠ CẢNH BÁO: vắng 2 tháng liên tiếp ({priestReportData.absentWarning.prevLabel} và {priestReportData.absentWarning.currentLabel})

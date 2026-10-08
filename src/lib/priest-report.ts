@@ -181,3 +181,27 @@ export function countAttendanceDays(
 
   return count
 }
+
+/** Count calendar Thursdays and Sundays in the inclusive local-date range. */
+export function countWeekdays(from: string, to: string): { thu5: number; cn: number } {
+  const current = parseLocalDate(from)
+  const end = parseLocalDate(to)
+  const counts = { thu5: 0, cn: 0 }
+
+  while (current.getTime() <= end.getTime()) {
+    const dayOfWeek = current.getDay()
+    if (dayOfWeek === 4) counts.thu5 += 1
+    if (dayOfWeek === 0) counts.cn += 1
+    current.setDate(current.getDate() + 1)
+  }
+
+  return counts
+}
+
+/** Calculate the attendance rate from roster size and students absent for the whole period. */
+export function attendanceRateByStudents(studentCount: number, absentCount: number): number | null {
+  if (studentCount <= 0) return null
+
+  const clampedAbsentCount = Math.min(studentCount, Math.max(0, absentCount))
+  return ((studentCount - clampedAbsentCount) / studentCount) * 100
+}
