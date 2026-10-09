@@ -12,15 +12,18 @@ import { attendanceScores, effectiveSessionDays, fmtScore, round2, scoreSummary 
 import { useAuth } from '@/lib/auth-context'
 import { filterByBranch, scopedBranches } from '@/lib/branch-scope'
 import {
-  attendanceRateByStudents,
   buildAbsentWarnings,
-  countAttendanceDays,
-  countFullyAbsentByClass,
-  countWeekdays,
+  buildPriestReportBranches,
+  isPriestReportClass,
   monthRange,
   monthOverlapsSchoolYear,
-  presentStudentIds,
-  previousMonth,
+  presentIdsOnSessions,
+  priestPeriodLabel,
+  priestPreviousWindow,
+  priestSubtitleLines,
+  sessionDates,
+  type PriestAbsentWarning,
+  type PriestAttendanceRecord,
   type PriestStudent,
 } from '@/lib/priest-report'
 
@@ -33,7 +36,8 @@ import ImportExcelModal from '@/components/ImportExcelModal'
 import ExportSuccessModal from '@/components/ExportSuccessModal'
 import ReportExportTemplate, { getAttendanceReportTitle } from '@/components/ReportExportTemplate'
 import PriestReportTemplate from '@/components/PriestReportTemplate'
-import type { PriestReportData, PriestReportBranchData, PriestReportClassData } from '@/components/PriestReportTemplate'
+import type { PriestReportData } from '@/components/PriestReportTemplate'
+import { buildPriestReportWorkbook } from '@/lib/priest-report-excel'
 import html2canvas from 'html2canvas'
 
 const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -556,14 +560,12 @@ export default function ActivitiesPage() {
   const [priestCustomFromDate, setPriestCustomFromDate] = useState<string>('')
   const [priestCustomToDate, setPriestCustomToDate] = useState<string>('')
   const [priestSchoolYearId, setPriestSchoolYearId] = useState<string>('')
-  const [priestAttendanceType, setPriestAttendanceType] = useState<AttendanceTypeFilter>('all')
   const [priestReportData, setPriestReportData] = useState<PriestReportData | null>(null)
   const [priestReportLoading, setPriestReportLoading] = useState(false)
   const [isPriestReportGenerated, setIsPriestReportGenerated] = useState(false)
   const [isPriestMonthDropdownOpen, setIsPriestMonthDropdownOpen] = useState(false)
   const [isPriestWeekPickerOpen, setIsPriestWeekPickerOpen] = useState(false)
   const [isPriestSchoolYearDropdownOpen, setIsPriestSchoolYearDropdownOpen] = useState(false)
-  const [isPriestAttendanceTypeDropdownOpen, setIsPriestAttendanceTypeDropdownOpen] = useState(false)
 
   // Report dropdown states
   const [isReportClassDropdownOpen, setIsReportClassDropdownOpen] = useState(false)
@@ -1586,7 +1588,6 @@ export default function ActivitiesPage() {
     setIsPriestMonthDropdownOpen(false)
     setIsPriestWeekPickerOpen(false)
     setIsPriestSchoolYearDropdownOpen(false)
-    setIsPriestAttendanceTypeDropdownOpen(false)
   }, [])
 
   const closeAllReportDropdowns = () => {
@@ -1602,7 +1603,6 @@ export default function ActivitiesPage() {
     setIsPriestMonthDropdownOpen(false)
     setIsPriestWeekPickerOpen(false)
     setIsPriestSchoolYearDropdownOpen(false)
-    setIsPriestAttendanceTypeDropdownOpen(false)
   }
 
   // Close all dropdowns when clicking outside
@@ -2080,7 +2080,7 @@ export default function ActivitiesPage() {
   const generatePriestReport = async () => {
     setPriestReportLoading(true)
     try {
-      // 1. Determine date range
+      // 1. Determine the report date range and label.
       let fromDate: string
       let toDate: string
       let timeLabel: string
@@ -2100,7 +2100,6 @@ export default function ActivitiesPage() {
         fromDate = range.from
         toDate = range.to
         timeLabel = `Tháng ${priestMonth + 1}/${priestYear}`
-        reportSY = schoolYears.find(sy => monthOverlapsSchoolYear({ from: fromDate, to: toDate }, sy)) ?? schoolYear
       } else if (priestTimeFilterMode === 'custom') {
         if (!priestCustomFromDate || !priestCustomToDate) {
           showNotification('error', 'Vui lòng chọn ngày bắt đầu và ngày kết thúc')
@@ -2128,7 +2127,17 @@ export default function ActivitiesPage() {
         timeLabel = `Năm học: ${selectedSY.name}`
       }
 
-      // 2. Fetch all active classes
+      reportSY = schoolYears.find(sy => monthOverlapsSchoolYear({ from: fromDate, to: toDate }, sy)) ?? schoolYear
+      const today = toLocalDateStr(new Date())
+      const clip = reportSY
+        ? {
+            clipFrom: reportSY.start_date,
+            clipTo: reportSY.end_date < today ? reportSY.end_date : today,
+          }
+        : { clipTo: today }
+      const prevWin = priestPreviousWindow(priestTimeFilterMode, fromDate)
+
+      // 2. Fetch active classes and students.
       const { data: allClasses, error: classError } = await supabase
         .from('classes')
         .select('*')
@@ -2139,8 +2148,9 @@ export default function ActivitiesPage() {
         throw classError || new Error('No classes found')
       }
       const scopedClasses = filterByBranch(allClasses as Class[], scope)
+      const activeClassIds = new Set(scopedClasses.map(classItem => classItem.id))
 
-      // 3. Fetch all active students once; this avoids the Supabase 1000-row limit and N+1 counts.
+      // Fetch all active students once; this avoids the Supabase 1000-row limit and N+1 counts.
       const students = await fetchAllRows<PriestStudent>(
         (from, to) => supabase
           .from('thieu_nhi')
@@ -2149,170 +2159,91 @@ export default function ActivitiesPage() {
           .order('id', { ascending: true })
           .range(from, to)
       )
+      const scopedStudents = students.filter(
+        student => student.class_id !== null && activeClassIds.has(student.class_id)
+      )
+      const warningClasses = scopedClasses.filter(isPriestReportClass)
+      const warningClassIds = new Set(warningClasses.map(classItem => classItem.id))
+      const warningScopedStudents = scopedStudents.filter(
+        student => student.class_id !== null && warningClassIds.has(student.class_id)
+      )
 
-      const classStudentCounts = new Map<string, number>()
-      students.forEach(student => {
-        if (student.class_id) {
-          classStudentCounts.set(student.class_id, (classStudentCounts.get(student.class_id) || 0) + 1)
-        }
-      })
-
-      const classIds = scopedClasses.map(c => c.id)
-      const activeClassIds = new Set(classIds)
-
-      type PriestAttendanceRow = {
-        id: string
-        class_id: string
-        status: string
-        day_type: string
-        student_id: string
-        attendance_date: string
-      }
+      // 3. Fetch attendance and holidays for current + previous windows.
+      type PriestAttendanceRow = PriestAttendanceRecord & { id: string; class_id: string }
 
       const fetchPriestAttendance = (rangeFrom: string, rangeTo: string) => fetchAllRows<PriestAttendanceRow>(
         (from, to) => {
-          let attendanceQuery = supabase
+          return supabase
             .from('attendance_records')
             .select('id, class_id, status, day_type, student_id, attendance_date')
             .gte('attendance_date', rangeFrom)
             .lte('attendance_date', rangeTo)
             .eq('status', 'present')
+            .in('day_type', ['thu5', 'cn', 'cn_le'])
             .order('id', { ascending: true })
-
-          if (priestAttendanceType === 'cn') {
-            attendanceQuery = attendanceQuery.in('day_type', ['cn', 'cn_le'])
-          } else if (priestAttendanceType !== 'all') {
-            attendanceQuery = attendanceQuery.eq('day_type', priestAttendanceType)
-          }
-
-          return attendanceQuery.range(from, to)
+            .range(from, to)
         }
       )
 
-      // 5. Fetch present records for current attendance and absence calculations.
-      const rawPriestRecords = await fetchPriestAttendance(fromDate, toDate)
-      const currentPresentIds = presentStudentIds(rawPriestRecords, priestAttendanceType)
-
-      let absentWarning: PriestReportData['absentWarning'] = null
-      if (priestTimeFilterMode === 'month') {
-        const holidayDates = new Set<string>()
-        if (schoolYear?.id) {
-          const { data: holidays } = await supabase
-            .from('holidays')
-            .select('holiday_date, day_type')
-            .eq('school_year_id', schoolYear.id)
-            .gte('holiday_date', fromDate)
-            .lte('holiday_date', toDate)
-
-          if (holidays) {
-            holidays.forEach(h => {
-              if (priestAttendanceType === 'all' || h.day_type === 'both' || h.day_type === priestAttendanceType) {
-                holidayDates.add(h.holiday_date)
-              }
-            })
-          }
-        }
-
-        const attendanceDayCount = countAttendanceDays(fromDate, toDate, priestAttendanceType, holidayDates)
-        const previous = previousMonth(priestYear, priestMonth)
-        const previousRange = monthRange(previous.year, previous.monthIndex0)
-        const previousHolidayDates = new Set<string>()
-        const { data: previousHolidays } = await supabase
+      const [currentRecords, previousRecords, holidayResult] = await Promise.all([
+        fetchPriestAttendance(fromDate, toDate),
+        prevWin ? fetchPriestAttendance(prevWin.from, prevWin.to) : Promise.resolve([] as PriestAttendanceRow[]),
+        supabase
           .from('holidays')
           .select('holiday_date, day_type')
-          .gte('holiday_date', previousRange.from)
-          .lte('holiday_date', previousRange.to)
+          .gte('holiday_date', prevWin?.from ?? fromDate)
+          .lte('holiday_date', toDate),
+      ])
+      if (holidayResult.error) throw holidayResult.error
+      const holidays = holidayResult.data ?? []
 
-        if (previousHolidays) {
-          previousHolidays.forEach(h => {
-            if (priestAttendanceType === 'all' || h.day_type === 'both' || h.day_type === priestAttendanceType) {
-              previousHolidayDates.add(h.holiday_date)
-            }
-          })
-        }
+      const sessions = sessionDates(fromDate, toDate, holidays, clip)
+      const prevSessions = prevWin ? sessionDates(prevWin.from, prevWin.to, holidays, clip) : null
 
-        const previousAttendanceDayCount = countAttendanceDays(
-          previousRange.from,
-          previousRange.to,
-          priestAttendanceType,
-          previousHolidayDates
-        )
-        const previousRecords = await fetchPriestAttendance(previousRange.from, previousRange.to)
-        const previousPresentIds = presentStudentIds(previousRecords, priestAttendanceType)
+      let warningStudents: PriestAbsentWarning[] = []
+      let absentWarning: PriestReportData['absentWarning'] = null
+      const warningMode = priestTimeFilterMode === 'month' || priestTimeFilterMode === 'custom'
+      const hasCurrentSessions = sessions.thu5.length + sessions.cn.length > 0
+      const hasPreviousSessions = !!prevSessions && prevSessions.thu5.length + prevSessions.cn.length > 0
 
-        if (
-          monthOverlapsSchoolYear(previousRange, reportSY) &&
-          attendanceDayCount > 0 &&
-          previousAttendanceDayCount > 0 &&
-          previousPresentIds.size > 0
-        ) {
+      if (warningMode && prevWin && prevSessions && hasCurrentSessions && hasPreviousSessions) {
+        const previousPresentAny = presentIdsOnSessions(previousRecords, prevSessions, 'any')
+        if (previousPresentAny.size > 0) {
+          const currentPresentAny = presentIdsOnSessions(currentRecords, sessions, 'any')
+          warningStudents = buildAbsentWarnings(
+            warningScopedStudents,
+            warningClasses,
+            currentPresentAny,
+            previousPresentAny
+          )
           absentWarning = {
-            prevLabel: `Tháng ${previous.monthIndex0 + 1}/${previous.year}`,
+            prevLabel: prevWin.label,
             currentLabel: timeLabel,
-            students: buildAbsentWarnings(
-              students.filter(student => student.class_id !== null && activeClassIds.has(student.class_id)),
-              scopedClasses,
-              currentPresentIds,
-              previousPresentIds
-            ),
+            students: warningStudents,
           }
         }
       }
 
-      // 7. Group by branch
-      const absentByClass = countFullyAbsentByClass(students, currentPresentIds)
-      const branchesData: PriestReportBranchData[] = []
-      let grandTotalStudents = 0
-      let grandTotalAbsent = 0
-
-      for (const branchName of reportBranches) {
-        const branchClasses = scopedClasses.filter(c => c.branch === branchName)
-        if (branchClasses.length === 0) continue
-
-        const classesData: PriestReportClassData[] = branchClasses.map(cls => {
-          const studentCount = classStudentCounts.get(cls.id) || 0
-          const absentCount = absentByClass.get(cls.id) ?? 0
-          const rate = attendanceRateByStudents(studentCount, absentCount)
-
-          return {
-            classId: cls.id,
-            className: cls.name,
-            branch: branchName,
-            studentCount,
-            absentCount,
-            rate,
-          }
-        })
-
-        const branchTotalStudents = classesData.reduce((sum, c) => sum + c.studentCount, 0)
-        const branchTotalAbsent = classesData.reduce((sum, c) => sum + c.absentCount, 0)
-        const branchRate = attendanceRateByStudents(branchTotalStudents, branchTotalAbsent)
-
-        branchesData.push({
-          branch: branchName,
-          classes: classesData,
-          totalStudents: branchTotalStudents,
-          totalAbsent: branchTotalAbsent,
-          rate: branchRate,
-        })
-
-        grandTotalStudents += branchTotalStudents
-        grandTotalAbsent += branchTotalAbsent
-      }
-
-      const grandRate = attendanceRateByStudents(grandTotalStudents, grandTotalAbsent)
-      const weekdayCounts = countWeekdays(fromDate, toDate)
+      const branches = buildPriestReportBranches({
+        classes: scopedClasses,
+        branchOrder: reportBranches,
+        students: scopedStudents,
+        sessions,
+        records: currentRecords,
+        prevSessions,
+        prevRecords: previousRecords,
+        warnings: warningStudents,
+      })
 
       const reportData: PriestReportData = {
-        branches: branchesData,
-        grandTotalStudents,
-        grandTotalAbsent,
-        grandRate,
-        thursdayCount: weekdayCounts.thu5,
-        sundayCount: weekdayCounts.cn,
+        branches,
         fromDate,
         toDate,
         timeLabel,
+        subtitleLines: priestSubtitleLines(
+          priestPeriodLabel(priestTimeFilterMode, fromDate, toDate, reportSY?.name),
+          sessions
+        ),
         absentWarning,
       }
 
@@ -2360,83 +2291,24 @@ export default function ActivitiesPage() {
   const handlePriestExportExcel = async () => {
     if (!priestReportData) return
     try {
-      const XLSX = await import('xlsx')
-      const wb = XLSX.utils.book_new()
-      const today = new Date().toISOString().split('T')[0]
-      const weekdaySentence = `Trong khoảng thời gian này có ${priestReportData.thursdayCount} ngày thứ Năm và ${priestReportData.sundayCount} ngày Chủ nhật`
-
-      const header = ['STT', 'Ngành / Lớp', 'Sĩ số', 'Nghỉ', 'Tỉ lệ (%)']
-      const rows: (string | number)[][] = []
-      let globalIndex = 0
-
-      priestReportData.branches.forEach(branch => {
-        branch.classes.forEach(cls => {
-          globalIndex++
-          rows.push([
-            globalIndex,
-            cls.className,
-            cls.studentCount,
-            cls.absentCount,
-            cls.rate !== null ? Number(cls.rate.toFixed(1)) : '-',
-          ])
-        })
-        // Branch subtotal
-        rows.push([
-          '',
-          `Cộng ngành ${branch.branch}`,
-          branch.totalStudents,
-          branch.totalAbsent,
-          branch.rate !== null ? Number(branch.rate.toFixed(1)) : '-',
-        ])
-      })
-
-      // Grand total
-      rows.push([
-        '',
-        'TỔNG CỘNG',
-        priestReportData.grandTotalStudents,
-        priestReportData.grandTotalAbsent,
-        priestReportData.grandRate !== null ? Number(priestReportData.grandRate.toFixed(1)) : '-',
-      ])
-
-      const ws = XLSX.utils.aoa_to_sheet([
-        [priestReportData.timeLabel],
-        [weekdaySentence],
-        [],
-        header,
-        ...rows,
-      ])
-      ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 8 }, { wch: 8 }, { wch: 10 }]
-      XLSX.utils.book_append_sheet(wb, ws, 'Tong hop')
-
-      if (priestReportData.absentWarning) {
-        const warning = priestReportData.absentWarning
-        const warningTitle = `CẢNH BÁO: vắng 2 tháng liên tiếp (${warning.prevLabel} và ${warning.currentLabel})`
-        const warningHeader = ['STT', 'Tên thánh', 'Họ tên', 'Lớp', 'SĐT phụ huynh']
-        const warningRows: (string | number)[][] = warning.students.length > 0
-          ? warning.students.map((student, index) => [
-            index + 1,
-            student.saintName,
-            student.fullName,
-            student.className,
-            student.parentPhones.join(' / '),
-          ])
-          : [['Không có em nào vắng 2 tháng liên tiếp']]
-        const warningWs = XLSX.utils.aoa_to_sheet([[warningTitle], warningHeader, ...warningRows])
-        warningWs['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 25 }]
-        XLSX.utils.book_append_sheet(wb, warningWs, 'Canh bao')
+      let logo: ArrayBuffer | undefined
+      try {
+        const response = await fetch('/images/tntt-logo-priest-report.jpeg')
+        if (response.ok) logo = await response.arrayBuffer()
+      } catch {
+        // The logo is optional; export the report if it cannot be fetched.
       }
 
-      const fileName = `bao_cao_tong_hop_${today}.xlsx`
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const workbook = await buildPriestReportWorkbook(priestReportData, logo)
+      const workbookBytes = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([new Uint8Array(workbookBytes)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = fileName
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `bao_cao_chuyen_can_${priestReportData.fromDate}_${priestReportData.toDate}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
       URL.revokeObjectURL(url)
 
       setExportSuccessMessage('Đã xuất Excel thành công!')
@@ -4538,42 +4410,6 @@ export default function ActivitiesPage() {
                   </div>
                 )}
 
-                {/* Day type filter */}
-                <div className="w-full md:w-[30%]">
-                  <label className="block text-sm font-medium text-[#666d80] mb-2">Loại buổi</label>
-                  <div className="relative" data-dropdown>
-                    <button
-                      onClick={() => { closeAllReportDropdowns(); setIsPriestAttendanceTypeDropdownOpen(!isPriestAttendanceTypeDropdownOpen) }}
-                      className="flex items-center justify-between w-full h-[52px] px-5 bg-white dark:bg-white/10 rounded-full"
-                    >
-                      <span className="text-sm text-black dark:text-white">
-                        {priestAttendanceType === 'all' ? 'Tất cả' : priestAttendanceType === 'thu5' ? 'Thứ 5' : 'Chủ nhật'}
-                      </span>
-                      <svg className="w-[9px] h-[18px] text-black dark:text-white" viewBox="0 0 9 18" fill="none">
-                        <path d="M4.935 5.5L4.14 6.296L8.473 10.63C8.542 10.7 8.625 10.756 8.716 10.793C8.807 10.831 8.904 10.851 9.003 10.851C9.101 10.851 9.199 10.831 9.29 10.793C9.381 10.756 9.463 10.7 9.533 10.63L13.868 6.296L13.073 5.5L9.004 9.569L4.935 5.5Z" fill="currentColor" transform="translate(-4, -2)" />
-                      </svg>
-                    </button>
-                    {isPriestAttendanceTypeDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-[#1a1a1a] border border-[#E5E1DC] dark:border-white/10 rounded-xl shadow-lg z-20 overflow-hidden">
-                        {[
-                          { value: 'all' as const, label: 'Tất cả' },
-                          { value: 'thu5' as const, label: 'Thứ 5' },
-                          { value: 'cn' as const, label: 'Chủ nhật' },
-                        ].map(opt => (
-                          <button
-                            key={opt.value}
-                            onClick={() => { setPriestAttendanceType(opt.value); setIsPriestAttendanceTypeDropdownOpen(false) }}
-                            className={`w-full px-5 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/10 ${
-                              priestAttendanceType === opt.value ? 'bg-brand/10 text-brand' : 'text-black dark:text-white'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
 
               {/* Divider */}
@@ -4599,194 +4435,36 @@ export default function ActivitiesPage() {
 
               {/* Priest Report Result Section */}
               {isPriestReportGenerated && priestReportData && (
-                <div className="bg-white dark:bg-white/10 rounded-[24px] p-4 sm:p-6 overflow-hidden">
-                  {/* Report Preview Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
+                <div className="rounded-[24px] bg-white p-4 sm:p-6 dark:bg-white/10">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-3">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12.0001 12C15.0793 12 18.0179 13.8185 20.1133 17.1592C20.8187 18.2839 20.8187 19.7161 20.1133 20.8408C18.0179 24.1815 15.0793 26 12.0001 26C8.92077 26 5.98224 24.1815 3.88678 20.8408C3.18144 19.7161 3.18144 18.2839 3.88678 17.1592C5.98224 13.8185 8.92077 12 12.0001 12ZM12.0001 14C9.77455 14 7.40822 15.3088 5.58112 18.2217C5.28324 18.6966 5.28324 19.3034 5.58112 19.7783C7.40822 22.6912 9.77455 24 12.0001 24C14.2256 24 16.5919 22.6912 18.419 19.7783C18.7169 19.3034 18.7169 18.6966 18.419 18.2217C16.5919 15.3088 14.2256 14 12.0001 14ZM12.0001 15C14.2092 15 16.0001 16.7909 16.0001 19C16.0001 21.2091 14.2092 23 12.0001 23C9.79092 23 8.00006 21.2091 8.00006 19C8.00006 16.7909 9.79092 15 12.0001 15ZM11.9141 17.0039C11.9687 17.1594 12.0001 17.3259 12.0001 17.5C12.0001 18.3284 11.3285 19 10.5001 19C10.326 19 10.1594 18.9686 10.004 18.9141C10.0028 18.9426 10.0001 18.9712 10.0001 19C10.0001 20.1046 10.8955 21 12.0001 21C13.1046 21 14.0001 20.1045 14.0001 19C14.0001 17.8955 13.1046 17 12.0001 17C11.9713 17 11.9426 17.0027 11.9141 17.0039Z" fill="#8A8C90" transform="translate(0, -7)"/>
-                      </svg>
                       <span className="text-sm text-[#666D80]">
-                        Xem trước báo cáo: <span className="font-medium text-black dark:text-white">Tổng hợp điểm danh</span>
+                        Xem trước báo cáo: <span className="font-medium text-black dark:text-white">Báo cáo chuyên cần</span>
                       </span>
-                      <span className="h-[26px] px-4 bg-[#8A8C90] rounded-[13px] text-xs font-medium text-white uppercase flex items-center">
+                      <span className="flex h-[26px] items-center rounded-[13px] bg-[#8A8C90] px-4 text-xs font-medium uppercase text-white">
                         {priestReportData.timeLabel}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
+                        type="button"
                         onClick={handlePriestExportImage}
-                        className="h-[38px] px-4 border border-brand rounded-[19px] flex items-center gap-2 text-sm text-brand hover:bg-brand/5 transition-colors"
+                        className="h-[38px] rounded-[19px] border border-brand px-4 text-sm text-brand transition-colors hover:bg-brand/5"
                       >
-                        <svg width="18" height="17" viewBox="0 0 18 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path fillRule="evenodd" clipRule="evenodd" d="M18 0V17H0V4H2V15H16V2H12V0H18ZM5 0C7.68925 0 9.88225 2.1223 9.99625 4.78305L10 5L10 8.5852L12.293 6.2929L13.707 7.7071L9 12.4142L4.293 7.707L5.707 6.2928L8 8.5852V5C8 3.4023 6.75075 2.0963 5.176 2.0051L5 2H-1V0H5Z" fill="#FA865E"/>
-                        </svg>
                         Xuất ảnh
                       </button>
                       <button
+                        type="button"
                         onClick={handlePriestExportExcel}
-                        className="h-[38px] px-4 border border-brand rounded-[19px] flex items-center gap-2 text-sm text-brand hover:bg-brand/5 transition-colors"
+                        className="h-[38px] rounded-[19px] border border-brand px-4 text-sm text-brand transition-colors hover:bg-brand/5"
                       >
-                        <svg width="18" height="17" viewBox="0 0 18 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path fillRule="evenodd" clipRule="evenodd" d="M18 0V17H0V4H2V15H16V2H12V0H18ZM5 0C7.68925 0 9.88225 2.1223 9.99625 4.78305L10 5L10 8.5852L12.293 6.2929L13.707 7.7071L9 12.4142L4.293 7.707L5.707 6.2928L8 8.5852V5C8 3.4023 6.75075 2.0963 5.176 2.0051L5 2H-1V0H5Z" fill="#FA865E"/>
-                        </svg>
                         Xuất Excel
                       </button>
                     </div>
                   </div>
-
-                  <p className="mb-4 text-xs text-[#666d80] dark:text-white/70">
-                    Trong khoảng thời gian này có {priestReportData.thursdayCount} ngày thứ Năm và {priestReportData.sundayCount} ngày Chủ nhật
-                  </p>
-
-                  {/* Stats Cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:flex xl:items-stretch gap-[3px] mb-6">
-                    {/* Tổng sĩ số */}
-                    <div className="flex-1 h-[130px] bg-brand rounded-[15px] px-4 py-4 flex flex-col justify-between relative overflow-hidden">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-white/80">Tổng sĩ số</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
-                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="white" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        </div>
-                      </div>
-                      <span className="text-[40px] font-bold text-white leading-none">{priestReportData.grandTotalStudents}</span>
-                    </div>
-
-                    {/* Số em nghỉ cả kỳ */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80 dark:text-white/80">Số em nghỉ cả kỳ</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
-                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        </div>
-                      </div>
-                      <span className="text-[40px] font-bold text-black dark:text-white leading-none">{priestReportData.grandTotalAbsent}</span>
-                    </div>
-
-                    {/* Tỉ lệ chung */}
-                    <div className="flex-1 h-[130px] bg-[#F3F3F3] dark:bg-white/5 rounded-[15px] px-4 py-4 flex flex-col justify-between border border-white/60">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-black/80 dark:text-white/80">Tỉ lệ chung</span>
-                        <div className="w-[44px] h-[44px] rounded-full bg-white dark:bg-white/10 backdrop-blur-[4px] flex items-center justify-center border border-white/20">
-                          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.41474 12.0253L6.63484 6.83699C7.34056 6.13558 7.69341 5.78487 8.13109 5.78492C8.56876 5.78497 8.92153 6.13576 9.62709 6.83734L9.79639 7.00569C10.5026 7.70788 10.8557 8.05898 11.2936 8.05882C11.7316 8.05866 12.0844 7.7073 12.7901 7.00459L15.562 4.24427M1.41474 12.0253L1.41474 8.10235M1.41474 12.0253L5.36335 12.0253" stroke="black" strokeWidth="1.27325" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        </div>
-                      </div>
-                      <span className="text-[40px] font-bold text-black dark:text-white leading-none">
-                        {priestReportData.grandRate !== null ? `${priestReportData.grandRate.toFixed(1)}%` : '-'}
-                      </span>
-                    </div>
+                  <div className="overflow-x-auto" role="region" aria-label="Bản xem trước báo cáo chuyên cần">
+                    <PriestReportTemplate data={priestReportData} />
                   </div>
-
-                  {/* Summary Table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[#e5e1dc]">
-                          <th className="text-left py-3 px-2 text-[#666d80] font-medium w-[50px]">STT</th>
-                          <th className="text-left py-3 px-2 text-[#666d80] font-medium">Ngành / Lớp</th>
-                          <th className="text-center py-3 px-2 text-[#666d80] font-medium w-[80px]">Sĩ số</th>
-                          <th className="text-center py-3 px-2 text-[#666d80] font-medium w-[80px]">Nghỉ</th>
-                          <th className="text-center py-3 px-2 text-[#666d80] font-medium w-[90px]">Tỉ lệ (%)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          let idx = 0
-                          return priestReportData.branches.map(branch => (
-                            <React.Fragment key={branch.branch}>
-                              {branch.classes.map(cls => {
-                                idx++
-                                return (
-                                  <tr key={cls.classId} className="border-b border-[#f0f0f0] hover:bg-gray-50 dark:hover:bg-white/5">
-                                    <td className="py-3 px-2 text-[14px] text-[#666d80]">{idx}</td>
-                                    <td className="py-3 px-2 text-[14px] text-black dark:text-white">{cls.className}</td>
-                                    <td className="py-3 px-2 text-[14px] text-center text-black dark:text-white">{cls.studentCount}</td>
-                                    <td className="py-3 px-2 text-[14px] text-center text-red-500 font-medium">{cls.absentCount}</td>
-                                    <td className="py-3 px-2 text-[14px] text-center text-black dark:text-white font-medium">
-                                      {cls.rate !== null ? cls.rate.toFixed(1) : '-'}
-                                    </td>
-                                  </tr>
-                                )
-                              })}
-                              {/* Branch subtotal */}
-                              <tr className="border-b border-[#e5e1dc] bg-[#fff3cd]/50">
-                                <td className="py-3 px-2" colSpan={2}>
-                                  <span className="text-[14px] font-semibold text-black dark:text-white">Cộng ngành {branch.branch}</span>
-                                </td>
-                                <td className="py-3 px-2 text-[14px] text-center font-semibold text-black dark:text-white">{branch.totalStudents}</td>
-                                <td className="py-3 px-2 text-[14px] text-center font-semibold text-red-500">{branch.totalAbsent}</td>
-                                <td className="py-3 px-2 text-[14px] text-center font-semibold text-black dark:text-white">
-                                  {branch.rate !== null ? branch.rate.toFixed(1) : '-'}
-                                </td>
-                              </tr>
-                            </React.Fragment>
-                          ))
-                        })()}
-                        {/* Grand total */}
-                        <tr className="bg-[#d4edda]/50">
-                          <td className="py-3 px-2" colSpan={2}>
-                            <span className="text-[14px] font-bold text-black dark:text-white">TỔNG CỘNG</span>
-                          </td>
-                          <td className="py-3 px-2 text-[14px] text-center font-bold text-black dark:text-white">{priestReportData.grandTotalStudents}</td>
-                          <td className="py-3 px-2 text-[14px] text-center font-bold text-red-500">{priestReportData.grandTotalAbsent}</td>
-                          <td className="py-3 px-2 text-[14px] text-center font-bold text-black dark:text-white">
-                            {priestReportData.grandRate !== null ? priestReportData.grandRate.toFixed(1) : '-'}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <p className="mt-2 text-xs text-[#666d80]">
-                    Nghỉ: số em không đi buổi nào trong kỳ báo cáo
-                  </p>
-
-                  {priestReportData.absentWarning && (
-                    <section className="mt-5 rounded-2xl border border-[#f5c6cb] bg-[#fff5f5] p-4">
-                      <h3 className="mb-3 text-sm font-bold text-[#c41e3a]">
-                        ⚠ CẢNH BÁO: vắng 2 tháng liên tiếp ({priestReportData.absentWarning.prevLabel} và {priestReportData.absentWarning.currentLabel})
-                      </h3>
-                      {priestReportData.absentWarning.students.length > 0 ? (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-[#f5c6cb] bg-[#f8d7da] text-[#721c24]">
-                                <th className="px-2 py-2 text-left font-medium w-[50px]">STT</th>
-                                <th className="px-2 py-2 text-left font-medium">Tên thánh + Họ tên</th>
-                                <th className="px-2 py-2 text-left font-medium">Lớp</th>
-                                <th className="px-2 py-2 text-left font-medium">SĐT phụ huynh</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {priestReportData.absentWarning.students.map((student, index) => (
-                                <tr key={student.studentId} className="border-b border-[#f5c6cb] bg-white/70">
-                                  <td className="px-2 py-2 text-[#666d80]">{index + 1}</td>
-                                  <td className="px-2 py-2 text-black">
-                                    {student.saintName} {student.fullName}
-                                  </td>
-                                  <td className="px-2 py-2 text-black">{student.className}</td>
-                                  <td className="px-2 py-2 text-black">
-                                    {student.parentPhones.length > 0
-                                      ? student.parentPhones.map((phone, phoneIndex) => (
-                                        <React.Fragment key={phone}>
-                                          {phoneIndex > 0 && ' / '}
-                                          <a className="text-[#c41e3a] underline" href={`tel:${phone}`}>
-                                            {phone}
-                                          </a>
-                                        </React.Fragment>
-                                      ))
-                                      : '-'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-[#721c24]">Không có em nào vắng 2 tháng liên tiếp</p>
-                      )}
-                    </section>
-                  )}
                 </div>
               )}
             </>
