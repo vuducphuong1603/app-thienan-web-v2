@@ -154,7 +154,8 @@ describe('buildPriestReportBranches', () => {
       thu5Absent: 4,
       cnAbsent: 4,
       warnedNames: ['Maria Trần Bình', 'Micae Nguyễn An'],
-      note: 'Thứ 5 và CN\nVắng 2 tháng:\nMaria Trần Bình\nMicae Nguyễn An',
+      // GHI CHÚ chỉ ghi buổi cần chú ý; tên em vắng 2 tháng nằm ở danh sách cảnh báo dưới bảng
+      note: 'Thứ 5 và CN',
     })
   })
 
