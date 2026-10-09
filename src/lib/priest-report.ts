@@ -492,7 +492,8 @@ export function buildPriestReportBranches(input: {
         prevThu5Rate,
         prevCnRate,
         warnedNames,
-        note: priestClassNote(thu5Absent, cnAbsent, warnedNames),
+        // GHI CHÚ chỉ ghi buổi cần chú ý; tên em vắng 2 tháng đã có ở danh sách cảnh báo dưới bảng (user 09/10/2026)
+        note: priestClassNote(thu5Absent, cnAbsent, []),
       }
     })
 
