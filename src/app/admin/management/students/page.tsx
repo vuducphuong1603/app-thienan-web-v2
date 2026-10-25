@@ -9,7 +9,9 @@ import ImportStudentsModal from '@/components/management/ImportStudentsModal'
 import DeleteStudentModal from '@/components/management/DeleteStudentModal'
 import { useStudentsWithDetails, useInvalidateQueries } from '@/lib/queries'
 import { normalizeSearchText } from '@/lib/search'
-import { fmtScore, parseScoreInput } from '@/lib/score-summary'
+import { fmtScore } from '@/lib/score-summary'
+import { useBulkScoreEntry } from '@/hooks/useBulkScoreEntry'
+import { BulkScoreActions, BulkScoreFloatingBar, ScoreInput } from '@/components/management/BulkScoreControls'
 
 interface StudentWithDetails extends ThieuNhiProfile {
   class_name?: string
@@ -29,13 +31,6 @@ interface StudentWithDetails extends ThieuNhiProfile {
   score_cn?: number        // Điểm CN = (attendance_cn * 0.6) * (10 / totalCnDays)
   avg_attendance?: number  // TB Điểm danh = score_thu5 + score_cn
   total_avg?: number | null
-}
-
-interface EditingScores {
-  score_45_hk1: string
-  score_exam_hk1: string
-  score_45_hk2: string
-  score_exam_hk2: string
 }
 
 // Tham chiếu ổn định giữa các lần render: `|| []` sinh mảng mới mỗi render,
@@ -61,16 +56,6 @@ export default function StudentsPage() {
   const scoreCellCls = showScores ? 'table-cell' : 'hidden lg:table-cell'
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<StudentWithDetails | null>(null)
-
-  // Edit mode state
-  const [editingStudentId, setEditingStudentId] = useState<string | null>(null)
-  const [editingScores, setEditingScores] = useState<EditingScores>({
-    score_45_hk1: '',
-    score_exam_hk1: '',
-    score_45_hk2: '',
-    score_exam_hk2: '',
-  })
-  const [isSaving, setIsSaving] = useState(false)
 
   const { data: queryData, isLoading: loading, isError, error } = useStudentsWithDetails()
   const students = queryData?.students ?? EMPTY_STUDENTS
@@ -190,75 +175,10 @@ export default function StudentsPage() {
     setIsDeleteModalOpen(true)
   }
 
-  // Start editing a student's scores
-  const startEditing = (student: StudentWithDetails) => {
-    setEditingStudentId(student.id)
+  const bulk = useBulkScoreEntry(students)
+  const startBulkEdit = () => {
     setShowScores(true)
-    setEditingScores({
-      score_45_hk1: student.score_45_hk1?.toString() ?? '',
-      score_exam_hk1: student.score_exam_hk1?.toString() ?? '',
-      score_45_hk2: student.score_45_hk2?.toString() ?? '',
-      score_exam_hk2: student.score_exam_hk2?.toString() ?? '',
-    })
-  }
-
-  // Cancel editing
-  const cancelEditing = () => {
-    setEditingStudentId(null)
-    setEditingScores({
-      score_45_hk1: '',
-      score_exam_hk1: '',
-      score_45_hk2: '',
-      score_exam_hk2: '',
-    })
-  }
-
-  // Save scores
-  const saveScores = async () => {
-    if (!editingStudentId) return
-
-    const score45Hk1 = parseScoreInput(editingScores.score_45_hk1)
-    const examHk1 = parseScoreInput(editingScores.score_exam_hk1)
-    const score45Hk2 = parseScoreInput(editingScores.score_45_hk2)
-    const examHk2 = parseScoreInput(editingScores.score_exam_hk2)
-    if (score45Hk1 === undefined || examHk1 === undefined || score45Hk2 === undefined || examHk2 === undefined) {
-      alert('Điểm phải từ 0 đến 10')
-      return
-    }
-
-    setIsSaving(true)
-    try {
-      const { error } = await supabase
-        .from('thieu_nhi')
-        .update({
-          score_45_hk1: score45Hk1,
-          score_exam_hk1: examHk1,
-          score_45_hk2: score45Hk2,
-          score_exam_hk2: examHk2,
-        })
-        .eq('id', editingStudentId)
-
-      if (error) {
-        console.error('Error saving scores:', error)
-        return
-      }
-
-      // Exit edit mode immediately, refresh data in background
-      cancelEditing()
-      fetchData()
-    } catch (err) {
-      console.error('Error:', err)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  // Handle score input change
-  const handleScoreChange = (field: keyof EditingScores, value: string) => {
-    // Allow empty string or valid number format
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setEditingScores((prev) => ({ ...prev, [field]: value }))
-    }
+    bulk.startBulkEdit()
   }
 
   return (
@@ -385,6 +305,15 @@ export default function StudentsPage() {
               </svg>
               {showScores ? 'Ẩn điểm' : 'Hiện điểm'}
             </button>
+
+            <BulkScoreActions
+              isBulkEditing={bulk.isBulkEditing}
+              isSaving={bulk.isSaving}
+              changedCount={bulk.changedCount}
+              onStart={startBulkEdit}
+              onSave={() => void bulk.saveAll()}
+              onCancel={bulk.cancelBulkEdit}
+            />
 
             {/* Import Button - Solid orange background */}
             <button
@@ -564,13 +493,13 @@ export default function StudentsPage() {
               </tr>
             ) : (
               filteredStudents.map((student) => {
-                const isEditing = editingStudentId === student.id
-                const rowBgClass = isEditing ? 'bg-[#FEF6EE]' : 'bg-white'
+                const isChanged = bulk.changedIds.has(student.id)
+                const rowBgClass = isChanged ? 'bg-[#FEF6EE]' : 'bg-white'
 
                 return (
                   <tr key={student.id} className="hover:bg-[#F8F8F8] transition-colors">
                     {/* Student Info - Avatar + Name + Code */}
-                    <td className={`py-3 ${rowBgClass} ${isEditing ? 'border-l-4 border-l-brand pl-3' : 'pl-4'}`}>
+                    <td className={`py-3 ${rowBgClass} ${isChanged ? 'border-l-4 border-l-brand pl-3' : 'pl-4'}`}>
                       <div
                         className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={() => router.push(`/admin/management/students/${student.id}/view`)}
@@ -629,12 +558,12 @@ export default function StudentsPage() {
 
                     {/* Score: 45' HK1 - Start of score group with #F6F6F6 background */}
                     <td className={`${scoreCellCls} px-1 py-3 text-center bg-[#F6F6F6]`} style={{ borderLeft: '0.5px solid #E5E1DC', borderRight: '0.5px solid #E5E1DC' }}>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editingScores.score_45_hk1}
-                          onChange={(e) => handleScoreChange('score_45_hk1', e.target.value)}
-                          className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
+                      {bulk.isBulkEditing ? (
+                        <ScoreInput
+                          field="score_45_hk1"
+                          value={bulk.draftFor(student).score_45_hk1}
+                          invalid={bulk.isInvalidCell(student, 'score_45_hk1')}
+                          onChange={(value) => bulk.setDraft(student, 'score_45_hk1', value)}
                         />
                       ) : (
                         <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_45_hk1)}</span>
@@ -643,12 +572,12 @@ export default function StudentsPage() {
 
                     {/* Score: THI HK1 */}
                     <td className={`${scoreCellCls} px-1 py-3 text-center bg-[#F6F6F6]`} style={{ borderRight: '0.5px solid #E5E1DC' }}>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editingScores.score_exam_hk1}
-                          onChange={(e) => handleScoreChange('score_exam_hk1', e.target.value)}
-                          className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
+                      {bulk.isBulkEditing ? (
+                        <ScoreInput
+                          field="score_exam_hk1"
+                          value={bulk.draftFor(student).score_exam_hk1}
+                          invalid={bulk.isInvalidCell(student, 'score_exam_hk1')}
+                          onChange={(value) => bulk.setDraft(student, 'score_exam_hk1', value)}
                         />
                       ) : (
                         <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_exam_hk1)}</span>
@@ -657,12 +586,12 @@ export default function StudentsPage() {
 
                     {/* Score: 45' HK2 */}
                     <td className={`${scoreCellCls} px-1 py-3 text-center bg-[#F6F6F6]`} style={{ borderRight: '0.5px solid #E5E1DC' }}>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editingScores.score_45_hk2}
-                          onChange={(e) => handleScoreChange('score_45_hk2', e.target.value)}
-                          className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
+                      {bulk.isBulkEditing ? (
+                        <ScoreInput
+                          field="score_45_hk2"
+                          value={bulk.draftFor(student).score_45_hk2}
+                          invalid={bulk.isInvalidCell(student, 'score_45_hk2')}
+                          onChange={(value) => bulk.setDraft(student, 'score_45_hk2', value)}
                         />
                       ) : (
                         <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_45_hk2)}</span>
@@ -671,12 +600,12 @@ export default function StudentsPage() {
 
                     {/* Score: THI HK2 */}
                     <td className={`${scoreCellCls} px-1 py-3 text-center bg-[#F6F6F6]`} style={{ borderRight: '0.5px solid #E5E1DC' }}>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editingScores.score_exam_hk2}
-                          onChange={(e) => handleScoreChange('score_exam_hk2', e.target.value)}
-                          className="w-10 h-7 text-center text-sm text-[#8a8c90] border border-[#E5E1DC] rounded-md bg-white focus:outline-none focus:border-brand"
+                      {bulk.isBulkEditing ? (
+                        <ScoreInput
+                          field="score_exam_hk2"
+                          value={bulk.draftFor(student).score_exam_hk2}
+                          invalid={bulk.isInvalidCell(student, 'score_exam_hk2')}
+                          onChange={(value) => bulk.setDraft(student, 'score_exam_hk2', value)}
                         />
                       ) : (
                         <span className="text-sm text-[#8a8c90]">{fmtScore(student.score_exam_hk2)}</span>
@@ -711,99 +640,60 @@ export default function StudentsPage() {
                     {/* Actions */}
                     <td className={`px-3 py-3 ${rowBgClass}`}>
                       <div className="flex items-center justify-center gap-2">
-                        {isEditing ? (
-                          <>
-                            {/* Save Button */}
-                            <button
-                              onClick={saveScores}
-                              disabled={isSaving}
-                              className="w-9 h-9 rounded-lg bg-brand flex items-center justify-center hover:bg-orange-500 transition-colors disabled:opacity-50"
-                              title="Lưu"
-                            >
-                              {isSaving ? (
-                                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                              ) : (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16L21 8V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                  <path d="M17 21V13H7V21" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                  <path d="M7 3V8H15" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                              )}
-                            </button>
-                            {/* Cancel Button */}
-                            <button
-                              onClick={cancelEditing}
-                              disabled={isSaving}
-                              className="w-9 h-9 rounded-lg bg-[#FEE2E2] flex items-center justify-center hover:bg-red-200 transition-colors disabled:opacity-50"
-                              title="Hủy"
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M18 6L6 18" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M6 6L18 18" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            {/* Medal/Award Icon - Chỉnh sửa điểm */}
-                            <button
-                              onClick={() => startEditing(student)}
-                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
-                              title="Chỉnh sửa điểm"
-                            >
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="12" cy="8" r="6" stroke="#8B8685" strokeWidth="1.5"/>
-                                <path d="M15.477 12.89L17 22L12 19L7 22L8.523 12.89" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </button>
-                            {/* Calendar Icon - Xem điểm danh */}
-                            <button
-                              onClick={() => router.push(`/admin/management/students/${student.id}/attendance`)}
-                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
-                              title="Xem điểm danh"
-                            >
-                              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M15.8333 3.33334H4.16667C3.24619 3.33334 2.5 4.07954 2.5 5.00001V16.6667C2.5 17.5872 3.24619 18.3333 4.16667 18.3333H15.8333C16.7538 18.3333 17.5 17.5872 17.5 16.6667V5.00001C17.5 4.07954 16.7538 3.33334 15.8333 3.33334Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M13.3333 1.66666V5.00001" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M6.66667 1.66666V5.00001" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M2.5 8.33334H17.5" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </button>
-                            {/* Edit Icon - Chỉnh sửa thiếu nhi */}
-                            <button
-                              onClick={() => router.push(`/admin/management/students/${student.id}/edit`)}
-                              className="w-9 h-9 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
-                              title="Chỉnh sửa thiếu nhi"
-                            >
-                              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M14.1667 2.5C14.3856 2.28113 14.6454 2.10752 14.9314 1.98906C15.2173 1.87061 15.5238 1.80965 15.8333 1.80965C16.1429 1.80965 16.4493 1.87061 16.7353 1.98906C17.0213 2.10752 17.2811 2.28113 17.5 2.5C17.7189 2.71887 17.8925 2.97871 18.0109 3.26468C18.1294 3.55064 18.1904 3.85714 18.1904 4.16667C18.1904 4.4762 18.1294 4.78269 18.0109 5.06866C17.8925 5.35462 17.7189 5.61446 17.5 5.83333L6.25 17.0833L1.66667 18.3333L2.91667 13.75L14.1667 2.5Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </button>
-                            {/* Delete Icon */}
-                            <button
-                              onClick={() => openDeleteModal(student)}
-                              className="w-9 h-9 rounded-lg bg-[#FEE2E2] flex items-center justify-center hover:bg-red-200 transition-colors"
-                              title="Xóa"
-                            >
-                              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M2.5 5H4.16667H17.5" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M6.66667 5V3.33333C6.66667 2.89131 6.84226 2.46738 7.15482 2.15482C7.46738 1.84226 7.89131 1.66667 8.33333 1.66667H11.6667C12.1087 1.66667 12.5326 1.84226 12.8452 2.15482C13.1577 2.46738 13.3333 2.89131 13.3333 3.33333V5M15.8333 5V16.6667C15.8333 17.1087 15.6577 17.5326 15.3452 17.8452C15.0326 18.1577 14.6087 18.3333 14.1667 18.3333H5.83333C5.39131 18.3333 4.96738 18.1577 4.65482 17.8452C4.34226 17.5326 4.16667 17.1087 4.16667 16.6667V5H15.8333Z" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </button>
-                            {isAdmin && (
-                              <button
-                                onClick={() => void handlePermanentDeleteStudent(student)}
-                                className="h-9 rounded-lg border border-red-300 px-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
-                                title="Xoá vĩnh viễn"
-                                aria-label={`Xoá vĩnh viễn ${student.full_name}`}
-                              >
-                                Xoá vĩnh viễn
-                              </button>
-                            )}
-                          </>
+                        {/* Medal/Award Icon - Nhập điểm cả danh sách */}
+                        <button
+                          onClick={startBulkEdit}
+                          className="w-9 h-9 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                          title="Nhập điểm"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="8" r="6" stroke="#8B8685" strokeWidth="1.5"/>
+                            <path d="M15.477 12.89L17 22L12 19L7 22L8.523 12.89" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        {/* Calendar Icon - Xem điểm danh */}
+                        <button
+                          onClick={() => router.push(`/admin/management/students/${student.id}/attendance`)}
+                          className="w-9 h-9 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                          title="Xem điểm danh"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M15.8333 3.33334H4.16667C3.24619 3.33334 2.5 4.07954 2.5 5.00001V16.6667C2.5 17.5872 3.24619 18.3333 4.16667 18.3333H15.8333C16.7538 18.3333 17.5 17.5872 17.5 16.6667V5.00001C17.5 4.07954 16.7538 3.33334 15.8333 3.33334Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M13.3333 1.66666V5.00001" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M6.66667 1.66666V5.00001" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M2.5 8.33334H17.5" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        {/* Edit Icon - Chỉnh sửa thiếu nhi */}
+                        <button
+                          onClick={() => router.push(`/admin/management/students/${student.id}/edit`)}
+                          className="w-9 h-9 rounded-lg bg-[#F6F6F6] dark:bg-white/5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                          title="Chỉnh sửa thiếu nhi"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M14.1667 2.5C14.3856 2.28113 14.6454 2.10752 14.9314 1.98906C15.2173 1.87061 15.5238 1.80965 15.8333 1.80965C16.1429 1.80965 16.4493 1.87061 16.7353 1.98906C17.0213 2.10752 17.2811 2.28113 17.5 2.5C17.7189 2.71887 17.8925 2.97871 18.0109 3.26468C18.1294 3.55064 18.1904 3.85714 18.1904 4.16667C18.1904 4.4762 18.1294 4.78269 18.0109 5.06866C17.8925 5.35462 17.7189 5.61446 17.5 5.83333L6.25 17.0833L1.66667 18.3333L2.91667 13.75L14.1667 2.5Z" stroke="#8B8685" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        {/* Delete Icon */}
+                        <button
+                          onClick={() => openDeleteModal(student)}
+                          className="w-9 h-9 rounded-lg bg-[#FEE2E2] flex items-center justify-center hover:bg-red-200 transition-colors"
+                          title="Xóa"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2.5 5H4.16667H17.5" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M6.66667 5V3.33333C6.66667 2.89131 6.84226 2.46738 7.15482 2.15482C7.46738 1.84226 7.89131 1.66667 8.33333 1.66667H11.6667C12.1087 1.66667 12.5326 1.84226 12.8452 2.15482C13.1577 2.46738 13.3333 2.89131 13.3333 3.33333V5M15.8333 5V16.6667C15.8333 17.1087 15.6577 17.5326 15.3452 17.8452C15.0326 18.1577 14.6087 18.3333 14.1667 18.3333H5.83333C5.39131 18.3333 4.96738 18.1577 4.65482 17.8452C4.34226 17.5326 4.16667 17.1087 4.16667 16.6667V5H15.8333Z" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => void handlePermanentDeleteStudent(student)}
+                            className="h-9 rounded-lg border border-red-300 px-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                            title="Xoá vĩnh viễn"
+                            aria-label={`Xoá vĩnh viễn ${student.full_name}`}
+                          >
+                            Xoá vĩnh viễn
+                          </button>
                         )}
                       </div>
                     </td>
@@ -815,6 +705,14 @@ export default function StudentsPage() {
         </table>
         </div>
       </div>
+
+      <BulkScoreFloatingBar
+        isBulkEditing={bulk.isBulkEditing}
+        isSaving={bulk.isSaving}
+        changedCount={bulk.changedCount}
+        onSave={() => void bulk.saveAll()}
+        onCancel={bulk.cancelBulkEdit}
+      />
 
       {/* Import Modal */}
       <ImportStudentsModal
