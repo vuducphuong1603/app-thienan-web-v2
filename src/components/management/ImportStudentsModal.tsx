@@ -7,6 +7,7 @@ import { supabase, Class } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { filterByBranch } from '@/lib/branch-scope'
 import { canonicalStudentCode } from '@/lib/qr-attendance'
+import { splitByStudentCode } from '@/lib/student-import'
 
 interface ImportStudentsModalProps {
   isOpen: boolean
@@ -240,22 +241,27 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
     let failed = 0
     const errors: string[] = []
 
-    for (const student of validStudents) {
+    // Chỉ bỏ qua khi trùng Mã TN (kể cả em đã nghỉ); trùng tên + tên thánh vẫn thêm
+    const codes = validStudents.map(s => canonicalStudentCode(s.student_code))
+    const { data: existingRows, error: existingError } = await supabase
+      .from('thieu_nhi')
+      .select('student_code')
+      .in('student_code', codes)
+
+    if (existingError) {
+      setImportResult({ success: 0, failed: validStudents.length, skipped: 0, errors: [`Không kiểm tra được Mã TN: ${existingError.message}`] })
+      setStep('result')
+      return
+    }
+
+    const { toInsert, skipped: skippedRows } = splitByStudentCode(
+      validStudents,
+      (existingRows || []).map(r => r.student_code as string)
+    )
+    skipped = skippedRows.length
+
+    for (const student of toInsert) {
       try {
-        // Check if student with same full_name and date_of_birth already exists - skip if exists
-        const { data: existing } = await supabase
-          .from('thieu_nhi')
-          .select('id')
-          .eq('full_name', student.full_name)
-          .eq('saint_name', student.saint_name || '')
-          .maybeSingle()
-
-        if (existing) {
-          // Skip existing student
-          skipped++
-          continue
-        }
-
         // Lookup class UUID by matching class name
         const classUuid = findClassId(student.class_name)
 
@@ -422,7 +428,7 @@ export default function ImportStudentsModal({ isOpen, onClose, onSuccess }: Impo
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-1.5 w-1 h-1 rounded-full bg-primary-3 flex-shrink-0" />
-                    <span>Nếu thiếu nhi đã tồn tại (trùng tên + tên thánh) sẽ được bỏ qua</span>
+                    <span>Nếu Mã TN đã có trong hệ thống (kể cả em đã nghỉ) sẽ được bỏ qua; trùng tên vẫn được thêm</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-1.5 w-1 h-1 rounded-full bg-primary-3 flex-shrink-0" />
