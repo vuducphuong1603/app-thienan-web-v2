@@ -8,6 +8,7 @@ import { supabase, ThieuNhiProfile, SchoolYear, AttendanceRecord, Holiday } from
 import { countWeekdays } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
 import { inScope } from '@/lib/branch-scope'
+import { recorderName } from '@/lib/attendance-recorder'
 
 
 interface StudentWithClass extends ThieuNhiProfile {
@@ -469,7 +470,7 @@ export default function StudentAttendancePage() {
                     <span className="text-sm font-light text-[#666d80]">Điểm danh lúc: {formatTime(record.check_in_time)}</span>
                   </div>
                   <p className="text-xs text-[#666d80]">
-                    &quot;{getCheckInMethodLabel(record.check_in_method)} - {record.created_by_user ? `${record.created_by_user.saint_name ? record.created_by_user.saint_name + ' ' : ''}${record.created_by_user.full_name}` : 'Không rõ'}&quot;
+                    &quot;{getCheckInMethodLabel(record.check_in_method)} - {recorderName(record.created_by_user)}&quot;
                   </p>
                 </div>
               ))}
@@ -504,10 +505,14 @@ export default function StudentAttendancePage() {
                     </span>
                   </div>
                   {([['Giáo lý', day.catechism], ['Đi lễ', day.mass]] as const).map(([label, rec]) => (
-                    <div key={label} className="flex items-center gap-2 text-sm">
-                      {rec ? <Check className="w-3.5 h-3.5 text-[#00a86b]" strokeWidth={3} /> : <span className="w-3.5 h-3.5 rounded-full border border-[#e0e0e0] inline-block" />}
-                      <span className={rec ? 'text-black dark:text-white' : 'text-[#666d80]'}>{label}</span>
-                      {rec && <span className="text-xs text-[#666d80]">{formatTime(rec.check_in_time)} · {getCheckInMethodLabel(rec.check_in_method)}</span>}
+                    <div key={label} className="flex items-baseline gap-2 text-sm">
+                      {rec ? <Check className="w-3.5 h-3.5 shrink-0 self-center text-[#00a86b]" strokeWidth={3} /> : <span className="w-3.5 h-3.5 shrink-0 self-center rounded-full border border-[#e0e0e0] inline-block" />}
+                      <span className={`shrink-0 ${rec ? 'text-black dark:text-white' : 'text-[#666d80]'}`}>{label}</span>
+                      {rec && (
+                        <span className="min-w-0 text-xs text-[#666d80]">
+                          {formatTime(rec.check_in_time)} · {getCheckInMethodLabel(rec.check_in_method)} · <span className="font-medium text-[#3d3d3d] dark:text-white/80">{recorderName(rec.created_by_user)}</span>
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
