@@ -49,7 +49,7 @@ describe('priest Excel adversarial calculation cases', () => {
     })
   })
 
-  it('counts cn_le-only student as absent from GL but present for warning calculation', () => {
+  it('counts cn_le-only student as present for Sunday and for warning calculation', () => {
     const pupils = [student('mass-only')]
     const sessions = { thu5: ['2026-09-17'], cn: ['2026-09-20'] }
     const records = [record('mass-only', 'cn_le', '2026-09-20')]
@@ -60,7 +60,7 @@ describe('priest Excel adversarial calculation cases', () => {
       branchOrder: ['Ấu Nhi'], students: pupils, sessions, records,
       prevSessions: null, prevRecords: [], warnings,
     })
-    expect(branches[0].classes[0].cnAbsent).toBe(1)
+    expect(branches[0].classes[0].cnAbsent).toBe(0)
     expect(warnings).toEqual([])
   })
 

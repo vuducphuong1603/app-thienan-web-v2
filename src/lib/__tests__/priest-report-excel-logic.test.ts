@@ -92,9 +92,13 @@ describe('presentIdsOnSessions', () => {
     attendance_date,
   })
 
-  it('counts only cn, not cn_le, for giáo lý attendance', () => {
-    const records = [record('cn', 'cn', '2026-09-20'), record('mass-only', 'cn_le', '2026-09-20')]
-    expect([...presentIdsOnSessions(records, sessions, 'cn')]).toEqual(['cn'])
+  it('counts cn or cn_le as Sunday attendance (user 05/11/2026: khớp báo cáo lớp)', () => {
+    const records = [
+      record('cn', 'cn', '2026-09-20'),
+      record('mass-only', 'cn_le', '2026-09-20'),
+      record('saturday', 'cn_le', '2026-09-19'),
+    ]
+    expect([...presentIdsOnSessions(records, sessions, 'cn')]).toEqual(['cn', 'mass-only'])
   })
 
   it('counts cn_le as attendance for any-presence warnings', () => {

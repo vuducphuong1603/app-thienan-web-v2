@@ -347,13 +347,13 @@ export function presentIdsOnSessions(
     if (record.status !== 'present') continue
 
     const isThu5 = record.day_type === 'thu5' && thu5Dates.has(record.attendance_date)
-    const isCn = record.day_type === 'cn' && cnDates.has(record.attendance_date)
-    const isAnySundayAttendance = (record.day_type === 'cn' || record.day_type === 'cn_le') &&
+    // Chúa Nhật: học GL ('cn') hoặc đi lễ ('cn_le') đều tính có mặt — khớp báo cáo lớp (user 05/11/2026)
+    const isSunday = (record.day_type === 'cn' || record.day_type === 'cn_le') &&
       cnDates.has(record.attendance_date)
 
     if (kind === 'thu5' && isThu5) presentIds.add(record.student_id)
-    if (kind === 'cn' && isCn) presentIds.add(record.student_id)
-    if (kind === 'any' && (isThu5 || isAnySundayAttendance)) presentIds.add(record.student_id)
+    if (kind === 'cn' && isSunday) presentIds.add(record.student_id)
+    if (kind === 'any' && (isThu5 || isSunday)) presentIds.add(record.student_id)
   }
 
   return presentIds

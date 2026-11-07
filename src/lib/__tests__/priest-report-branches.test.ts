@@ -94,7 +94,7 @@ describe('buildPriestReportBranches', () => {
       ],
     })
 
-    expect(groups[0].classes[0]).toMatchObject({ studentCount: 3, thu5Absent: 2, cnAbsent: 2 })
+    expect(groups[0].classes[0]).toMatchObject({ studentCount: 3, thu5Absent: 2, cnAbsent: 1 })
   })
 
   it('sets absent counts to zero when the corresponding session list is empty', () => {
