@@ -21,6 +21,18 @@ describe('feedbackCue', () => {
     expect(cue.vibrate).toEqual([250])
   })
 
+  it('trễ: tiếng riêng, khác thành công / trùng / lỗi, có rung', () => {
+    const cue = feedbackCue('late')!
+    expect(cue).toEqual(FEEDBACK_CUES.late)
+    expect(cue.tones.length).toBeGreaterThan(0)
+    expect(cue.vibrate.length).toBeGreaterThan(0)
+    for (const other of ['success', 'duplicate', 'not_found'] as const) {
+      expect(cue).not.toEqual(FEEDBACK_CUES[other])
+      expect(cue.tones).not.toEqual(FEEDBACK_CUES[other].tones)
+      expect(cue.vibrate).not.toEqual(FEEDBACK_CUES[other].vibrate)
+    }
+  })
+
   it('không có loại → không phát gì', () => {
     expect(feedbackCue(null)).toBeNull()
   })

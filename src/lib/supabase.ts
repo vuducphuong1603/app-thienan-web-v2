@@ -216,6 +216,10 @@ export interface AttendanceRecord {
   // Compensatory attendance fields
   is_compensatory?: boolean // TRUE if this is a make-up attendance for missed Thursday
   compensated_for_date?: string // The Thursday date this attendance compensates for (YYYY-MM-DD)
+  // Xét đi trễ (chỉ Chủ nhật cn/cn_le, do DB trigger tính): true = trễ, false = đúng giờ, null = chưa xét
+  is_late?: boolean | null
+  late_edited_by?: string | null // do trigger đóng dấu khi sửa tay, client không gửi
+  late_edited_at?: string | null
 }
 
 // Plan category

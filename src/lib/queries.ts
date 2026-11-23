@@ -4,6 +4,7 @@ import { supabase, UserProfile, Class, Branch, WeeklyPlan, PlanCategory, AlertRu
 import { CLASS_TEACHER_ROLES } from './class-teachers'
 import type { DirectoryClass, DirectoryUser } from './teacher-directory'
 import { sortByGivenName } from './student-sort'
+import { sortWindows, type AttendanceTimeWindow, type PunctualitySession } from './attendance-punctuality'
 import { effectiveSessionDays } from './score-summary'
 import { calculateStudentScoreDetails, countPresentAttendance } from './student-score-summary'
 import { useAuth } from './auth-context'
@@ -91,6 +92,7 @@ export const queryKeys = {
   holidayCheck: (schoolYearId: string, date: string) => ['holidayCheck', schoolYearId, date] as const,
   classDetail: (classId: string) => ['classDetail', classId] as const,
   teacherDirectory: ['teacherDirectory'] as const,
+  attendanceTimeWindows: ['attendance-time-windows'] as const,
 }
 
 // ============ Dashboard Stats ============
@@ -1837,11 +1839,15 @@ export interface StudentWithAttendance extends ThieuNhiProfile {
   attendance_time?: string
   attendance_by?: string
   attendance_record_id?: string
+  /** Chủ nhật – đi trễ buổi giáo lý ('cn'): true = trễ, false = đúng giờ, null/undefined = chưa xét (DB trigger tính) */
+  attendance_is_late?: boolean | null
   /** Chủ nhật – buổi đi lễ (day_type 'cn_le'); attendance_* ở trên là buổi học giáo lý ('cn') */
   mass_status?: 'present' | 'absent' | null
   mass_time?: string
   mass_by?: string
   mass_record_id?: string
+  /** Chủ nhật – đi trễ buổi đi lễ ('cn_le'), cùng nghĩa với attendance_is_late */
+  mass_is_late?: boolean | null
   has_thursday_attendance?: boolean
   has_compensatory_attendance?: boolean
   compensatory_record_id?: string
@@ -2040,10 +2046,12 @@ export function useAttendanceStudents(
             attendance_time: attendance?.check_in_time?.substring(0, 5) || undefined,
             attendance_by: attendance?.created_by ? attendanceUserNameMap.get(attendance.created_by) : undefined,
             attendance_record_id: attendance?.id || undefined,
+            attendance_is_late: attendance?.status === 'present' ? (attendance.is_late ?? null) : null,
             mass_status: mass?.status || null,
             mass_time: mass?.check_in_time?.substring(0, 5) || undefined,
             mass_by: mass?.created_by ? attendanceUserNameMap.get(mass.created_by) : undefined,
             mass_record_id: mass?.id || undefined,
+            mass_is_late: mass?.status === 'present' ? (mass.is_late ?? null) : null,
             has_compensatory_attendance: !!compensatory,
             compensatory_record_id: compensatory?.id,
             compensatory_time: compensatory?.check_in_time?.substring(0, 5),
@@ -2162,4 +2170,78 @@ export function useTeacherDirectory() {
       }
     },
   })
+}
+
+// ============ Khung giờ xét đi trễ (Chủ nhật) ============
+// Bảng attendance_time_windows: ai cũng đọc được, chỉ admin ghi (RLS). Người không phải admin
+// ghi → insert báo lỗi RLS, update/delete ảnh hưởng 0 dòng (không có lỗi) → ném lỗi rõ ràng.
+const WINDOW_COLUMNS = 'id, session_type, start_time, end_time, label, created_by, created_at, updated_at'
+const NOT_ADMIN_MESSAGE = 'Không có quyền thay đổi khung giờ (chỉ admin) hoặc khung giờ không còn tồn tại'
+
+export interface AttendanceTimeWindowValues {
+  start_time: string
+  end_time: string
+  label: string | null
+}
+
+export function useAttendanceTimeWindows(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.attendanceTimeWindows,
+    enabled,
+    staleTime: 60 * 1000,
+    queryFn: async (): Promise<AttendanceTimeWindow[]> => {
+      const { data, error } = await supabase.from('attendance_time_windows').select(WINDOW_COLUMNS)
+      if (error) throw new Error(error.message)
+      return sortWindows((data || []) as AttendanceTimeWindow[])
+    },
+  })
+}
+
+export async function createAttendanceTimeWindow(
+  session: PunctualitySession,
+  v: AttendanceTimeWindowValues,
+): Promise<AttendanceTimeWindow> {
+  const { data, error } = await supabase
+    .from('attendance_time_windows')
+    .insert({ session_type: session, start_time: v.start_time, end_time: v.end_time, label: v.label })
+    .select(WINDOW_COLUMNS)
+  if (error) throw new Error(error.message)
+  if (!data || data.length === 0) throw new Error(NOT_ADMIN_MESSAGE)
+  return data[0] as AttendanceTimeWindow
+}
+
+export async function updateAttendanceTimeWindow(
+  id: string,
+  v: AttendanceTimeWindowValues,
+): Promise<AttendanceTimeWindow> {
+  const { data, error } = await supabase
+    .from('attendance_time_windows')
+    .update({ start_time: v.start_time, end_time: v.end_time, label: v.label })
+    .eq('id', id)
+    .select(WINDOW_COLUMNS)
+  if (error) throw new Error(error.message)
+  if (!data || data.length === 0) throw new Error(NOT_ADMIN_MESSAGE)
+  return data[0] as AttendanceTimeWindow
+}
+
+export async function deleteAttendanceTimeWindow(id: string): Promise<void> {
+  const { data, error } = await supabase.from('attendance_time_windows').delete().eq('id', id).select('id')
+  if (error) throw new Error(error.message)
+  if (!data || data.length === 0) throw new Error(NOT_ADMIN_MESSAGE)
+}
+
+/**
+ * Sửa tay trạng thái đi trễ của MỘT bản ghi điểm danh Chủ nhật. Trả về is_late DB lưu sau khi sửa.
+ * Không gửi late_edited_* — trigger tự đóng dấu người sửa.
+ */
+export async function setAttendanceLate(recordId: string, value: boolean): Promise<boolean | null> {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .update({ is_late: value })
+    .eq('id', recordId)
+    .select('is_late')
+  if (error) throw new Error(error.message)
+  if (!data || data.length === 0) throw new Error('Không cập nhật được trạng thái đi trễ (không có quyền hoặc bản ghi không còn)')
+  const stored = (data[0] as { is_late: boolean | null }).is_late
+  return stored === undefined ? null : stored
 }
