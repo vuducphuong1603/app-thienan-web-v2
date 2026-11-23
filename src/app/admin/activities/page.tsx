@@ -7,7 +7,7 @@ import { sortByGivenName, compareByGivenName } from '@/lib/student-sort'
 import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, Holiday } from '@/lib/supabase'
 import { useActiveClasses, useSchoolYears, fetchAllRows, setAttendanceLate } from '@/lib/queries'
-import { nextLateValue, punctualityOf, PUNCTUALITY_LABELS, type Punctuality } from '@/lib/attendance-punctuality'
+import { canEditLate, nextLateValue, punctualityOf, PUNCTUALITY_LABELS, type Punctuality } from '@/lib/attendance-punctuality'
 import { countReportCells, reportCellStatus, reportTotalAttendance, REPORT_CELL_SYMBOL, type ReportCellStatus } from '@/lib/report-cell'
 import { attendanceScores, effectiveSessionDays, fmtScore, round2, scoreSummary } from '@/lib/score-summary'
 import { useAuth } from '@/lib/auth-context'
@@ -477,6 +477,8 @@ export default function ActivitiesPage() {
   const { user, isManager, scope } = useAuth()
   // admin + phân đoàn trưởng: được chọn lớp (danh sách lớp đã lọc theo phân đoàn ở hook)
   const isAdmin = isManager
+  // Sửa tay Trễ ↔ Đúng giờ: CHỈ admin thật (không gồm phân đoàn trưởng / GLV); DB cũng chặn
+  const canEditLateStatus = canEditLate(user?.role)
   const reportBranches = scopedBranches(scope)
   const reportExportRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab] = useState<TabType>('attendance')
@@ -1052,6 +1054,7 @@ export default function ActivitiesPage() {
    * lỗi → hoàn lại giá trị cũ + thông báo lỗi. Chỉ áp dụng cho buổi ĐÃ có mặt.
    */
   const toggleLate = async (studentId: string, session: SundaySession) => {
+    if (!canEditLateStatus) return
     const student = students.find(s => s.id === studentId)
     if (!student) return
     const recordId = session === 'cn' ? student.attendance_record_id : student.mass_record_id
@@ -1646,6 +1649,19 @@ export default function ActivitiesPage() {
     if (status !== 'present') return null
     const kind = punctualityOf(session === 'cn' ? student.attendance_is_late : student.mass_is_late)
     const hasRecord = !!(session === 'cn' ? student.attendance_record_id : student.mass_record_id)
+    if (!canEditLateStatus) {
+      // Không phải admin: chỉ xem, không bấm đổi được
+      return (
+        <span
+          data-testid={`late-pill-${session}-${student.id}`}
+          data-late-state={kind}
+          title={`${SUNDAY_SESSION_SHORT_LABELS[session]}: ${PUNCTUALITY_LABELS[kind]}`}
+          className={`ml-2 inline-flex items-center h-6 px-2.5 rounded-full border text-xs font-semibold whitespace-nowrap ${LATE_PILL_STYLES[kind]}`}
+        >
+          {PUNCTUALITY_LABELS[kind]}
+        </span>
+      )
+    }
     return (
       <button
         type="button"
