@@ -191,3 +191,8 @@ export function punctualityOf(isLate: boolean | null | undefined): Punctuality {
 export function nextLateValue(current: boolean | null | undefined): boolean {
   return current !== true
 }
+
+/** Chỉ admin (Ban điều hành) được sửa tay Trễ ↔ Đúng giờ. DB (trigger set_attendance_lateness) cũng chặn. */
+export function canEditLate(role: string | null | undefined): boolean {
+  return role === 'admin'
+}

@@ -9,6 +9,7 @@ import {
   formatWindow,
   punctualityOf,
   nextLateValue,
+  canEditLate,
   localTodayISO,
   PUNCTUALITY_LABELS,
   type AttendanceTimeWindow,
@@ -344,5 +345,16 @@ describe('punctualityOf / PUNCTUALITY_LABELS / nextLateValue', () => {
     expect(punctualityOf(v)).toBe('on_time')
     v = nextLateValue(v)
     expect(punctualityOf(v)).toBe('late')
+  })
+})
+
+describe('canEditLate (chỉ admin được sửa tay Trễ ↔ Đúng giờ)', () => {
+  it('admin → true', () => {
+    expect(canEditLate('admin')).toBe(true)
+  })
+  it('các vai trò khác / chưa biết vai trò → false', () => {
+    for (const role of ['phan_doan_truong', 'giao_ly_vien', 'ADMIN', '', null, undefined]) {
+      expect(canEditLate(role)).toBe(false)
+    }
   })
 })
