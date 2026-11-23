@@ -8,7 +8,7 @@ import { getBranchScope, filterByBranch } from '@/lib/branch-scope'
 import { todayForAttendance } from '@/lib/debug-date'
 import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { playFeedback, primeAudio } from '@/lib/attendance-feedback'
-import { SundaySession, SUNDAY_SESSION_LABELS, SUNDAY_SESSIONS, holidayDayTypesFor, DayType } from '@/lib/sunday-attendance'
+import { SundaySession, SUNDAY_SESSION_LABELS, SUNDAY_SESSIONS, holidayDayTypesFor, DayType, isSundayType } from '@/lib/sunday-attendance'
 import { BookOpen, Church } from 'lucide-react'
 import { parseStudentCode, studentCodePattern, decodeQrText, getScanTarget, shouldThrottleScan, filterManualStudents, mapRestoredScanEntry, RestoredAttendanceRecord, removeStudentFromHistory, shouldRunManualSearch, prependScanHistory, SCAN_HISTORY_LIMIT } from '@/lib/qr-attendance'
 import { fetchAllRows } from '@/lib/queries'
@@ -22,11 +22,44 @@ type ScanEntry = {
   className: string
   time: string
   status: 'success' | 'duplicate' | 'not_found'
+  /** true = điểm danh TRỄ (DB xét, chỉ buổi Chủ nhật); không có = đúng giờ / chưa xét */
+  isLate?: boolean
 }
 
 type Feedback = {
-  type: 'success' | 'duplicate' | 'not_found' | null
+  type: 'success' | 'duplicate' | 'not_found' | 'late' | null
   message: string
+}
+
+/**
+ * Ghi 1 lượt điểm danh. Buổi Chủ nhật đọc lại `is_late` do DB (trigger) tính — không tự suy ra.
+ * Nếu insert không trả dòng nào (trigger normalize_attendance_date biến insert trùng thành UPDATE,
+ * không lỗi) thì tra lại is_late theo (student, ngày, buổi).
+ */
+async function insertAttendanceReadLate(
+  insertData: Record<string, unknown>,
+  dayType: DayType,
+): Promise<{ error: { code?: string; message: string } | null; isLate: boolean | null; refetched: boolean }> {
+  if (!isSundayType(dayType)) {
+    const { error } = await supabase.from('attendance_records').insert(insertData)
+    return { error, isLate: null, refetched: false }
+  }
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .insert(insertData)
+    .select('id, is_late')
+  if (error) return { error, isLate: null, refetched: false }
+  const row = Array.isArray(data) ? data[0] : data
+  if (row) return { error: null, isLate: (row.is_late as boolean | null | undefined) ?? null, refetched: false }
+  const { data: refetched } = await supabase
+    .from('attendance_records')
+    .select('is_late')
+    .eq('student_id', insertData.student_id as string)
+    .eq('attendance_date', insertData.attendance_date as string)
+    .eq('day_type', dayType)
+    .maybeSingle()
+  // refetched = true: không có dòng trả về (đường normalize) → chỉ dùng để gắn thẻ Trễ, KHÔNG đổi loại thông báo
+  return { error: null, isLate: (refetched?.is_late as boolean | null | undefined) ?? null, refetched: true }
 }
 
 
@@ -257,9 +290,7 @@ export default function QRScanAttendanceModal({
         if (user?.id) insertData.created_by = user.id
         if (schoolYear?.id) insertData.school_year_id = schoolYear.id
 
-        const { error: insertError } = await supabase
-          .from('attendance_records')
-          .insert(insertData)
+        const { error: insertError, isLate, refetched } = await insertAttendanceReadLate(insertData, dayType)
 
         if (insertError) {
           if (insertError.code === '23505') {
@@ -278,10 +309,12 @@ export default function QRScanAttendanceModal({
           className,
           time: timeDisplay,
           status: 'success' as const,
+          ...(isLate === true ? { isLate: true } : {}),
         }))
         setScanCount(c => c + 1)
         successCountRef.current += 1
-        showFeedback('success', `Đã điểm danh: ${student.full_name}`, 800)
+        if (isLate === true && !refetched) showFeedback('late', `TRỄ — ${student.full_name} điểm danh lúc ${timeDisplay}`, 1500)
+        else showFeedback('success', `Đã điểm danh: ${student.full_name}`, 800)
         updateAttendanceCount(student.id)
       } catch {
         showFeedback('not_found', 'Có lỗi xảy ra. Thử lại.')
@@ -453,7 +486,7 @@ export default function QRScanAttendanceModal({
       if (user?.id) insertData.created_by = user.id
       if (schoolYear?.id) insertData.school_year_id = schoolYear.id
 
-      const { error } = await supabase.from('attendance_records').insert(insertData)
+      const { error, isLate, refetched } = await insertAttendanceReadLate(insertData, dayType)
 
       if (error) {
         if (error.code === '23505') {
@@ -473,11 +506,13 @@ export default function QRScanAttendanceModal({
         className: student.className,
         time: timeDisplay,
         status: 'success' as const,
+        ...(isLate === true ? { isLate: true } : {}),
       }))
       setScanCount(c => c + 1)
       successCountRef.current += 1
       setMarkedStudents(prev => new Set(prev).add(student.id))
-      showFeedback('success', `Đã điểm danh: ${student.full_name}`, 800)
+      if (isLate === true && !refetched) showFeedback('late', `TRỄ — ${student.full_name} điểm danh lúc ${timeDisplay}`, 1500)
+      else showFeedback('success', `Đã điểm danh: ${student.full_name}`, 800)
       updateAttendanceCount(student.id)
     } catch {
       showFeedback('not_found', 'Có lỗi xảy ra. Thử lại.')
@@ -541,7 +576,7 @@ export default function QRScanAttendanceModal({
     // markedStudents vẫn lấy toàn bộ để chặn điểm danh trùng.
     let histQuery = supabase
       .from('attendance_records')
-      .select('id, student_id, check_in_time, thieu_nhi(full_name, saint_name, student_code, classes(name))')
+      .select('id, student_id, check_in_time, is_late, thieu_nhi(full_name, saint_name, student_code, classes(name))')
       .eq('attendance_date', dateStr)
       .eq('day_type', dayType)
       .in('check_in_method', ['qr_scan', 'manual'])
@@ -849,6 +884,7 @@ export default function QRScanAttendanceModal({
     feedback.type === 'success' ? 'border-[#22c55e]'
     : feedback.type === 'duplicate' ? 'border-[#f59e0b]'
     : feedback.type === 'not_found' ? 'border-[#ef4444]'
+    : feedback.type === 'late' ? 'border-[#a855f7]'
     : 'border-white'
 
   return (
@@ -1143,7 +1179,7 @@ export default function QRScanAttendanceModal({
                 scanHistory.map(scan => {
                   const isSuccess = scan.status === 'success' && !!scan.studentId
                   const borderCls =
-                    scan.status === 'success' ? 'border-[#22c55e]'
+                    scan.status === 'success' ? (scan.isLate ? 'border-[#a855f7]' : 'border-[#22c55e]')
                     : scan.status === 'duplicate' ? 'border-[#f59e0b]'
                     : 'border-[#ef4444]'
 
@@ -1155,7 +1191,17 @@ export default function QRScanAttendanceModal({
                         {scan.status === 'not_found' && <XCircle className="w-4 h-4 text-[#ef4444]" />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-white truncate">{scan.studentName}</p>
+                        <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                          <span className="truncate">{scan.studentName}</span>
+                          {scan.isLate && (
+                            <span
+                              data-testid={`scan-late-tag-${scan.id}`}
+                              className="shrink-0 rounded-full bg-[#7C3AED] px-2 py-0.5 text-[11px] font-bold text-white"
+                            >
+                              Trễ
+                            </span>
+                          )}
+                        </p>
                         <p className="text-xs text-[#94A3B8] truncate">
                           {scan.className}{scan.className && ' • '}{scan.studentCode}{scan.time && ` • ${scan.time}`}
                         </p>
@@ -1209,12 +1255,14 @@ export default function QRScanAttendanceModal({
           className={`pointer-events-none fixed inset-x-4 bottom-[max(20px,env(safe-area-inset-bottom))] z-[55] mx-auto flex max-w-[480px] items-start gap-2.5 rounded-2xl px-4 py-3 shadow-2xl ${
             feedback.type === 'success' ? 'bg-[#16A34A]'
             : feedback.type === 'duplicate' ? 'bg-[#F59E0B]'
+            : feedback.type === 'late' ? 'bg-[#7C3AED]'
             : 'bg-[#DC2626]'
           }`}
         >
           {feedback.type === 'success' && <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-white" />}
           {feedback.type === 'duplicate' && <Clock className="mt-0.5 h-5 w-5 shrink-0 text-white" />}
           {feedback.type === 'not_found' && <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-white" />}
+          {feedback.type === 'late' && <Clock className="mt-0.5 h-5 w-5 shrink-0 text-white" />}
           <span className="min-w-0 break-words text-sm font-semibold leading-5 text-white">{feedback.message}</span>
         </div>
       )}

@@ -126,6 +126,8 @@ export type RestoredAttendanceRecord = {
   id: string
   student_id?: string | null
   check_in_time: string | null
+  /** Kết quả xét đi trễ do DB tính (chỉ có ở buổi Chủ nhật); null = chưa xét */
+  is_late?: boolean | null
   thieu_nhi?: {
     full_name?: string
     saint_name?: string | null
@@ -146,6 +148,7 @@ export function mapRestoredScanEntry(record: RestoredAttendanceRecord): {
   className: string
   time: string
   status: 'success'
+  isLate?: boolean
 } {
   const tn = record.thieu_nhi
   return {
@@ -156,6 +159,8 @@ export function mapRestoredScanEntry(record: RestoredAttendanceRecord): {
     className: tn?.classes?.name || '',
     time: record.check_in_time?.substring(0, 5) || '',
     status: 'success',
+    // chỉ thêm khi DB đã xét — giữ nguyên hình dạng cũ cho bản ghi chưa xét
+    ...(typeof record.is_late === 'boolean' ? { isLate: record.is_late } : {}),
   }
 }
 

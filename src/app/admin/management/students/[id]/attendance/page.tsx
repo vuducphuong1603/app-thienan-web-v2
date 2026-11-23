@@ -9,6 +9,7 @@ import { countWeekdays } from '@/lib/queries'
 import { useAuth } from '@/lib/auth-context'
 import { inScope } from '@/lib/branch-scope'
 import { recorderName } from '@/lib/attendance-recorder'
+import { PUNCTUALITY_LABELS, punctualityOf } from '@/lib/attendance-punctuality'
 
 
 interface StudentWithClass extends ThieuNhiProfile {
@@ -17,6 +18,24 @@ interface StudentWithClass extends ThieuNhiProfile {
 
 interface AttendanceRecordWithDetails extends AttendanceRecord {
   created_by_user?: { full_name: string; saint_name?: string }
+}
+
+/** Nhãn Trễ / Đúng giờ (chỉ đọc) — không hiện gì khi chưa xét (is_late = null). */
+function LatePill({ isLate, testId }: { isLate: boolean | null | undefined; testId: string }) {
+  const p = punctualityOf(isLate)
+  if (p === 'unknown') return null
+  return (
+    <span
+      data-testid={testId}
+      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+        p === 'late'
+          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+          : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+      }`}
+    >
+      {PUNCTUALITY_LABELS[p]}
+    </span>
+  )
 }
 
 export default function StudentAttendancePage() {
@@ -512,6 +531,9 @@ export default function StudentAttendancePage() {
                         <span className="min-w-0 text-xs text-[#666d80]">
                           {formatTime(rec.check_in_time)} · {getCheckInMethodLabel(rec.check_in_method)} · <span className="font-medium text-[#3d3d3d] dark:text-white/80">{recorderName(rec.created_by_user)}</span>
                         </span>
+                      )}
+                      {rec && (
+                        <LatePill isLate={rec.is_late} testId={`late-history-${rec.day_type}-${rec.id}`} />
                       )}
                     </div>
                   ))}

@@ -1,7 +1,7 @@
 // Âm thanh + rung khi điểm danh (quét QR / thủ công).
 // Âm thanh tạo bằng Web Audio, không cần file; rung chỉ chạy trên Android (iPhone Safari không hỗ trợ).
 
-export type FeedbackKind = 'success' | 'duplicate' | 'not_found'
+export type FeedbackKind = 'success' | 'duplicate' | 'not_found' | 'late'
 
 export type Tone = { freq: number; ms: number }
 export type FeedbackCue = { tones: Tone[]; vibrate: number[] }
@@ -13,6 +13,11 @@ export const FEEDBACK_CUES: Record<FeedbackKind, FeedbackCue> = {
   duplicate: { tones: [{ freq: 700, ms: 90 }, { freq: 700, ms: 90 }], vibrate: [60, 60, 60] },
   // 1 bíp trầm dài, rung dài
   not_found: { tones: [{ freq: 300, ms: 260 }], vibrate: [250] },
+  // Điểm danh được nhưng ĐI TRỄ: 3 bíp thấp xuống dần, rung 3 nhịp — khác hẳn 3 loại trên
+  late: {
+    tones: [{ freq: 900, ms: 110 }, { freq: 600, ms: 110 }, { freq: 400, ms: 160 }],
+    vibrate: [120, 50, 120, 50, 200],
+  },
 }
 
 export function feedbackCue(kind: FeedbackKind | null | undefined): FeedbackCue | null {

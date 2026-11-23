@@ -12,8 +12,9 @@ import AvatarCropModal from '@/components/ui/AvatarCropModal'
 import { validateAvatarFile } from '@/lib/student-avatar'
 import { useCurrentSchoolYear, useHolidays, useInvalidateQueries, countWeekdays, queryKeys } from '@/lib/queries'
 import { useQueryClient } from '@tanstack/react-query'
+import AttendanceTimeSettings from '@/components/settings/AttendanceTimeSettings'
 
-type SettingsTab = 'personal' | 'password' | 'school-year' | 'notifications' | 'system'
+type SettingsTab = 'personal' | 'password' | 'school-year' | 'notifications' | 'system' | 'attendance-time'
 
 const settingsTabs = [
   { id: 'personal' as SettingsTab, label: 'Thông tin cá nhân' },
@@ -21,6 +22,7 @@ const settingsTabs = [
   { id: 'school-year' as SettingsTab, label: 'Năm học' },
   { id: 'notifications' as SettingsTab, label: 'Thông báo' },
   { id: 'system' as SettingsTab, label: 'Hệ thống' },
+  { id: 'attendance-time' as SettingsTab, label: 'Giờ điểm danh' },
 ]
 
 interface FormData {
@@ -1721,6 +1723,8 @@ export default function SettingsPage() {
         return renderNotificationsContent()
       case 'system':
         return renderSystemContent()
+      case 'attendance-time':
+        return isAdmin ? <AttendanceTimeSettings /> : renderPersonalInfoContent()
       default:
         return renderPersonalInfoContent()
     }
@@ -1755,6 +1759,8 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+            {/* Tab "Giờ điểm danh" lưu ngay từng thao tác → ẩn nút Lưu/Hủy chung */}
+            {activeTab !== 'attendance-time' && (
             <div className="flex items-center gap-3">
               <button
                 onClick={handleCancel}
@@ -1777,6 +1783,7 @@ export default function SettingsPage() {
                 {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
               </button>
             </div>
+            )}
           </div>
 
           {/* Settings Card */}

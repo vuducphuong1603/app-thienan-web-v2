@@ -6,7 +6,8 @@ import { isSundayDate, countSundayReport, DayType, SundaySession, SUNDAY_SESSION
 import { sortByGivenName, compareByGivenName } from '@/lib/student-sort'
 import { recalcAttendanceCount } from '@/lib/attendance-count'
 import { supabase, ThieuNhiProfile, Class, BRANCHES, AttendanceRecord, Holiday } from '@/lib/supabase'
-import { useActiveClasses, useSchoolYears, fetchAllRows } from '@/lib/queries'
+import { useActiveClasses, useSchoolYears, fetchAllRows, setAttendanceLate } from '@/lib/queries'
+import { nextLateValue, punctualityOf, PUNCTUALITY_LABELS, type Punctuality } from '@/lib/attendance-punctuality'
 import { countReportCells, reportCellStatus, reportTotalAttendance, REPORT_CELL_SYMBOL, type ReportCellStatus } from '@/lib/report-cell'
 import { attendanceScores, effectiveSessionDays, fmtScore, round2, scoreSummary } from '@/lib/score-summary'
 import { useAuth } from '@/lib/auth-context'
@@ -105,11 +106,15 @@ interface StudentWithAttendance extends ThieuNhiProfile {
   attendance_time?: string
   attendance_by?: string
   attendance_record_id?: string
+  /** Chủ nhật – đi trễ buổi học giáo lý ('cn'): true = trễ, false = đúng giờ, null/undefined = chưa xét. Do DB trigger tính. */
+  attendance_is_late?: boolean | null
   /** Chủ nhật – buổi đi lễ (day_type 'cn_le'); attendance_* là buổi học giáo lý ('cn') */
   mass_status?: 'present' | 'absent' | null
   mass_time?: string
   mass_by?: string
   mass_record_id?: string
+  /** Chủ nhật – đi trễ buổi đi lễ ('cn_le'), cùng nghĩa với attendance_is_late */
+  mass_is_late?: boolean | null
   // Compensatory attendance fields
   has_thursday_attendance?: boolean
   has_compensatory_attendance?: boolean
@@ -477,6 +482,9 @@ export default function ActivitiesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('attendance')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState<string | null>(null) // studentId being saved
+  // Ô đi trễ (Chủ nhật) đang lưu: khoá `${session}:${studentId}` (xem lateCellKey / isLateSaving)
+  const [lateSavingKeys, setLateSavingKeys] = useState<ReadonlySet<string>>(new Set())
+  const lateSavingRef = useRef<Set<string>>(new Set())
   const { data: classes = [] } = useActiveClasses()
   const reportClasses = filterByBranch(classes, scope)
   const [students, setStudents] = useState<StudentWithAttendance[]>([])
@@ -896,10 +904,12 @@ export default function ActivitiesPage() {
             attendance_time: attendance?.check_in_time?.substring(0, 5) || undefined,
             attendance_by: attendance?.created_by ? attendanceUserNameMap.get(attendance.created_by) : undefined,
             attendance_record_id: attendance?.id || undefined,
+            attendance_is_late: attendance?.status === 'present' ? (attendance.is_late ?? null) : null,
             mass_status: mass?.status || null,
             mass_time: mass?.check_in_time?.substring(0, 5) || undefined,
             mass_by: mass?.created_by ? attendanceUserNameMap.get(mass.created_by) : undefined,
             mass_record_id: mass?.id || undefined,
+            mass_is_late: mass?.status === 'present' ? (mass.is_late ?? null) : null,
             has_compensatory_attendance: !!compensatory,
             compensatory_record_id: compensatory?.id,
             compensatory_time: compensatory?.check_in_time?.substring(0, 5),
@@ -1001,9 +1011,69 @@ export default function ActivitiesPage() {
     ? students.filter(s => sundayStatus(s.attendance_status, s.mass_status) === 'none').length
     : students.filter(s => s.attendance_status === null).length
 
+  // Chủ nhật: số em ĐÃ có mặt mà đi trễ, theo từng buổi (cho phần tóm tắt)
+  const lateCounts: Record<SundaySession, number> = {
+    cn: students.filter(s => s.attendance_status === 'present' && s.attendance_is_late === true).length,
+    cn_le: students.filter(s => s.mass_status === 'present' && s.mass_is_late === true).length,
+  }
+
   // Số buổi T5/CN trong thieu_nhi (CN = (giáo lý + đi lễ) / 2)
   const updateAttendanceCount = async (studentId: string) => {
     await recalcAttendanceCount(studentId, schoolYear)
+  }
+
+  /** Chủ nhật: tải lại is_late (+ id) của các bản ghi vừa lưu khi upsert không trả dòng về. Lỗi → [] (coi như chưa xét). */
+  const fetchSundayLate = async (studentIds: string[], dts: DayType[]) => {
+    try {
+      const { data } = await supabase
+        .from('attendance_records')
+        .select('id, student_id, day_type, is_late')
+        .in('student_id', studentIds)
+        .eq('attendance_date', selectedDate)
+        .in('day_type', dts)
+      return (data || []) as { id: string; student_id: string; day_type: string; is_late: boolean | null }[]
+    } catch {
+      return []
+    }
+  }
+
+  // ---- Đi trễ Chủ nhật (nút bấm do UI vẽ; DB mới là nguồn sự thật) ----
+  const lateCellKey = (studentId: string, session: SundaySession) => `${session}:${studentId}`
+  /** Ô (em, buổi) đang lưu is_late → UI nên disable pill. */
+  const isLateSaving = (studentId: string, session: SundaySession) => lateSavingKeys.has(lateCellKey(studentId, session))
+
+  const patchStudentLate = (studentId: string, session: SundaySession, value: boolean | null) => {
+    setStudents(prev => prev.map(s => s.id !== studentId ? s
+      : session === 'cn' ? { ...s, attendance_is_late: value } : { ...s, mass_is_late: value }))
+  }
+
+  /**
+   * Bấm pill: Trễ → Đúng giờ, còn lại → Trễ. Lạc quan: hiện ngay, lưu DB rồi hiện giá trị DB trả về;
+   * lỗi → hoàn lại giá trị cũ + thông báo lỗi. Chỉ áp dụng cho buổi ĐÃ có mặt.
+   */
+  const toggleLate = async (studentId: string, session: SundaySession) => {
+    const student = students.find(s => s.id === studentId)
+    if (!student) return
+    const recordId = session === 'cn' ? student.attendance_record_id : student.mass_record_id
+    const status = session === 'cn' ? student.attendance_status : student.mass_status
+    if (!recordId || status !== 'present') return
+    const key = lateCellKey(studentId, session)
+    if (lateSavingRef.current.has(key)) return
+
+    const previous = (session === 'cn' ? student.attendance_is_late : student.mass_is_late) ?? null
+    lateSavingRef.current.add(key)
+    setLateSavingKeys(new Set(lateSavingRef.current))
+    patchStudentLate(studentId, session, nextLateValue(previous))
+    try {
+      const stored = await setAttendanceLate(recordId, nextLateValue(previous))
+      patchStudentLate(studentId, session, stored)
+    } catch (error) {
+      patchStudentLate(studentId, session, previous)
+      showNotification('error', 'Không thể cập nhật trạng thái đi trễ: ' + (error instanceof Error ? error.message : 'lỗi không xác định'))
+    } finally {
+      lateSavingRef.current.delete(key)
+      setLateSavingKeys(new Set(lateSavingRef.current))
+    }
   }
 
   // Handle attendance marking - save to database
@@ -1096,6 +1166,17 @@ export default function ActivitiesPage() {
         return
       }
 
+      // Chủ nhật: đọc is_late DB đã tính (trigger). Không có dòng trả về (trigger chuẩn hoá ngày) → tải lại.
+      const lateReadBack = new Map<DayType, boolean | null>()
+      if (dayType === 'cn' && status === 'present') {
+        const missing = targetTypes.filter(dt => !upserted?.some(r => r.day_type === dt))
+        const refetched = missing.length > 0 ? await fetchSundayLate([studentId], missing) : []
+        for (const dt of targetTypes) {
+          const row = upserted?.find(r => r.day_type === dt) ?? refetched.find(r => r.day_type === dt)
+          lateReadBack.set(dt, row?.is_late ?? null)
+        }
+      }
+
       // Update local state (không tải lại trang để giữ vị trí cuộn)
       if (dayType === 'cn') {
         const byName = user?.full_name || 'Người dùng hiện tại'
@@ -1109,12 +1190,14 @@ export default function ActivitiesPage() {
             next.attendance_time = time
             next.attendance_by = byName
             next.attendance_record_id = idOf('cn') ?? s.attendance_record_id
+            next.attendance_is_late = lateReadBack.get('cn') ?? null
           }
           if (targetTypes.includes('cn_le')) {
             next.mass_status = status
             next.mass_time = time
             next.mass_by = byName
             next.mass_record_id = idOf('cn_le') ?? s.mass_record_id
+            next.mass_is_late = lateReadBack.get('cn_le') ?? null
           }
           return next
         }))
@@ -1194,7 +1277,7 @@ export default function ActivitiesPage() {
         .upsert(records, {
           onConflict: 'student_id,attendance_date,day_type',
         })
-        .select('id, student_id, day_type')
+        .select('id, student_id, day_type, is_late')
 
       if (error) {
         console.error('Error saving attendance:', error)
@@ -1204,6 +1287,23 @@ export default function ActivitiesPage() {
           showNotification('error', 'Không thể lưu điểm danh: ' + error.message)
         }
         return
+      }
+
+      // Chủ nhật: đọc is_late DB đã tính; dòng nào không trả về (trigger chuẩn hoá ngày) thì tải lại.
+      const lateByKey = new Map<string, boolean | null>()
+      if (dayType === 'cn') {
+        const missingTargets = targets.filter(({ student, dayTypes }) =>
+          dayTypes.some(dt => !upsertedAll?.some(r => r.student_id === student.id && r.day_type === dt)))
+        const refetched = missingTargets.length > 0
+          ? await fetchSundayLate(missingTargets.map(t => t.student.id), ['cn', 'cn_le'])
+          : []
+        for (const { student, dayTypes } of targets) {
+          for (const dt of dayTypes) {
+            const row = upsertedAll?.find(r => r.student_id === student.id && r.day_type === dt)
+              ?? refetched.find(r => r.student_id === student.id && r.day_type === dt)
+            lateByKey.set(`${dt}:${student.id}`, row?.is_late ?? null)
+          }
+        }
       }
 
       // Update local state (không tải lại trang để giữ vị trí cuộn)
@@ -1217,10 +1317,12 @@ export default function ActivitiesPage() {
           attendance_time: s.attendance_status === 'present' ? s.attendance_time : time,
           attendance_by: s.attendance_status === 'present' ? s.attendance_by : byName,
           attendance_record_id: idOf(s.id, 'cn') ?? s.attendance_record_id,
+          attendance_is_late: lateByKey.has(`cn:${s.id}`) ? lateByKey.get(`cn:${s.id}`) : s.attendance_is_late,
           mass_status: 'present' as const,
           mass_time: s.mass_status === 'present' ? s.mass_time : time,
           mass_by: s.mass_status === 'present' ? s.mass_by : byName,
           mass_record_id: idOf(s.id, 'cn_le') ?? s.mass_record_id,
+          mass_is_late: lateByKey.has(`cn_le:${s.id}`) ? lateByKey.get(`cn_le:${s.id}`) : s.mass_is_late,
         })))
       } else {
         setStudents(prev => prev.map(s => ({
@@ -1254,7 +1356,7 @@ export default function ActivitiesPage() {
       // Just clear local state if no record exists
       setStudents(prev => prev.map(s =>
         s.id === studentId
-          ? { ...s, attendance_status: null, attendance_time: undefined, attendance_by: undefined, attendance_record_id: undefined, mass_status: null, mass_time: undefined, mass_by: undefined, mass_record_id: undefined }
+          ? { ...s, attendance_status: null, attendance_time: undefined, attendance_by: undefined, attendance_record_id: undefined, attendance_is_late: null, mass_status: null, mass_time: undefined, mass_by: undefined, mass_record_id: undefined, mass_is_late: null }
           : s
       ))
       return
@@ -1283,17 +1385,17 @@ export default function ActivitiesPage() {
           if (s.id !== studentId) return s
           const next = { ...s }
           if (session !== 'cn_le') {
-            next.attendance_status = null; next.attendance_time = undefined; next.attendance_by = undefined; next.attendance_record_id = undefined
+            next.attendance_status = null; next.attendance_time = undefined; next.attendance_by = undefined; next.attendance_record_id = undefined; next.attendance_is_late = null
           }
           if (session !== 'cn') {
-            next.mass_status = null; next.mass_time = undefined; next.mass_by = undefined; next.mass_record_id = undefined
+            next.mass_status = null; next.mass_time = undefined; next.mass_by = undefined; next.mass_record_id = undefined; next.mass_is_late = null
           }
           return next
         }))
       } else {
         setStudents(prev => prev.map(s =>
           s.id === studentId
-            ? { ...s, attendance_status: null, attendance_time: undefined, attendance_by: undefined, attendance_record_id: undefined }
+            ? { ...s, attendance_status: null, attendance_time: undefined, attendance_by: undefined, attendance_record_id: undefined, attendance_is_late: null }
             : s
         ))
       }
@@ -1528,6 +1630,33 @@ export default function ActivitiesPage() {
       >
         {status === 'present' ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : status === 'absent' ? <X className="w-3.5 h-3.5" strokeWidth={3} /> : <Icon className="w-3.5 h-3.5" />}
         {SUNDAY_SESSION_SHORT_LABELS[session]}
+      </button>
+    )
+  }
+
+  const LATE_PILL_STYLES: Record<Punctuality, string> = {
+    late: 'bg-[rgba(220,38,38,0.12)] border-[#dc2626] text-[#dc2626]',
+    on_time: 'bg-[rgba(0,168,107,0.12)] border-[#00a86b] text-[#00a86b]',
+    unknown: 'bg-[#f0f0f0] border-[#d4d4d8] text-[#666d80]',
+  }
+
+  /** Chủ nhật: pill Trễ / Đúng giờ / Chưa xét cạnh giờ điểm danh — chỉ cho buổi ĐÃ có mặt; bấm để đổi tay. */
+  const renderLatePill = (student: StudentWithAttendance, session: SundaySession) => {
+    const status = session === 'cn' ? student.attendance_status : student.mass_status
+    if (status !== 'present') return null
+    const kind = punctualityOf(session === 'cn' ? student.attendance_is_late : student.mass_is_late)
+    const hasRecord = !!(session === 'cn' ? student.attendance_record_id : student.mass_record_id)
+    return (
+      <button
+        type="button"
+        data-testid={`late-pill-${session}-${student.id}`}
+        data-late-state={kind}
+        onClick={() => toggleLate(student.id, session)}
+        disabled={isLateSaving(student.id, session) || !hasRecord}
+        title={`${SUNDAY_SESSION_SHORT_LABELS[session]}: ${PUNCTUALITY_LABELS[kind]} — bấm để đổi`}
+        className={`ml-2 inline-flex items-center h-6 px-2.5 rounded-full border text-xs font-semibold whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${LATE_PILL_STYLES[kind]}`}
+      >
+        {isLateSaving(student.id, session) ? <Loader2 className="w-3 h-3 animate-spin" /> : PUNCTUALITY_LABELS[kind]}
       </button>
     )
   }
@@ -2702,6 +2831,11 @@ export default function ActivitiesPage() {
                         <div className="flex items-start justify-between">
                           <div className="flex flex-col gap-1">
                             <span className="text-sm text-white/80">{isCompensatoryMode ? 'Đã đi/bổ sung' : 'Có mặt'}</span>
+                            {isSunday && !isCompensatoryMode && (
+                              <span data-testid="late-summary" className="text-xs text-white/80">
+                                Trễ: Giáo lý {lateCounts.cn} · Đi lễ {lateCounts.cn_le}
+                              </span>
+                            )}
                           </div>
                           {/* Chart icon in circle */}
                           <div className="w-[48px] h-[48px] rounded-full bg-white/10 backdrop-blur-[4.24px] flex items-center justify-center border border-white/20">
@@ -3108,12 +3242,14 @@ export default function ActivitiesPage() {
                                         <span className="text-sm text-black dark:text-white leading-tight">
                                           Giáo lý: {student.attendance_status === 'present' ? `có mặt${student.attendance_time ? ` lúc ${student.attendance_time}` : ''}` : 'vắng'}
                                           {student.attendance_by ? <span className="text-[#666d80]"> · {student.attendance_by}</span> : null}
+                                          {renderLatePill(student, 'cn')}
                                         </span>
                                       )}
                                       {student.mass_status && (
                                         <span className="text-sm text-black dark:text-white leading-tight mt-0.5">
                                           Đi lễ: {student.mass_status === 'present' ? `có mặt${student.mass_time ? ` lúc ${student.mass_time}` : ''}` : 'vắng'}
                                           {student.mass_by ? <span className="text-[#666d80]"> · {student.mass_by}</span> : null}
+                                          {renderLatePill(student, 'cn_le')}
                                         </span>
                                       )}
                                     </div>
