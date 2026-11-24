@@ -39,6 +39,7 @@ import ReportExportTemplate, { getAttendanceReportTitle } from '@/components/Rep
 import PriestReportTemplate from '@/components/PriestReportTemplate'
 import type { PriestReportData } from '@/components/PriestReportTemplate'
 import { buildPriestReportWorkbook } from '@/lib/priest-report-excel'
+import PunctualityReportSection from '@/components/PunctualityReportSection'
 import html2canvas from 'html2canvas'
 
 const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -97,7 +98,7 @@ const getReportScoreSummary = (student: ReportStudentScore) => scoreSummary({
 type TimeFilterMode = 'week' | 'dateRange' | 'month'
 type ReportType = 'attendance' | 'score'
 type AttendanceTypeFilter = 'all' | 'thu5' | 'cn'
-type ReportStyleType = 'parent' | 'priest'
+type ReportStyleType = 'parent' | 'priest' | 'punctuality'
 type PriestTimeFilterMode = 'week' | 'month' | 'year' | 'custom'
 
 interface StudentWithAttendance extends ThieuNhiProfile {
@@ -3425,6 +3426,19 @@ export default function ActivitiesPage() {
                   </div>
                   <span className="text-sm font-medium text-black dark:text-white">Cho Cha</span>
                 </button>
+                <button
+                  type="button"
+                  data-testid="report-style-punctuality"
+                  onClick={() => setReportStyle('punctuality')}
+                  className="flex items-center gap-2"
+                >
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    reportStyle === 'punctuality' ? 'border-brand' : 'border-gray-300 dark:border-white/30'
+                  }`}>
+                    {reportStyle === 'punctuality' && <div className="w-2 h-2 rounded-full bg-brand" />}
+                  </div>
+                  <span className="text-sm font-medium text-black dark:text-white">Thống kê đúng giờ</span>
+                </button>
               </div>
             </div>
 
@@ -4384,6 +4398,19 @@ export default function ActivitiesPage() {
               </div>
             )}
             </>
+            ) : reportStyle === 'punctuality' ? (
+            <PunctualityReportSection
+              scope={scope}
+              reportBranches={reportBranches}
+              schoolYear={schoolYear}
+              schoolYears={schoolYears}
+              notify={showNotification}
+              onExported={message => {
+                setExportSuccessMessage(message)
+                setIsExportSuccessModalOpen(true)
+                setTimeout(() => setIsExportSuccessModalOpen(false), 2000)
+              }}
+            />
             ) : (
             /* Priest Report */
             <>
